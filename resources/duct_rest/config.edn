@@ -1,0 +1,15 @@
+{:duct.profile/base
+ {:duct.core/project-ns duct-rest
+
+  :duct.router/ataraxy
+  {:routes {}}}
+
+ :duct.profile/dev   #duct/include "dev"
+ :duct.profile/local #duct/include "local"
+ :duct.profile/prod  {}
+
+ :duct.module/logging {}
+ :duct.module.web/api
+ {}
+ :duct.module/sql
+ {}}
