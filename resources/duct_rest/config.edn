@@ -2,14 +2,19 @@
  {:duct.core/project-ns duct-rest
 
   :duct.router/ataraxy
-  {:routes {}}}
+  {:routes {[:get "/dynamic" {q :query-params}]
+            [:duct-rest.handler.sql/dynamic q]
+            [:get "/static" ] [:duct-rest.handler.sql/static]}}
+
+  :duct-rest.handler.sql/static
+  {:db #ig/ref :duct.database/sql}}
 
  :duct.profile/dev   #duct/include "dev"
  :duct.profile/local #duct/include "local"
  :duct.profile/prod  {}
 
  :duct.module/logging {}
- :duct.module.web/api
- {}
- :duct.module/sql
- {}}
+ :duct.module.web/api {}
+ :duct.module/sql {}
+ :duct-rest.module.sql/register {}
+}
