@@ -1,10 +1,9 @@
-{:duct.profile/base
+{
+ :duct.profile/base
  {:duct.core/project-ns duct-rest
 
   :duct.router/ataraxy
-  {:routes {[:get "/dynamic" {q :query-params}]
-            [:duct-rest.handler.sql/dynamic q]
-            [:get "/static" ] [:duct-rest.handler.sql/static]}}
+  {:routes {[:get "/static" ] [:duct-rest.handler.sql/static]}}
 
   :duct-rest.handler.sql/static
   {:db #ig/ref :duct.database/sql}}
@@ -16,5 +15,5 @@
  :duct.module/logging {}
  :duct.module.web/api {}
  :duct.module/sql {}
- :duct-rest.module.sql/register {}
-}
+ :duct-rest.module.sql/register {}}
+

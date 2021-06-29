@@ -1,84 +1,84 @@
 (ns duct-rest.module.sql
-  (:require [duct.core :as core]
+  (:require [clojure.string :as s]
+            [duct.core :as core]
             [duct-rest.boundary.db.core :as db]
             [integrant.core :as ig]
             [clojure.pprint :as pp]))
 
-;; DB operations
-
-;; Config functions
-
 (defn get-db-schema [db]
-  (println "get-db-schema" db)
   (let [tables (map :name (db/get-table-names db))]
     (map (fn [table-name]
-           (list (keyword table-name)
-            {:columns (db/get-columns db table-name)
-             :fks (db/get-fks db table-name)}))
+           {:name table-name
+            :columns (db/get-columns db table-name)
+            :fks (db/get-fks db table-name)})
          tables)))
 
-(defn resource-handler-key [project-ns resource action]
-  (let [ns (str project-ns ".handler." resource)]
+(defn resource-handler-key [project-ns action]
+  (let [ns (str project-ns ".handler.sql")]
     (keyword ns action)))
 
-(defn handler-map [project-ns db]
-  (let [handler {[:duct-rest.handler.sql/list
-                  :duct-rest.handler.sql/dynamic]
-                 {:db db}}] ; (ig/ref :duct.database/sql)}}]
-    (derive :auto-test.handler.example/example-test
-            :auto-test.handler.example/list)
-    (println handler)
-    handler))
+(defn resource-route-key [project-ns resource action]
+  (let [ns (str project-ns ".handler.sql." resource)]
+    (keyword ns action)))
 
-;(defn rest-config [project-ns db]
-;  (let [db-schema (get-db-schema db)]
-;    (
+(defn handler-map [handler-key route-key opts]
+    (derive route-key handler-key)
+    {[handler-key route-key] opts})
+
+(defn make-root-config [table ns db db-ref]
+  (let [rsc (:name table)]
+    (if-not (s/includes? rsc "_") ; exclude n-n tables
+      (map (fn [[action method]]
+             (let [route-key (resource-route-key ns rsc action)
+                   handler-key (resource-handler-key ns action)]
+               (list {[method (str "/" rsc)] ; todo: support qs
+                      [route-key]}
+                     (handler-map handler-key route-key
+                                  {:db db-ref :rsc rsc}))))
+           [["list" :get], ["create" :post]]))))
+
+(defn make-1-n-config [table ns db db-ref]
+  nil)
+
+(defn make-n-n-config [table ns db db-ref]
+  nil)
+
+(defn make-rest-config
+  "Makes handler config and routes from DB. Each config is a list with 
+  2 elements of a handler config map and a route map."
+  ([ns db db-ref]
+   (make-rest-config ns db db-ref (get-db-schema db)))
+  ([ns db db-ref db-schema]
+   (apply map list
+          (mapcat (fn [table]
+                    (concat (make-root-config table ns db db-ref)
+                            (make-1-n-config table ns db db-ref)
+                            (make-n-n-config table ns db db-ref)))
+                  db-schema))))
 
 (defn- get-project-ns [config options]
   (:project-ns options (:duct.core/project-ns config)))
 
 (defn- get-db
-  ([]
-   (get-db nil))
-  ([options]
-   (:db options (ig/ref :duct.database/sql))))
+  "Builds database config and returns database. Required as
+  ig/ref to :duct.database/sql is only built in :duct/profile
+  namespace."
+  [config conf-db-key db-key]
+   (ig/load-namespaces config)
+   (db-key (ig/init config [conf-db-key])))
 
-;; Key implementations
-
-(defmethod ig/init-key :db-rest.module/register
-  [_ {:keys [db project-ns]}]
-  #(let [rest-config (handler-map project-ns)]
-;         db-schema (get-db-schema db)]
-     (println "module db")
-     (println db)
-;     (println "sche")
-;     (println db-schema)
-     (core/merge-configs % rest-config)))
-
-;(defmethod ig/init-key :duct.module/db-rest [_ options]
-;  #(let [project-ns (get-project-ns % options)]
-;     core/merge-configs % options {:db-rest.handler/register
-;                                   {:db (ig/ref :duct.database/sql)
-;                                    :project-ns project-ns}}))
-
-;(defmethod ig/prep-key :auto-rest.handler/example [_ options]
-;  (println "fdsa" options)
-;  (if (:db options)
-;    options
-;    (assoc options :db (ig/ref :duct.database.sql))))
-
-;(defmethod ig/prep-key ::register [_ opts]
-;  (println "prepin")
-;  (println opts)
-;  (if (:db opts)
-;    opts
-;    (assoc opts :db (ig/ref :duct.database/sql))))
+(defn- merge-rest-config [config rest-config]
+  (let [route-config {:duct.router/ataraxy
+                      {:routes (apply merge (first rest-config))}}
+        handler-config (apply merge (second rest-config))]
+    (core/merge-configs config (merge route-config handler-config))))
 
 (defmethod ig/init-key ::register [_ options]
-  #(let [project-ns (get-project-ns % options)
-         db (get-db options)
-         rest-config (handler-map project-ns db)]
-     (println %)
-     (println "built" project-ns)
-     (println "db" db)
-     (core/merge-configs % rest-config)))
+  (fn [config]
+    (let [project-ns (get-project-ns config options)
+          config-db-key (:config-db-key options :duct.database/sql)
+          db-key (:db-key options :duct.database.sql/hikaricp)
+          db-ref (ig/ref config-db-key)
+          db (get-db config config-db-key db-key)
+          rest-config (make-rest-config project-ns db db-ref)]
+      (merge-rest-config config rest-config))))

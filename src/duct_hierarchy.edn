@@ -1,1 +1,2 @@
-{}
+{:duct.module/rest [:duct/handler]
+ :duct-rest.module/sql [:duct.database/sql]}

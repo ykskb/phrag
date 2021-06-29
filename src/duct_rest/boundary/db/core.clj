@@ -1,6 +1,8 @@
 (ns duct-rest.boundary.db.core
   (:require [clojure.java.jdbc :as jdbc]))
 
+;; todo: query handling to be improved with proper formatting
+
 (defn get-table-names [{db :spec}]
   (jdbc/query db (str "select name from sqlite_master "
                       "where type = 'table' "
@@ -13,7 +15,7 @@
 (defn get-fks [{db :spec} table]
   (jdbc/query db (str "pragma foreign_key_list(" table ");")))
 
-(defn get-products [{db :spec}]
-  (jdbc/query db "select * from product"))
+(defn list-resource [{db :spec} rsc]
+  (jdbc/query db (str "select * from " rsc ";")))
 
 
