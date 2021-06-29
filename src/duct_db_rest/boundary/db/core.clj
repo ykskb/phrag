@@ -1,4 +1,4 @@
-(ns duct-rest.boundary.db.core
+(ns duct-db-rest.boundary.db.core
   (:require [clojure.java.jdbc :as jdbc]))
 
 ;; todo: query handling to be improved with proper formatting

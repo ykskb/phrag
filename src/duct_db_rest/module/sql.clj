@@ -1,7 +1,7 @@
-(ns duct-rest.module.sql
+(ns duct-db-rest.module.sql
   (:require [clojure.string :as s]
             [duct.core :as core]
-            [duct-rest.boundary.db.core :as db]
+            [duct-db-rest.boundary.db.core :as db]
             [integrant.core :as ig]
             [clojure.pprint :as pp]))
 
