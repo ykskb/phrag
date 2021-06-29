@@ -1,8 +1,18 @@
-# duct-rest
+# duct-db-rest
 
-Auto-creation of REST APIs from DB at [Integrant](https://github.com/weavejester/integrant)'s config-build time in [Duct](https://github.com/duct-framework/duct) framework. This repository is for proof-of-concept using a generated project. Hopefully I can port it as library in the mean time.
+REST APIs generated from DB (before server starts)
 
-### Features
+This repository is proof-of-concept project to generate REST APIs from DB, levaraging the data-driven & super-modular [Integrant](https://github.com/weavejester/integrant) in [Duct](https://github.com/duct-framework/duct).
+
+It reads table schema from DB, creates routes & handlers based on a set of rules and registers them before starting the server (thus no runtime overhead.)
+
+### Supported Types
+
+* Root-level
+
+* `1-to-1` / `1-to-N` relation
+
+* `N-to-N` relation
 
 ### Setup
 
