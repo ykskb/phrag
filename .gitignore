@@ -13,3 +13,4 @@ pom.xml.asc
 /dev/resources/local.edn
 /dev/src/local.clj
 /db/dev.sqlite
+*.DS_Store
