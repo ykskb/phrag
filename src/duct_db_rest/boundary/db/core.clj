@@ -18,6 +18,9 @@
 (defn list-resource [{db :spec} rsc]
   (jdbc/query db (str "select * from " rsc ";")))
 
+(defn create [{db :spec} rsc raw-map]
+  (jdbc/insert! db rsc raw-map))
+
 (defn get-db-schema [db]
   (let [tables (map :name (get-table-names db))]
     (map (fn [table-name]

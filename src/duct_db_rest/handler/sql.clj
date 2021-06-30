@@ -11,8 +11,7 @@
 
 (defmethod ig/init-key ::create [_ {:keys [db rsc cols]}]
   (fn [{[_ body] :ataraxy/result}]
-    (println rsc)
-    (println body)
+    (println (db/create db rsc body))
     [::response/ok {:result "CREATED"}]))
 
 (defmethod ig/init-key ::static [_ {:keys [db]}]
