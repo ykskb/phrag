@@ -10,7 +10,8 @@
       [::response/ok res])))
 
 (defmethod ig/init-key ::create [_ {:keys [db rsc cols]}]
-  (fn [{[_ body] :ataraxy/ersult}]
+  (fn [{[_ body] :ataraxy/result}]
+    (println rsc)
     (println body)
     [::response/ok {:result "CREATED"}]))
 

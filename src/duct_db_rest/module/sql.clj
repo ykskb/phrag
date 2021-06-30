@@ -18,12 +18,14 @@
   {[handler-key route-key] opts})
 
 (defn resource-route-map [method route-key rsc param-map]
-  {[method (str "/" rsc) param-map]
-   [route-key (first (keys param-map))]})
-
+  (if (nil? param-map)
+    {[method (str "/" rsc)] [route-key]}
+    {[method (str "/" rsc) param-map]
+      [route-key (first (keys param-map))]}))
+  
 (def ^:private resource-settings
   [["list" :get {'query :query-params}]
-   ["create" :post {'body :body-params}]])
+   ["create" :post {'body :params}]])
 
 (defn make-root-config [table ns db db-ref]
   (let [rsc (:name table)]
