@@ -1,4 +1,4 @@
-(ns duct-rest.main
+(ns duct-db-rest.main
   (:gen-class)
   (:require [duct.core :as duct]))
 

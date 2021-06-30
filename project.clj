@@ -10,7 +10,7 @@
                  [duct/module.web "0.7.3"]
                  [org.xerial/sqlite-jdbc "3.34.0"]]
   :plugins [[duct/lein-duct "0.12.3"]]
-  :main ^:skip-aot duct-rest.main
+  :main ^:skip-aot duct-db-rest.main
   :resource-paths ["resources" "target/resources"]
   :prep-tasks     ["javac" "compile" ["run" ":duct/compiler"]]
   :middleware     [lein-duct.plugin/middleware]
