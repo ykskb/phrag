@@ -17,31 +17,50 @@
   (derive route-key handler-key)
   {[handler-key route-key] opts})
 
-(defn resource-route-map [path route-key param-name]
-  (if (nil? param-name)
-    {path [route-key]}
-    {path [route-key param-name]}))
+(defn resource-route-map [path route-key param-names]
+  (if (coll? param-names)
+    {path (into [] (concat [route-key] param-names))}
+    {path [route-key]}))
 
 (defn path-config [path route-key handler-key param-name opt]
-    (list (resource-route-map path route-key param-name)
-          (resource-handler-map handler-key route-key opt)))
+  (list (resource-route-map path route-key param-name)
+        (resource-handler-map handler-key route-key opt)))
 
 (defn root-config [tables ns db-ref]
   (mapcat
    (fn [table]
      (let [rsc (:name table)
            opt {:db db-ref :rsc rsc}]
-       (map (fn [[action path param-name]]
+       (map (fn [[action path param-names]]
               (let [route-key (resource-route-key ns rsc action)
                     handler-key (resource-handler-key ns action)] 
                 (path-config path route-key handler-key
-                             param-name opt)))
-            [["list" [:get (str "/" rsc) {'q :query-params}] 'q]
-             ["create" [:post (str "/" rsc) {'b :params}] 'b]])))
+                             param-names opt)))
+            [["list-root" [:get (str "/" rsc) {'q :query-params}] ['q]]
+             ["create-root" [:post (str "/" rsc) {'b :params}] ['b]]])))
    tables))
 
 (defn one-n-config [tables ns db-ref]
-  nil)
+  (mapcat
+   (fn [table]
+     (let [rsc (:name table)]
+       (mapcat
+        (fn [linked]
+          (map (fn [[action path param-name]]
+                 (let [rscs (str linked "." rsc)
+                       route-key (resource-route-key ns rscs action)
+                       handler-key (resource-handler-key ns action)
+                       opt {:db db-ref :rsc rsc :p-rsc linked}] 
+                   (path-config path route-key handler-key
+                                param-name opt)))
+               [["list-one-n"
+                 [:get (str "/" linked "/") 'id (str "/" rsc)
+                  {'q :query-params}] [^int 'id 'q]]
+                ["create-one-n"
+                 [:post (str "/" linked "/") 'id (str "/" rsc)
+                  {'b :params}] [^int 'id 'b]]]))
+        (:linked-resources table))))
+   tables))
 
 (defn n-n-config [tables ns db-ref]
   nil)
@@ -53,7 +72,7 @@
   (some (fn [column] (is-relation-column? (:name column)))
         (:columns table)))
 
-(defn relation-columns [table]
+(defn linked-resources [table]
   (reduce (fn [v column]
             (let [name (:name column)]
               (if (is-relation-column? name)
@@ -66,10 +85,10 @@
   table)
 
 (defn one-n-schema [table]
-  (assoc table :relation-columns (relation-columns table)))
+  (assoc table :linked-resources (linked-resources table)))
 
 (defn n-n-schema [table]
-  (assoc table :relation-columns (relation-columns table)))
+  (assoc table :linked-resources (linked-resources table)))
 
 (defn- table-type [table]
   (if (s/includes? (:name table) "_") :n-n
@@ -84,7 +103,7 @@
                             (= t :n-n) (n-n-schema table)))))
           {:root [] :one-n [] :n-n []}
           (db/get-db-schema db)))
-          
+
 (defn rest-config
   "Makes config maps of resource handlers and routes from DB.
   Each endpoint contains a handler config map and a route map."
