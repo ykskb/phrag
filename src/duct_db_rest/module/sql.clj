@@ -22,9 +22,10 @@
     {path (into [] (concat [route-key] param-names))}
     {path [route-key]}))
 
-(defn config-root-resource [table ns db-ref]
+(defn config-root-routes [table ns db-ref]
   (let [rsc (:name table)
-        opts {:db db-ref :rsc rsc}]
+        opts {:db db-ref :rsc rsc}
+        rsc-path (str "/" rsc)]
     (reduce (fn [m [action path param-names]]
               (let [route-key (resource-route-key ns rsc action)
                     handler-key (resource-handler-key ns action)] 
@@ -34,48 +35,97 @@
                     (update :handlers conj (resource-handler-map
                                             handler-key route-key opts)))))
             {:routes [] :handlers []}
-            [["list-root" [:get (str "/" rsc) {'q :query-params}] ['q]]
-             ["create-root" [:post (str "/" rsc) {'b :params}] ['b]]])))
+            [["list-root" [:get rsc-path {'q :query-params}] ['q]]
+             ["create-root" [:post rsc-path {'b :params}] ['b]]])))
 
-(defn config-one-n-resource [ns p-rsc rsc db-ref]
-  (reduce (fn [m [action path param-names]]
-            (let [rscs (str p-rsc "." rsc)
-                  route-key (resource-route-key ns rscs action)
-                  handler-key (resource-handler-key ns action)
-                  opts {:db db-ref :rsc rsc :p-rsc p-rsc}] 
-              (-> m
-                  (update :routes conj (resource-route-map
-                                        path route-key param-names))
-                  (update :handlers conj (resource-handler-map
-                                          handler-key route-key opts)))))
-          {:routes [] :handlers []}
-          [["list-one-n"
-            [:get (str "/" p-rsc "/") 'id (str "/" rsc) {'q :query-params}]
-            [^int 'id 'q]]
-           ["create-one-n"
-            [:post (str "/" p-rsc "/") 'id (str "/" rsc) {'b :params}]
-            [^int 'id 'b]]]))
+(defn config-one-n-routes [ns p-rsc rsc db-ref]
+  (let [p-rsc-path (str "/" p-rsc "/")
+        rsc-path (str "/" rsc)]
+    (reduce (fn [m [action path param-names]]
+              (let [rscs (str p-rsc "." rsc)
+                    route-key (resource-route-key ns rscs action)
+                    handler-key (resource-handler-key ns action)
+                    opts {:db db-ref :rsc rsc :p-rsc p-rsc}] 
+                (-> m
+                    (update :routes conj (resource-route-map
+                                          path route-key param-names))
+                    (update :handlers conj (resource-handler-map
+                                            handler-key route-key opts)))))
+            {:routes [] :handlers []}
+            [["list-one-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
+              [^int 'id 'q]]
+             ["create-one-n" [:post p-rsc-path 'id rsc-path {'b :params}]
+              [^int 'id 'b]]])))
 
-(defn config-one-n-resources [table ns db-ref]
+(defn config-n-n-create-routes [table ns db-ref]
+  (let [parts (s/split (:name table) #"_")
+        rsc-a (first parts)
+        rsc-b (second parts)]
+    (reduce (fn [m [action rscs path param-names]]
+              (let [route-key (resource-route-key ns rscs action)
+                    handler-key (resource-handler-key ns action)
+                    opts {:db db-ref :rsc-a rsc-a :rsc-b rsc-b}]
+                (-> m
+                    (update :routes conj (resource-route-map
+                                          path route-key param-names))
+                    (update :handlers conj (resource-handler-map
+                                            handler-key route-key opts)))))
+            {:routes [] :handlers []}
+            [["create-n-n" (str rsc-a "." rsc-b)
+               [:post (str "/" rsc-a "/") 'id-a (str "/" rsc-b "/")
+               'id-b "/add" {'b :params}] [^int 'id-a ^int 'id-b 'b]]
+              ["create-n-n" (str rsc-b "." rsc-a)
+               [:post (str "/" rsc-b "/") 'id-a (str "/" rsc-a "/")
+               'id-b "/add" {'b :params}] [^int 'id-a ^int 'id-b 'b]]])))
+
+(defn config-n-n-get-routes [ns p-rsc rsc db-ref]
+ (let [p-rsc-path (str "/" p-rsc "/")
+        rsc-path (str "/" rsc)]
+    (reduce (fn [m [action path param-names]]
+              (let [rscs (str p-rsc "." rsc)
+                    route-key (resource-route-key ns rscs action)
+                    handler-key (resource-handler-key ns action)
+                    opts {:db db-ref :rsc rsc :p-rsc p-rsc}] 
+                (-> m
+                    (update :routes conj (resource-route-map
+                                          path route-key param-names))
+                    (update :handlers conj (resource-handler-map
+                                            handler-key route-key opts)))))
+            {:routes [] :handlers []}
+            [["list-one-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
+              [^int 'id 'q]]])))
+
+(defn config-one-n [table ns db-ref]
   (let [rsc (:name table)]
-    (reduce
-     (fn [m p-rsc]
-       (let [p-rsc-config (config-one-n-resource ns p-rsc rsc db-ref)]
-         (-> m
-             (update :routes concat (:routes p-rsc-config))
-             (update :handlers concat (:handlers p-rsc-config)))))
-     {:routes [] :handlers []}
-     (:belongs-to table))))
+    (reduce (fn [m p-rsc]
+              (let [p-rsc-config (config-one-n-routes ns p-rsc rsc db-ref)]
+                (-> m
+                    (update :routes concat (:routes p-rsc-config))
+                    (update :handlers concat (:handlers p-rsc-config)))))
+            {:routes [] :handlers []}
+            (:belongs-to table))))
 
-(defn config-n-n-resource [tables ns db-ref]
-  nil)
+(defn config-n-n [table ns db-ref]
+  (merge-with
+   into
+   (config-n-n-create-routes table ns db-ref)
+   (let [parts (s/split (:name table) #"_")
+         rsc-a (first parts)
+         rsc-b (second parts)]
+     (reduce (fn [m [p-rsc rsc]]
+               (let [config (config-n-n-get-routes ns p-rsc rsc db-ref)]
+                 (-> m
+                     (update :routes concat (:routes config))
+                     (update :handlers concat (:handlers config)))))
+             {:routes [] :handlers []}
+             [[rsc-a rsc-b] [rsc-b rsc-a]]))))
 
 (defn config-resource [table ns db-ref]
   (reduce (fn [m relation-type]
             (let [conf (case relation-type
-                         :root (config-root-resource table ns db-ref)
-                         :one-n (config-one-n-resources table ns db-ref)
-                         :n-n (config-n-n-resource table ns db-ref))]
+                         :root (config-root-routes table ns db-ref)
+                         :one-n (config-one-n table ns db-ref)
+                         :n-n (config-n-n table ns db-ref))]
               (-> m
                   (update :routes concat (:routes conf))
                   (update :handlers concat (:handlers conf)))))
@@ -99,10 +149,9 @@
           (:columns table)))
 
 (defn- relation-types [table]
-  (filter some? (-> [:root]
-                    (conj (if (s/includes? (:name table) "_") :n-n))
-                    (conj (if (has-relation-column? table) :one-n)))))
-
+  (if (s/includes? (:name table) "_") [:n-n]
+      (if (has-relation-column? table) [:one-n :root] [:root])))
+          
 (defn default-schema-map [db]
   (map (fn [table]
          (-> table
@@ -127,9 +176,8 @@
   (:project-ns options (:duct.core/project-ns config)))
 
 (defn- get-db
-  "Builds database config and returns database map by keys.
-  Required as ig/ref to :duct.database/sql is only built in
-  :duct/profile namespace."
+  "Builds database config and returns database map by keys. Required as
+  ig/ref to :duct.database/sql is only built in :duct/profile namespace."
   [config opts db-config-key db-key]
   (ig/load-namespaces config)
   (db-key (ig/init config [db-config-key])))
@@ -150,5 +198,5 @@
           db-ref (ig/ref db-config-key)
           db (get-db config options db-config-key db-key)
           rest-config (config-resources project-ns options db-ref db)]
-                                        ;(pp/pprint r-config)
+                                        (pp/pprint rest-config)
       (merge-rest-config config rest-config))))
