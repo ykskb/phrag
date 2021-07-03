@@ -1,16 +1,8 @@
 {:duct.profile/base
  {:duct.core/project-ns duct-db-rest
 
-  [:duct-db-rest.handler.sql/create
-    :duct-db-rest.handler.sql.yo/create]
-  {:db #ig/ref :duct.database/sql
-   :rsc "groups"}
-
-
   :duct.router/ataraxy
-  {:routes {[:post "/yo" {b :params}]
-            [:duct-db-rest.handler.sql.yo/create b]
-            [:get "/static"]
+  {:routes {[:get "/static"]
             [:duct-db-rest.handler.sql/static]}}
 
   :duct-db-rest.handler.sql/static

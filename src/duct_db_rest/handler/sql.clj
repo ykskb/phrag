@@ -13,8 +13,8 @@
       [::response/ok res])))
 
 (defmethod ig/init-key ::create-root [_ {:keys [db rsc cols]}]
-  (fn [{[_ body] :ataraxy/result}]
-    (println (db/create db rsc body))
+  (fn [{[_ params] :ataraxy/result}]
+    (println (db/create db rsc params))
     [::response/ok {:result "CREATED"}]))
 
 (defmethod ig/init-key ::list-one-n [_ {:keys [db rsc cols p-rsc]}]
@@ -24,16 +24,16 @@
       [::response/ok res])))
 
 (defmethod ig/init-key ::create-one-n [_ {:keys [db rsc cols p-rsc]}]
-  (fn [{[_ p-id {:as body}] :ataraxy/result}]
-    (println body)
-    (let [params (assoc body (rsc->id-key p-rsc) p-id)
+  (fn [{[_ p-id {:as params}] :ataraxy/result}]
+    (println params)
+    (let [params (assoc params (rsc->id-key p-rsc) p-id)
           res (db/create db rsc params)]
       [::response/ok res])))
 
 (defmethod ig/init-key ::create-n-n [_ {:keys [db rsc cols rsc-a rsc-b]}]
-  (fn [{[_ id-a id-b {:as body}] :ataraxy/result}]
-    (println body)
-    (let [params (-> body
+  (fn [{[_ id-a id-b {:as params}] :ataraxy/result}]
+    (println params)
+    (let [params (-> params
                      (assoc (rsc->id-key rsc-a) id-a)
                      (assoc (rsc->id-key rsc-b) id-b))
           rsc (str rsc-a "_" rsc-b)]
