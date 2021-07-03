@@ -21,13 +21,22 @@
     {path (into [] (concat [route-key] param-names))}
     {path [route-key]}))
 
+(defn- to-path-rsc [rsc config]
+  (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
+
+(defn- to-table-name [rsc config]
+  (if (:table-name-plural config) (inf/plural rsc) (inf/singular rsc)))
+
+(defn- to-col-name [rsc]
+  (str (inf/singular rsc) "_id"))
+
 (defn root-routes [table config]
   (let [ns (:project-ns config)
-        rsc (:name table)
-        opts {:db (:db-ref config) :rsc rsc}
-        rsc-path (str "/" rsc)]
+        table-name (:name table)
+        opts {:db (:db-ref config) :table table-name}
+        rsc-path (str "/" (to-path-rsc table-name config))]
     (reduce (fn [m [action path param-names]]
-              (let [route-key (route-key ns rsc action)
+              (let [route-key (route-key ns table-name action)
                     handler-key (handler-key ns action)] 
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
@@ -37,15 +46,15 @@
             [["list-root" [:get rsc-path {'q :query-params}] ['q]]
              ["create-root" [:post rsc-path {'b :params}] ['b]]])))
 
-(defn one-n-rel-routes [p-rsc rsc config]
+(defn one-n-rel-routes [p-rsc table-name config]
   (let [ns (:project-ns config)
-        p-rsc-path (str "/" p-rsc "/")
-        rsc-path (str "/" rsc)]
+        p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
+        rsc-path (str "/" (to-path-rsc table-name config))
+        opts {:db (:db-ref config) :table table-name :p-col (to-col-name p-rsc)}
+        rscs (str p-rsc "." table-name)]
     (reduce (fn [m [action path param-names]]
-              (let [rscs (str p-rsc "." rsc)
-                    route-key (route-key ns rscs action)
-                    handler-key (handler-key ns action)
-                    opts {:db (:db-ref config) :rsc rsc :p-rsc p-rsc}] 
+              (let [route-key (route-key ns rscs action)
+                    handler-key (handler-key ns action)] 
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
                     (update :handlers conj (handler-map
@@ -58,34 +67,39 @@
 
 (defn n-n-create-routes [table config]
   (let [ns (:project-ns config)
-        parts (s/split (:name table) #"_")
+        table-name (:name table)
+        parts (s/split table-name #"_")
         rsc-a (first parts)
-        rsc-b (second parts)]
+        rsc-b (second parts)
+        rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
+        rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")
+        opts {:db (:db-ref config) :table table-name
+              :col-a (to-col-name rsc-a) :col-b (to-col-name rsc-b)}]
     (reduce (fn [m [action rscs path param-names]]
               (let [route-key (route-key ns rscs action)
-                    handler-key (handler-key ns action)
-                    opts {:db (:db-ref config) :rsc-a rsc-a :rsc-b rsc-b}]
+                    handler-key (handler-key ns action)]
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
-                    (update :handlers conj (handler-map
-                                            handler-key route-key opts)))))
+                    (update :handlers conj (handler-map handler-key
+                                                        route-key opts)))))
             {:routes [] :handlers []}
             [["create-n-n" (str rsc-a "." rsc-b)
-              [:post (str "/" rsc-a "/") 'id-a (str "/" rsc-b "/")
-               'id-b "/add" {'b :params}] [^int 'id-a ^int 'id-b 'b]]
+              [:post rsc-a-path 'id-a rsc-b-path 'id-b "/add" {'b :params}]
+              [^int 'id-a ^int 'id-b 'b]]
              ["create-n-n" (str rsc-b "." rsc-a)
-              [:post (str "/" rsc-b "/") 'id-a (str "/" rsc-a "/")
-               'id-b "/add" {'b :params}] [^int 'id-a ^int 'id-b 'b]]])))
+              [:post rsc-b-path 'id-a rsc-a-path 'id-b "/add" {'b :params}]
+              [^int 'id-a ^int 'id-b 'b]]])))
 
-(defn n-n-list-routes [p-rsc rsc config]
+(defn n-n-list-routes [table-name p-rsc rsc config]
   (let [ns (:project-ns config)
-        p-rsc-path (str "/" p-rsc "/")
-        rsc-path (str "/" rsc)]
+        p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
+        rsc-path (str "/" (to-path-rsc rsc config))
+        opts {:db (:db-ref config) :p-col (to-col-name p-rsc)
+              :table table-name}]
     (reduce (fn [m [action path param-names]]
               (let [rscs (str p-rsc "." rsc)
                     route-key (route-key ns rscs action)
-                    handler-key (handler-key ns action)
-                    opts {:db (:db-ref config) :rsc rsc :p-rsc p-rsc}] 
+                    handler-key (handler-key ns action)] 
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
                     (update :handlers conj (handler-map
@@ -105,18 +119,20 @@
             (:belongs-to table))))
 
 (defn n-n-routes [table config]
-  (merge-with into
-              (n-n-create-routes table config)
-              (let [parts (s/split (:name table) #"_")
-                    rsc-a (first parts)
-                    rsc-b (second parts)]
-                (reduce (fn [m [p-rsc rsc]]
-                          (let [routes (n-n-list-routes p-rsc rsc config)]
-                            (-> m
-                                (update :routes concat (:routes routes))
-                                (update :handlers concat (:handlers routes)))))
-                        {:routes [] :handlers []}
-                        [[rsc-a rsc-b] [rsc-b rsc-a]]))))
+  (merge-with
+   into
+   (n-n-create-routes table config)
+   (let [table-name (:name table)
+         parts (s/split table-name #"_")
+         rsc-a (first parts)
+         rsc-b (second parts)]
+     (reduce (fn [m [p-rsc rsc]]
+               (let [routes (n-n-list-routes table-name p-rsc rsc config)]
+                 (-> m
+                     (update :routes concat (:routes routes))
+                     (update :handlers concat (:handlers routes)))))
+             {:routes [] :handlers []}
+             [[rsc-a rsc-b] [rsc-b rsc-a]]))))
 
 (defn table-routes [table config]
   (reduce (fn [m relation-type]
@@ -197,8 +213,9 @@
         (assoc :db-key db-key)
         (assoc :db-ref db-ref)
         (assoc :db db)
-        (assoc :plural-mode (:plural-mode options true))
-        (assoc :tables (:tables options (default-schema-map db))))))
+        (assoc :tables (:tables options (default-schema-map db)))
+        (assoc :table-name-plural (:table-name-plural options true))
+        (assoc :resource-path-plural (:resource-path-plural options true)))))
 
 (defmethod ig/init-key ::register [_ options]
   (fn [config]
