@@ -69,8 +69,8 @@
   (let [ns (:project-ns config)
         table-name (:name table)
         parts (s/split table-name #"_")
-        rsc-a (first parts)
-        rsc-b (second parts)
+        rsc-a (first (:belongs-to table))
+        rsc-b (second (:belongs-to table))
         rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
         rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")
         opts {:db (:db-ref config) :table table-name
@@ -108,24 +108,24 @@
             [["list-one-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
               [^int 'id 'q]]])))
 
-(defn one-n-routes [table config]
-  (let [rsc (:name table)]
+(defn one-n-routes
+  [table config]
+  (let [table-name (:name table)]
     (reduce (fn [m p-rsc]
-              (let [routes (one-n-rel-routes p-rsc rsc config)]
+              (let [routes (one-n-rel-routes p-rsc table-name config)]
                 (-> m
                     (update :routes concat (:routes routes))
                     (update :handlers concat (:handlers routes)))))
             {:routes [] :handlers []}
-            (:belongs-to table))))
+            (:belongs-to table-name))))
 
 (defn n-n-routes [table config]
   (merge-with
    into
    (n-n-create-routes table config)
    (let [table-name (:name table)
-         parts (s/split table-name #"_")
-         rsc-a (first parts)
-         rsc-b (second parts)]
+         rsc-a (first (:belongs-to table))
+         rsc-b (second (:belongs-to table))]
      (reduce (fn [m [p-rsc rsc]]
                (let [routes (n-n-list-routes table-name p-rsc rsc config)]
                  (-> m
@@ -164,7 +164,12 @@
   (some (fn [column] (is-relation-column? (:name column)))
         (:columns table)))
 
-(defn belongs-to [table]
+(defn n-n-belongs-to [table]
+  (let [table-name (:name table)
+        parts (s/split table-name #"_")]
+    [(first parts) (second parts)]))
+
+(defn links-to [table]
   (reduce (fn [v column]
             (let [name (:name column)]
               (if (is-relation-column? name)
@@ -173,15 +178,20 @@
           []
           (:columns table)))
 
+(defn- is-n-n-table? [table]
+  (s/includes? (:name table) "_"))
+
 (defn- relation-types [table]
-  (if (s/includes? (:name table) "_") [:n-n]
+  (if (is-n-n-table? table) [:n-n]
       (if (has-relation-column? table) [:one-n :root] [:root])))
 
 (defn default-schema-map [db]
   (map (fn [table]
-         (-> table
-             (assoc :relation-types (relation-types table))
-             (assoc :belongs-to (belongs-to table))))
+         (let [is-n-n (is-n-n-table? table)]
+           (cond-> table
+             true (assoc :relation-types (relation-types table))
+             (not is-n-n) (assoc :belongs-to (links-to table))
+             is-n-n (assoc :belongs-to (n-n-belongs-to table)))))
        (db/get-db-schema db)))
 
 (defn- get-project-ns [config options]
