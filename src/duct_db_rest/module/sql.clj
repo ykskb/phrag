@@ -117,7 +117,7 @@
                     (update :routes concat (:routes routes))
                     (update :handlers concat (:handlers routes)))))
             {:routes [] :handlers []}
-            (:belongs-to table-name))))
+            (:belongs-to table))))
 
 (defn n-n-routes [table config]
   (merge-with
