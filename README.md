@@ -2,13 +2,13 @@
 
 REST APIs generated from DB Schema
 
-This library reads DB schema from a running DB (or config) → creates routes & handlers → registers them at app initialization time of [Integrant](https://github.com/weavejester/integrant) (thus without run-time overhead).
+This library reads DB schema (from a running DB or config) → creates routes & handlers → registers them at an app initialization time of [Integrant](https://github.com/weavejester/integrant)... thus without any run-time overhead!
 
 ### Schema to REST Endpoints
 
 ![Image of Yaktocat](./docs/images/db-rest-apis.png)
 
-Currently supported logic is as the diagram above: tables are classified to be either `Root` or `N-to-N` and `1-to-N` relationships between tables are identified (yellow tags). Using those attributes identified, corresponding routes are created with handlers (green boxes).
+As shown in the diagram above, tables are classified to be either `Root` type or `N-to-N` type and `1-to-N` relationships between tables are identified (yellow tags). Using those attributes identified, corresponding routes are created with handlers (green boxes).
 
 ### Logic for Identifying Table & Relations
 
@@ -16,32 +16,33 @@ Table types and relations are identified with the logic described as below, howe
 
 ###### Table Types
 
-In config: `:relation-types` list in a table map
-
 * `Root` (`:root`) or `N-to-N` (`:n-n`)
-	If a table name has `_` (underscore) character, it is classified as `N-to-N` otherwise `Root`. In other words, all the root entities should be named without using `_`.
+	If a table name has `_` (underscore) character, it is classified as `N-to-N` otherwise `Root`.
+	*In other words, all the root entities should be named without using `_` without specifying table types in the config.
 
 * `1-to-N` (`:one-n`)
 	If a table is not `N-to-N` and contains a column ending with `_id`, it is classified as `1-to-N`.
 
+(In config: `:relation-types` list in a table map)
+
 ###### Linked Table Name
 
-In config: `:belongs-to` list in a table map
-
 * `1-to-N` 
-	String before `_id` of relations a column name is used. Table name being plural or singular is handled with `:table-name-plural` config value.
+	String before `_id` of a relation column name is used. Table name being plural or singular is handled with `:table-name-plural` config value.
 * `N-to-N`
 	Strings separated by `_` from a table name are used. Table name being plural or singular is handled with `:table-name-plural` config value.
 
+(In config: `:belongs-to` list in a table map)
+
 ### Schema-to-REST Config
 
-Example with default values (except `:tables`)
-```
-{:db-config-key :duct.database/sql
- :db-key :duct.database.sql/hikaricp
- :table-name-plural true
- :resource-path-plural true
+```edn
+{:db-config-key :duct.database/sql  ; default
+ :db-key :duct.database.sql/hikaricp  ; default
+ :table-name-plural true  ; default
+ :resource-path-plural true  ; default
  :tables [
+   ; example
    {:relation-types [:root :one-n]
     :name "users"
     :columns [{
