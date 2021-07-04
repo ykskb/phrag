@@ -17,19 +17,24 @@ Table types and relations are identified with the logic described as below, howe
 ###### Table Types
 
 * `Root` (`:root`) or `N-to-N` (`:n-n`)
+
 	If a table name has `_` (underscore) character, it is classified as `N-to-N` otherwise `Root`.
 	*In other words, all the root entities should be named without using `_` without specifying table types in the config.
 
 * `1-to-N` (`:one-n`)
+
 	If a table is not `N-to-N` and contains a column ending with `_id`, it is classified as `1-to-N`.
 
 (In config: `:relation-types` list in a table map)
 
 ###### Linked Table Name
 
-* `1-to-N` 
+* `1-to-N`
+
 	String before `_id` of a relation column name is used. Table name being plural or singular is handled with `:table-name-plural` config value.
+
 * `N-to-N`
+
 	Strings separated by `_` from a table name are used. Table name being plural or singular is handled with `:table-name-plural` config value.
 
 (In config: `:belongs-to` list in a table map)
