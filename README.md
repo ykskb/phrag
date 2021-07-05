@@ -8,7 +8,7 @@ This library reads DB schema (from a running DB or config) → creates routes & 
 
 Example case of a meetup service (simplified):
 
-![Image of Schema to APIs](./docs/images/db-rest-apis-vertical.png)
+![Image of Schema to APIs](./docs/images/db-rest-apis-highlighted.png)
 
 As shown in the diagram above, tables are classified to be either `Root` type or `N-to-N` type and `1-to-N` relationships between tables are identified (yellow tags). Using those attributes identified, corresponding routes are created with handlers (green boxes).
 
