@@ -81,8 +81,8 @@ Table types and relations are identified with the logic described as below, howe
 
 | Routes                                              | HTTP methods |
 |-----------------------------------------------------|--------------|
-| `/resource-a/{id}/resource-b/`                      | `GET`        |
-| `/resource-b/{id}/resource-a/`                      | `GET`        |
+| `/resource-a/{id-of-a}/resource-b/`                 | `GET`        |
+| `/resource-b/{id-of-b}/resource-a/`                 | `GET`        |
 | `/resource-a/{id-of-a}/resource-b/{if-of-b}/add`    | `POST`       |
 | `/resource-b/{id-of-b}/resource-a/{if-of-a}/add`    | `POST`       |
 | `/resource-a/{id-of-a}/resource-b/{if-of-b}/delete` | `POST`       |
