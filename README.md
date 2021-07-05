@@ -6,7 +6,7 @@ This library reads DB schema (from a running DB or config) → creates routes & 
 
 ### Schema to REST Endpoints
 
-![Image of Yaktocat](./docs/images/db-rest-apis.png)
+![Image of Schema to APIs](./docs/images/db-rest-apis.png)
 
 As shown in the diagram above, tables are classified to be either `Root` type or `N-to-N` type and `1-to-N` relationships between tables are identified (yellow tags). Using those attributes identified, corresponding routes are created with handlers (green boxes).
 
@@ -19,6 +19,7 @@ Table types and relations are identified with the logic described as below, howe
 * `Root` (`:root`) or `N-to-N` (`:n-n`)
 
 	If a table name has `_` (underscore) character, it is classified as `N-to-N` otherwise `Root`.
+	
 	*In other words, all the root entities should be named without using `_` without specifying table types in the config.
 
 * `1-to-N` (`:one-n`)
