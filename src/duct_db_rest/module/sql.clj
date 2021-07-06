@@ -36,7 +36,8 @@
   (let [ns (:project-ns config)
         table-name (:name table)
         opts {:db (:db-ref config) :table table-name}
-        rsc-path (str "/" (to-path-rsc table-name config))]
+        rsc-path (str "/" (to-path-rsc table-name config) "/")
+        rsc-path-end (str "/" (to-path-rsc table-name config))]
     (reduce (fn [m [action path param-names]]
               (let [route-key (route-key ns table-name action)
                     handler-key (handler-key ns action)] 
@@ -45,8 +46,12 @@
                     (update :handlers conj (handler-map
                                             handler-key route-key opts)))))
             {:routes [] :handlers []}
-            [["list-root" [:get rsc-path {'q :query-params}] ['q]]
-             ["create-root" [:post rsc-path {'b :params}] ['b]]])))
+            [["list-root" [:get rsc-path-end {'q :query-params}] ['q]]
+             ["create-root" [:post rsc-path-end {'b :params}] ['b]]
+             ["fetch-root" [:get rsc-path 'id] [^int 'id]]
+             ["delete-root" [:delete rsc-path 'id] [^int 'id]]
+             ["put-root" [:put rsc-path 'id {'b :params}] [^int 'id 'b]]
+             ["patch-root" [:patch rsc-path 'id {'b :params}] [^int 'id 'b]]])))
 
 (defmulti one-n-link-routes (fn [config & _] (:router config)))
 
@@ -214,11 +219,11 @@
 
 (defmulti merge-rest-routes (fn [config & _] (:router config)))
 
-(defmethod :ataraxy merge-rest-routes [config rest-config]
-  (let [routes (apply merge (:routes rest-config))
-        route-config {:duct.router/ataraxy {:routes routes}}
-        handler-config (apply merge (:handlers rest-config))]
-    (-> config
+(defmethod merge-rest-routes :ataraxy [config duct-config routes]
+  (let [flat-routes (apply merge (:routes routes))
+        route-config {:duct.router/ataraxy {:routes flat-routes}}
+        handler-config (apply merge (:handlers routes))]
+    (-> duct-config
         (core/merge-configs route-config)
         (core/merge-configs handler-config))))
 
@@ -244,4 +249,4 @@
           routes (rest-routes rest-config)]
       (pp/pprint rest-config)
       (pp/pprint routes)
-      (merge-rest-routes config routes))))
+      (merge-rest-routes rest-config config routes))))

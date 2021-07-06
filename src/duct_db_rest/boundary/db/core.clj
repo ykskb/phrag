@@ -15,11 +15,20 @@
 (defn get-fks [{db :spec} table]
   (jdbc/query db (str "pragma foreign_key_list(" table ");")))
 
-(defn list-resource [{db :spec} rsc]
+(defn list[{db :spec} rsc]
   (jdbc/query db (str "select * from " rsc ";")))
 
-(defn create [{db :spec} rsc raw-map]
+(defn fetch [{db :spec} rsc id]
+  (jdbc/query db [(str "select * from " rsc " where id = ?") id]))
+
+(defn delete! [{db :spec} rsc id]
+  (jdbc/delete! db rsc ["id = ?" id]))
+
+(defn create! [{db :spec} rsc raw-map]
   (jdbc/insert! db rsc raw-map))
+
+(defn update! [{db :spec} rsc id raw-map]
+  (jdbc/update! db rsc raw-map ["id = ?" id]))
 
 (defn get-db-schema [db]
   (let [tables (map :name (get-table-names db))]
