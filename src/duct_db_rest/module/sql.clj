@@ -30,7 +30,9 @@
 (defn- to-col-name [rsc]
   (str (inf/singular rsc) "_id"))
 
-(defn root-routes [table config]
+(defmulti root-routes (fn [config & _] (:router config)))
+
+(defmethod root-routes :ataraxy [config table]
   (let [ns (:project-ns config)
         table-name (:name table)
         opts {:db (:db-ref config) :table table-name}
@@ -46,7 +48,9 @@
             [["list-root" [:get rsc-path {'q :query-params}] ['q]]
              ["create-root" [:post rsc-path {'b :params}] ['b]]])))
 
-(defn one-n-rel-routes [p-rsc table-name config]
+(defmulti one-n-link-routes (fn [config & _] (:router config)))
+
+(defmethod one-n-link-routes :ataraxy [config table-name p-rsc]
   (let [ns (:project-ns config)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
         rsc-path (str "/" (to-path-rsc table-name config))
@@ -65,7 +69,9 @@
              ["create-one-n" [:post p-rsc-path 'id rsc-path {'b :params}]
               [^int 'id 'b]]])))
 
-(defn n-n-create-routes [table config]
+(defmulti n-n-create-routes (fn [config & _] (:router config)))
+
+(defmethod n-n-create-routes :ataraxy [config table]
   (let [ns (:project-ns config)
         table-name (:name table)
         parts (s/split table-name #"_")
@@ -90,7 +96,10 @@
               [:post rsc-b-path 'id-a rsc-a-path 'id-b "/add" {'b :params}]
               [^int 'id-a ^int 'id-b 'b]]])))
 
-(defn n-n-list-routes [table-name p-rsc rsc config]
+
+(defmulti n-n-link-routes (fn [config & _] (:router config)))
+
+(defmethod n-n-link-routes :ataraxy [config table-name p-rsc rsc]
   (let [ns (:project-ns config)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
         rsc-path (str "/" (to-path-rsc rsc config))
@@ -108,26 +117,25 @@
             [["list-one-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
               [^int 'id 'q]]])))
 
-(defn one-n-routes
-  [table config]
+(defn one-n-routes [config table]
   (let [table-name (:name table)]
     (reduce (fn [m p-rsc]
-              (let [routes (one-n-rel-routes p-rsc table-name config)]
+              (let [routes (one-n-link-routes config table-name p-rsc)]
                 (-> m
                     (update :routes concat (:routes routes))
                     (update :handlers concat (:handlers routes)))))
             {:routes [] :handlers []}
             (:belongs-to table))))
 
-(defn n-n-routes [table config]
+(defn n-n-routes [config table]
   (merge-with
    into
-   (n-n-create-routes table config)
+   (n-n-create-routes config table)
    (let [table-name (:name table)
          rsc-a (first (:belongs-to table))
          rsc-b (second (:belongs-to table))]
      (reduce (fn [m [p-rsc rsc]]
-               (let [routes (n-n-list-routes table-name p-rsc rsc config)]
+               (let [routes (n-n-link-routes config table-name p-rsc rsc)]
                  (-> m
                      (update :routes concat (:routes routes))
                      (update :handlers concat (:handlers routes)))))
@@ -137,9 +145,9 @@
 (defn table-routes [table config]
   (reduce (fn [m relation-type]
             (let [routes (case relation-type
-                           :root (root-routes table config)
-                           :one-n (one-n-routes table config)
-                           :n-n (n-n-routes table config))]
+                           :root (root-routes config table)
+                           :one-n (one-n-routes config table)
+                           :n-n (n-n-routes config table))]
               (-> m
                   (update :routes concat (:routes routes))
                   (update :handlers concat (:handlers routes)))))
@@ -219,6 +227,7 @@
         db (:db options (get-db config db-config-key db-key))]
     (-> {}
         (assoc :project-ns (get-project-ns config options))
+        (assoc :router (:router options :ataraxy))
         (assoc :db-config-key db-config-key)
         (assoc :db-key db-key)
         (assoc :db-ref db-ref)

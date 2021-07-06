@@ -45,10 +45,11 @@ Table types and relations are identified with the logic described as below, howe
 ### Schema-to-REST Config
 
 ```edn
-{:db-config-key :duct.database/sql  ; default
- :db-key :duct.database.sql/hikaricp  ; default
- :table-name-plural true  ; default
- :resource-path-plural true  ; default
+{:router :ataraxy ; default value
+ :db-config-key :duct.database/sql  ; default value
+ :db-key :duct.database.sql/hikaricp  ; default value
+ :table-name-plural true  ; default value
+ :resource-path-plural true  ; default value
  :tables [
    ; example
    {:relation-types [:root :one-n]
