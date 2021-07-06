@@ -212,7 +212,9 @@
   (ig/load-namespaces config)
   (db-key (ig/init config [db-config-key])))
 
-(defn- merge-rest-routes [config rest-config]
+(defmulti merge-rest-routes (fn [config & _] (:router config)))
+
+(defmethod :ataraxy merge-rest-routes [config rest-config]
   (let [routes (apply merge (:routes rest-config))
         route-config {:duct.router/ataraxy {:routes routes}}
         handler-config (apply merge (:handlers rest-config))]
