@@ -8,6 +8,7 @@
                  [duct/module.logging "0.5.0"]
                  [duct/module.sql "0.6.1"]
                  [duct/module.web "0.7.3"]
+                 [com.github.seancorfield/honeysql "2.0.0-rc3"]
                  [org.xerial/sqlite-jdbc "3.34.0"]
                  [inflections "0.13.2"]]
   :plugins [[duct/lein-duct "0.12.3"]]
