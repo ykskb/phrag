@@ -1,4 +1,4 @@
-(ns duct-db-rest.boundary.db.core
+(ns lapis.db
   (:require [clojure.java.jdbc :as jdbc]
             [honey.sql.helpers :refer
              [select update delete-from from where] :as h]
@@ -22,7 +22,7 @@
 
 ;; Resource queries
 
-(defn list[{db :spec} rsc & [filters]]
+(defn list [{db :spec} rsc & [filters]]
   (println filters (not-empty filters))
   (let [q (-> (select :*) (from (keyword rsc)))
         q (if (not-empty filters) (apply where q filters) q)]
@@ -34,16 +34,16 @@
         q (if (empty? filters) (where q [[:= :id id]])
               (apply where q (conj filters [:= :id id])))]
     (jdbc/query db (sql/format q))))
-                       
+
 (defn delete! [{db :spec} rsc id & [p-col p-id]]
   (let [filters (if (nil? p-id) [[:= :id id]]
                     [[:= :id id] [:= (keyword p-col) p-id]])
         q (apply where (delete-from (keyword rsc)) filters)]
-  (jdbc/execute! db (sql/format q))))
+    (jdbc/execute! db (sql/format q))))
 
 (defn delete-where! [{db :spec} rsc filters]
   (let [q (apply where (delete-from (keyword rsc)) filters)]
-  (jdbc/execute! db (sql/format q))))
+    (jdbc/execute! db (sql/format q))))
 
 (defn create! [{db :spec} rsc raw-map]
   (jdbc/insert! db rsc raw-map))

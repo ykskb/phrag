@@ -1,7 +1,7 @@
-(ns duct-db-rest.handler.sql
+(ns lapis.handler
   (:require [ataraxy.response :as response]
             [clojure.string :as s]
-            [duct-db-rest.boundary.db.core :as db]
+            [lapis.db :as db]
             [integrant.core :as ig]))
 
 (def ^:private operator-map

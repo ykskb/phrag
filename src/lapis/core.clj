@@ -1,16 +1,16 @@
-(ns duct-db-rest.module.sql
+(ns lapis.core
   (:require [clojure.string :as s]
             [duct.core :as core]
-            [duct-db-rest.boundary.db.core :as db]
+            [lapis.db :as db]
             [inflections.core :as inf]
             [integrant.core :as ig]
             [clojure.pprint :as pp]))
 
 (defn handler-key [project-ns action]
-  (let [ns (str project-ns ".handler.sql")] (keyword ns action)))
+  (let [ns (str project-ns ".handler")] (keyword ns action)))
 
 (defn route-key [project-ns resource action]
-  (let [ns (str project-ns ".handler.sql." resource)] (keyword ns action)))
+  (let [ns (str project-ns ".handler." resource)] (keyword ns action)))
 
 (defn handler-map [handler-key route-key opts]
   (derive route-key handler-key)
@@ -43,7 +43,7 @@
         rsc-path-end (str "/" (to-path-rsc table-name config))]
     (reduce (fn [m [action path param-names]]
               (let [route-key (route-key ns table-name action)
-                    handler-key (handler-key ns action)] 
+                    handler-key (handler-key ns action)]
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
                     (update :handlers conj (handler-map
@@ -68,7 +68,7 @@
         rscs (str p-rsc "." table-name)]
     (reduce (fn [m [action path param-names]]
               (let [route-key (route-key ns rscs action)
-                    handler-key (handler-key ns action)] 
+                    handler-key (handler-key ns action)]
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
                     (update :handlers conj (handler-map
@@ -133,7 +133,7 @@
     (reduce (fn [m [action path param-names]]
               (let [rscs (str p-rsc "." rsc)
                     route-key (route-key ns rscs action)
-                    handler-key (handler-key ns action)] 
+                    handler-key (handler-key ns action)]
                 (-> m
                     (update :routes conj (route-map path route-key param-names))
                     (update :handlers conj (handler-map

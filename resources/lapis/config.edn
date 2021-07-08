@@ -1,11 +1,11 @@
 {:duct.profile/base
- {:duct.core/project-ns duct-db-rest
+ {:duct.core/project-ns lapis
 
   :duct.router/ataraxy
   {:routes {[:get "/static"]
-            [:duct-db-rest.handler.sql/static]}}
+            [:lapis.handler/static]}}
 
-  :duct-db-rest.handler.sql/static
+  :lapis.handler/static
   {:db #ig/ref :duct.database/sql}}
 
  :duct.profile/dev   #duct/include "dev"
@@ -15,5 +15,5 @@
  :duct.module/logging {}
  :duct.module.web/api {}
  :duct.module/sql {}
- :duct-db-rest.module.sql/register {}}
+ :lapis.core/register {}}
 

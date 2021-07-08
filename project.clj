@@ -1,4 +1,4 @@
-(defproject duct-db-rest "0.1.0-SNAPSHOT"
+(defproject lapis "0.1.0-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
   :min-lein-version "2.0.0"
@@ -12,7 +12,7 @@
                  [org.xerial/sqlite-jdbc "3.34.0"]
                  [inflections "0.13.2"]]
   :plugins [[duct/lein-duct "0.12.3"]]
-  :main ^:skip-aot duct-db-rest.main
+  :main ^:skip-aot lapis.main
   :resource-paths ["resources" "target/resources"]
   :prep-tasks     ["javac" "compile" ["run" ":duct/compiler"]]
   :middleware     [lein-duct.plugin/middleware]
