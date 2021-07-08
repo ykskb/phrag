@@ -1,8 +1,8 @@
-# schema-to-rest
+# lapis
 
 REST APIs generated from DB Schema
 
-This library reads DB schema (from a running DB or config) → creates routes & handlers → registers them at an app initialization time of [Integrant](https://github.com/weavejester/integrant)... thus without any run-time overhead!
+This library reads DB schema (from a running DB or config) → creates routes & handlers → registers them at an app initialization time of [Integrant](https://github.com/weavejester/integrant) thus without run-time overhead.
 
 ### Schema to REST Endpoints
 
