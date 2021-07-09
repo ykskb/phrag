@@ -218,7 +218,7 @@
   (if (is-n-n-table? table) [:n-n]
       (if (has-relation-column? table) [:one-n :root] [:root])))
 
-(defn default-schema-map [db]
+(defn schema-from-db [db]
   (map (fn [table]
          (let [is-n-n (is-n-n-table? table)]
            (cond-> table
@@ -247,11 +247,12 @@
         (core/merge-configs route-config)
         (core/merge-configs handler-config))))
 
-(defn- make-rest-config [config options]
+(defn make-rest-config [config options]
+  (println (:tables options "a"))
   (let [db-config-key (:db-config-key options :duct.database/sql)
         db-key (:db-key options :duct.database.sql/hikaricp)
-        db-ref (:db-ref options (ig/ref db-config-key))
-        db (:db options (get-db config db-config-key db-key))]
+        db-ref (or (:db-ref options) (ig/ref db-config-key))
+        db (or (:db options) (get-db config db-config-key db-key))]
     (-> {}
         (assoc :project-ns (get-project-ns config options))
         (assoc :router (:router options :ataraxy))
@@ -259,7 +260,7 @@
         (assoc :db-key db-key)
         (assoc :db-ref db-ref)
         (assoc :db db)
-        (assoc :tables (:tables options (default-schema-map db)))
+        (assoc :tables (or (:tables options) (schema-from-db db)))
         (assoc :table-name-plural (:table-name-plural options true))
         (assoc :resource-path-plural (:resource-path-plural options true)))))
 
