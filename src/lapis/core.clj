@@ -38,7 +38,8 @@
 (defmethod root-routes :ataraxy [config table]
   (let [ns (:project-ns config)
         table-name (:name table)
-        opts {:db (:db-ref config) :table table-name :cols (col-names table)}
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :table table-name :cols (col-names table)}
         rsc-path (str "/" (to-path-rsc table-name config) "/")
         rsc-path-end (str "/" (to-path-rsc table-name config))]
     (reduce (fn [m [action path param-names]]
@@ -63,7 +64,8 @@
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
         rsc-path (str "/" (to-path-rsc table-name config) "/")
         rsc-path-end (str "/" (to-path-rsc table-name config))
-        opts {:db (:db-ref config) :table table-name :p-col (to-col-name p-rsc)
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :table table-name :p-col (to-col-name p-rsc)
               :cols (col-names table)}
         rscs (str p-rsc "." table-name)]
     (reduce (fn [m [action path param-names]]
@@ -97,9 +99,9 @@
         rsc-b (second (:belongs-to table))
         rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
         rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")
-        opts {:db (:db-ref config) :table table-name
-              :col-a (to-col-name rsc-a) :col-b (to-col-name rsc-b)
-              :cols (col-names table)}]
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :table table-name :col-a (to-col-name rsc-a)
+              :col-b (to-col-name rsc-b) :cols (col-names table)}]
     (reduce (fn [m [action rscs path param-names]]
               (let [route-key (route-key ns rscs action)
                     handler-key (handler-key ns action)]
@@ -128,8 +130,9 @@
   (let [ns (:project-ns config)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
         rsc-path (str "/" (to-path-rsc rsc config))
-        opts {:db (:db-ref config) :p-col (to-col-name p-rsc)
-              :table table-name :cols (col-names table)}]
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :p-col (to-col-name p-rsc) :table table-name
+              :cols (col-names table)}]
     (reduce (fn [m [action path param-names]]
               (let [rscs (str p-rsc "." rsc)
                     route-key (route-key ns rscs action)
@@ -233,9 +236,11 @@
 (defn- get-db
   "Builds database config and returns database map by keys. Required as
   ig/ref to :duct.database/sql is only built in :duct/profile namespace."
-  [config db-config-key db-key]
+  [config db-config-key db-keys]
   (ig/load-namespaces config)
-  (db-key (ig/init config [db-config-key])))
+  (let [init-conifg (ig/init config [db-config-key])
+        db (second (first (ig/find-derived init-conifg db-config-key)))]
+    (get-in db db-keys)))
 
 (defmulti merge-rest-routes (fn [config & _] (:router config)))
 
@@ -248,16 +253,17 @@
         (core/merge-configs handler-config))))
 
 (defn make-rest-config [config options]
-  (println (:tables options "a"))
   (let [db-config-key (:db-config-key options :duct.database/sql)
-        db-key (:db-key options :duct.database.sql/hikaricp)
+        db-keys (if (contains? options :db-keys) (:db-keys options) [:spec])
         db-ref (or (:db-ref options) (ig/ref db-config-key))
-        db (or (:db options) (get-db config db-config-key db-key))]
+        db (or (:db options) (get-db config db-config-key db-keys))]
+    (println "database: ")
+    (println db)
     (-> {}
         (assoc :project-ns (get-project-ns config options))
         (assoc :router (:router options :ataraxy))
         (assoc :db-config-key db-config-key)
-        (assoc :db-key db-key)
+        (assoc :db-keys db-keys)
         (assoc :db-ref db-ref)
         (assoc :db db)
         (assoc :tables (or (:tables options) (schema-from-db db)))
@@ -268,6 +274,6 @@
   (fn [config]
     (let [rest-config (make-rest-config config options)
           routes (rest-routes rest-config)]
-      (pp/pprint rest-config)
-      (pp/pprint routes)
+;      (pp/pprint rest-config)
+;      (pp/pprint routes)
       (merge-rest-routes rest-config config routes))))
