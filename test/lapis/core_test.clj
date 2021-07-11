@@ -1,8 +1,6 @@
 (ns lapis.core-test
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
-            [clojure.data :as d]
-            [clojure.pprint :as pp]
             [lapis.core :as lapis]
             [integrant.core :as ig]))
 
@@ -232,7 +230,7 @@
            (lapis/rest-routes
             (lapis/make-rest-config {} n-n-option))))))
 
-(defn- create-database []
+(defn create-database []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
     (jdbc/execute! (str "create table members ("
                         "id               integer primary key, "
@@ -306,14 +304,12 @@
     (let [res-map
           (reduce (fn [m table]
                     (let [col-names (map #(:name %) (:columns table))]
-                      (println col-names)
                       (assoc m (:name table)
                              (assoc table :col-names col-names))))
                   {}
                   (lapis/schema-from-db (create-database)))]
       (doseq [exp-table expected-schema-map]
         (let [res-table (get res-map (:name exp-table))]
-          (println res-table)
           (is (= (:col-names res-table) (map #(:name %) (:columns exp-table))))
           (is (= (:relation-types res-table) (:relation-types exp-table)))
           (is (= (:belongs-to res-table) (:belongs-to exp-table))))))))

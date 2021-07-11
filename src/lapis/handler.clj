@@ -41,33 +41,32 @@
   (let [db-con (get-in db db-keys)]
     (fn [{[_ params] :ataraxy/result}]
       (db/create! db-con table params)
-      [::response/ok {:result "CREATED"}])))
+      [::response/ok])))
 
 (defmethod ig/init-key ::fetch-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id {:as query}] :ataraxy/result}]
       (let [res (db/fetch db-con table id (query->filters query cols))]
-        [::response/ok res]))))
+        [::response/ok (first res)]))))
 
 (defmethod ig/init-key ::delete-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id] :ataraxy/result}]
-      (let [res (db/delete! db-con table id)]
-        [::response/ok res]))))
+      (db/delete! db-con table id)
+      [::response/ok])))
 
 (defmethod ig/init-key ::put-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id {:as params}] :ataraxy/result}]
       ; TODO: params to be cover all the attributes as PUT updates all attributes
-      (println "ID: " id "DATA:" params)
-      (println (db/update! db table id params))
-      [::response/ok {:result "UPDATED"}])))
+      (db/update! db table id params)
+      [::response/ok])))
 
 (defmethod ig/init-key ::patch-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id {:as params}] :ataraxy/result}]
-      (println (db/update! db-con table id params))
-      [::response/ok {:result "UPDATED"}])))
+      (db/update! db-con table id params)
+      [::response/ok])))
 
 ;; one-n
 

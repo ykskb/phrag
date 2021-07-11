@@ -238,8 +238,9 @@
   ig/ref to :duct.database/sql is only built in :duct/profile namespace."
   [config db-config-key db-keys]
   (ig/load-namespaces config)
-  (let [init-conifg (ig/init config [db-config-key])
-        db (second (first (ig/find-derived init-conifg db-config-key)))]
+  (let [init-config (ig/init config [db-config-key])
+        db (or (db-config-key init-config)
+               (second (first (ig/find-derived init-config db-config-key))))]
     (get-in db db-keys)))
 
 (defmulti merge-rest-routes (fn [config & _] (:router config)))
