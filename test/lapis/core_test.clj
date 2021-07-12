@@ -310,6 +310,6 @@
                   (lapis/schema-from-db (create-database)))]
       (doseq [exp-table expected-schema-map]
         (let [res-table (get res-map (:name exp-table))]
-          (is (= (:col-names res-table) (map #(:name %) (:columns exp-table))))
-          (is (= (:relation-types res-table) (:relation-types exp-table)))
-          (is (= (:belongs-to res-table) (:belongs-to exp-table))))))))
+          (is (= (map #(:name %) (:columns exp-table)) (:col-names res-table)))
+          (is (= (:relation-types exp-table) (:relation-types res-table)))
+          (is (= (:belongs-to exp-table) (:belongs-to res-table))))))))
