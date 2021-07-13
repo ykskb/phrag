@@ -27,4 +27,6 @@
                   :dependencies   [[integrant/repl "0.3.2"]
                                    [hawk "0.2.11"]
                                    [eftest "0.5.9"]
-                                   [kerodon "0.9.1"]]}})
+                                   [kerodon "0.9.1"]
+                                   [ring/ring-core "1.9.3"]
+                                   [ring/ring-jetty-adapter "1.9.3"]]}})

@@ -9,22 +9,32 @@
             [eftest.runner :as eftest]
             [integrant.core :as ig]
             [integrant.repl :refer [clear halt go init prep reset]]
-            [integrant.repl.state :refer [config system]]))
-
-(duct/load-hierarchy)
-
-(defn read-config []
-  (duct/read-config (io/resource "lapis/config.edn")))
+            [integrant.repl.state :refer [config system]]
+            [ring.adapter.jetty :as jetty]
+            [ring.util.response :as response]))
 
 (defn test []
   (eftest/run-tests (eftest/find-tests "test")))
 
-(def profiles
-  [:duct.profile/dev :duct.profile/local])
-
 (clojure.tools.namespace.repl/set-refresh-dirs "dev/src" "src" "test")
 
-(when (io/resource "local.clj")
-  (load "local"))
+;;; handlers
 
-(integrant.repl/set-prep! #(duct/prep-config (read-config) profiles))
+(defn hello-world [request]
+  (response/response "Hello, World!"))
+
+(defmethod ig/init-key ::app [_ _]
+  hello-world)
+
+;;; API server
+
+(defmethod ig/init-key ::server [_ {:keys [app options]}]
+  (jetty/run-jetty app options))
+
+(defmethod ig/halt-key! ::server [_ server]
+  (.stop server))
+
+(integrant.repl/set-prep! (constantly {::app {}
+                                       ::server {:app (ig/ref ::app)
+                                                 :options {:port 3000
+                                                           :join? false}}}))

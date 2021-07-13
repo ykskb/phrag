@@ -1,8 +1,14 @@
 (ns user)
 
-(defn dev
+(defn dev-duct
   "Load and switch to the 'dev' namespace."
+  []
+  (require 'dev-duct)
+  (in-ns 'dev-duct)
+  :dev-duct-loaded)
+
+(defn dev
   []
   (require 'dev)
   (in-ns 'dev)
-  :loaded)
+  :dev-loaded)
