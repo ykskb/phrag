@@ -4,6 +4,8 @@ REST APIs from DB Schema
 
 Sapid configures REST API endpoints from DB schema at app init time, leveraging [Integrant](https://github.com/weavejester/integrant).
 
+#### Key Features:
+
 * Auto-registers routes & handlers from a single line of config for [Ataraxy](https://github.com/weavejester/ataraxy) in [Duct](https://github.com/duct-framework/duct). (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
 
 * DB schema can be retrieved from a running DB or specified with a config map.
@@ -12,7 +14,7 @@ Sapid configures REST API endpoints from DB schema at app init time, leveraging 
 
 #### Notes:
 
-* This project is currently at work-in-progress state.
+* This project is currently in state of work-in-progress.
 
 * Sapid comes with generalizations which are the trade-offs for instantly working endpoints.
 
@@ -42,14 +44,25 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 |--------------|-----------------------------------------------------|
 | `GET`        | `/resource-a/{id-of-a}/resource-b`                  |
 | `GET`        | `/resource-b/{id-of-b}/resource-a`                  |
-| `POST`       | `/resource-a/{id-of-a}/resource-b/{if-of-b}/add`    |
-| `POST`       | `/resource-b/{id-of-b}/resource-a/{if-of-a}/add`    |
-| `POST`       | `/resource-a/{id-of-a}/resource-b/{if-of-b}/delete` |
-| `POST`       | `/resource-b/{id-of-b}/resource-a/{if-of-a}/delete` |
+| `POST`       | `/resource-a/{id-of-a}/resource-b/{id-of-b}/add`    |
+| `POST`       | `/resource-b/{id-of-b}/resource-a/{id-of-a}/add`    |
+| `POST`       | `/resource-a/{id-of-a}/resource-b/{id-of-b}/delete` |
+| `POST`       | `/resource-b/{id-of-b}/resource-a/{id-of-a}/delete` |
 
 ### Usage
 
 #### Schema from DB
+
+##### Examples:
+
+* Ataraxy in Duct
+
+```edn
+; at root/module level of duct config
+:sapid.core/register {}
+```
+
+##### Notes:
 
 Auto-configuration from a running DB follows logics as below:
 
@@ -63,20 +76,9 @@ Auto-configuration from a running DB follows logics as below:
 
 *If other naming patterns are required, table names can be specified in the [config map](#sapid-config).
 
-##### Examples:
 
-* Ataraxy in Duct
-
-```edn
-; at root/module level of duct config
-:sapid.core/register {}
-```
 
 #### Schema Config Map
-
-When `tables` data is provided in the [config](#sapid-config), Sapid uses it for DB schema instead of retrieving from a datbase.
-
-Please refer to [config section](#sapid-config) for the format of schema data.
 
 ##### Examples:
 
@@ -86,6 +88,12 @@ Please refer to [config section](#sapid-config) for the format of schema data.
 ; at root/module level of duct config
 :sapid.core/register {:router "..." :tables: [{:name "..."}]}
 ```
+
+##### Notes:
+
+When `tables` data is provided in the [config](#sapid-config), Sapid uses it for DB schema instead of retrieving from a datbase.
+
+Please refer to [config section](#sapid-config) for the format of schema data.
 
 ### Sapid Config
 
@@ -126,10 +134,10 @@ Please refer to [config section](#sapid-config) for the format of schema data.
 
 | Key             | Description                                                                                                       |
 |-----------------|-------------------------------------------------------------------------------------------------------------------|
-| :relation-types | Relation types. `:root`, `:one-n` and `:n-n` are supported.                                                       |
+| :relation-types | List of relation types. `:root`, `:one-n` and `:n-n` are supported.                                               |
 | :name           | Table name.                                                                                                       |
 | :columns        | List of columns. A column can contain `:name` and `:type` parameters.                                             |
-| :belongs-to     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)                |
+| :belongs-to     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
 | :pre-signal     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
 | :post-signal    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
 
