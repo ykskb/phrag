@@ -2,15 +2,15 @@
 
 REST APIs from DB Schema
 
-Sapid configures REST API endpoints from DB schema at app init time, leveraging [Integrant](https://github.com/weavejester/integrant). No run-time overhead :)
+Sapid configures REST API endpoints from DB schema at app init time, leveraging [Integrant](https://github.com/weavejester/integrant).
 
-* Auto-registers routes & handlers with [Ataraxy](https://github.com/weavejester/ataraxy) in [Duct](https://github.com/duct-framework/duct) from a single line in config. (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
+* Auto-registers routes & handlers from a single line of config for [Ataraxy](https://github.com/weavejester/ataraxy) in [Duct](https://github.com/duct-framework/duct). (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
 
 * DB schema can be retrieved from a running DB or specified with a config map.
 
 * Query filters, sorting and pagination come out of the box.
 
-Notes:
+#### Notes:
 
 * This project is currently at work-in-progress state.
 
@@ -40,8 +40,8 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 
 | HTTP methods | Routes                                              |
 |--------------|-----------------------------------------------------|
-| `GET`        | `/resource-a/{id-of-a}/resource-b/`                 |
-| `GET`        | `/resource-b/{id-of-b}/resource-a/`                 |
+| `GET`        | `/resource-a/{id-of-a}/resource-b`                  |
+| `GET`        | `/resource-b/{id-of-b}/resource-a`                  |
 | `POST`       | `/resource-a/{id-of-a}/resource-b/{if-of-b}/add`    |
 | `POST`       | `/resource-b/{id-of-b}/resource-a/{if-of-a}/add`    |
 | `POST`       | `/resource-a/{id-of-a}/resource-b/{if-of-b}/delete` |
@@ -49,7 +49,7 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 
 ### Usage
 
-##### Schema from DB
+#### Schema from DB
 
 Auto-configuration from a running DB follows logics as below:
 
@@ -63,7 +63,7 @@ Auto-configuration from a running DB follows logics as below:
 
 *If other naming patterns are required, table names can be specified in the [config map](#sapid-config).
 
-###### Examples:
+##### Examples:
 
 * Ataraxy in Duct
 
@@ -72,13 +72,13 @@ Auto-configuration from a running DB follows logics as below:
 :sapid.core/register {}
 ```
 
-##### Schema Config Map
+#### Schema Config Map
 
 When `tables` data is provided in the [config](#sapid-config), Sapid uses it for DB schema instead of retrieving from a datbase.
 
 Please refer to [config section](#sapid-config) for the format of schema data.
 
-###### Examples:
+##### Examples:
 
 * Ataraxy in Duct
 
@@ -88,6 +88,8 @@ Please refer to [config section](#sapid-config) for the format of schema data.
 ```
 
 ### Sapid Config
+
+##### Example with all parameters
 
 ```edn
 {:router :ataraxy
@@ -109,7 +111,7 @@ Please refer to [config section](#sapid-config) for the format of schema data.
    ]}
 ```
 
-Parameter Details:
+##### Parameter Details:
 
 | Key                   | Description                                                                | Default Value      |
 |-----------------------|----------------------------------------------------------------------------|--------------------|
@@ -120,7 +122,7 @@ Parameter Details:
 | :resource-path-plural | True if plural is desired for URL paths like `/users` instead of `/user`.  | true               |
 | :tables               | DB schema including list of table definitions.                             |                    |
 
-Table Parameter Details:
+##### Table Details:
 
 | Key             | Description                                                                                                       |
 |-----------------|-------------------------------------------------------------------------------------------------------------------|
