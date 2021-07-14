@@ -4,7 +4,7 @@ REST APIs from DB Schema
 
 Sapid configures REST API endpoints from DB schema at app init time, leveraging [Integrant](https://github.com/weavejester/integrant).
 
-#### Key Features:
+#### Features:
 
 * Auto-registers routes & handlers from a single line of config for [Ataraxy](https://github.com/weavejester/ataraxy) in [Duct](https://github.com/duct-framework/duct). (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
 
@@ -31,7 +31,7 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 | `GET`, `POST`                              | `/resource`      |
 | `GET`, `DELETE`, `PUT` and `PATCH`         | `/resource/{id}` |
 
-* `N-to-1` / `1-to-N`
+* `1-to-N`
 
 | HTTP methods                       | Routes                                                   |
 |------------------------------------|----------------------------------------------------------|
@@ -53,8 +53,6 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 
 #### Schema from DB
 
-##### Examples:
-
 * Ataraxy in Duct
 
 ```edn
@@ -64,7 +62,7 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 
 ##### Notes:
 
-Auto-configuration from a running DB follows logics as below:
+Auto-configuration from a running DB leverages naming patterns of tables and columns to identify relationships as below:
 
 1. `Root` or `N-to-N` relationship?
 
@@ -78,9 +76,7 @@ Auto-configuration from a running DB follows logics as below:
 
 
 
-#### Schema Config Map
-
-##### Examples:
+#### Schema from a Config Map
 
 * Ataraxy in Duct
 
@@ -91,7 +87,7 @@ Auto-configuration from a running DB follows logics as below:
 
 ##### Notes:
 
-When `tables` data is provided in the [config](#sapid-config), Sapid uses it for DB schema instead of retrieving from a datbase.
+When `tables` data is provided in a config, Sapid uses it for DB schema instead of retrieving from a datbase.
 
 Please refer to [config section](#sapid-config) for the format of schema data.
 
@@ -111,7 +107,9 @@ Please refer to [config section](#sapid-config) for the format of schema data.
     :columns [{:name "id"
        	       :type "text"}
               {:name "image_id"
-               :type "int"}]  ; ... more columns
+               :type "int"}
+	       ; ... more columns
+	      ]
     :belongs-to ["image"]
     :pre-signal #ig/ref :my/pre-signal-fn
     :post-signal #ig/ref :my/post-signal-fn}
@@ -121,14 +119,14 @@ Please refer to [config section](#sapid-config) for the format of schema data.
 
 ##### Parameter Details:
 
-| Key                   | Description                                                                | Default Value      |
-|-----------------------|----------------------------------------------------------------------------|--------------------|
-| :router               | Router type.                                                               | :ataraxy           |
-| :db-config-key        | Integrant key for a database.                                              | :duct.database/sql |
-| :db-keys              | Keys to get a connection from a database.                                  | ["db-spec"]        |
-| :table-name-plural    | True if tables uses plural naming like `users` instead of `user`.          | true               |
-| :resource-path-plural | True if plural is desired for URL paths like `/users` instead of `/user`.  | true               |
-| :tables               | DB schema including list of table definitions.                             |                    |
+| Key                   | Description                                                                 | Default Value      |
+|-----------------------|-----------------------------------------------------------------------------|--------------------|
+| :router               | Router type.                                                                | :ataraxy           |
+| :db-config-key        | Integrant key for a database.                                               | :duct.database/sql |
+| :db-keys              | Keys to get a connection from a database.                                   | ["db-spec"]        |
+| :table-name-plural    | `true` if tables uses plural naming like `users` instead of `user`.         | `true`             |
+| :resource-path-plural | `true` if plural is desired for URL paths like `/users` instead of `/user`. | `true`             |
+| :tables               | DB schema including list of table definitions.                              |                    |
 
 ##### Table Details:
 
@@ -140,19 +138,6 @@ Please refer to [config section](#sapid-config) for the format of schema data.
 | :belongs-to     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
 | :pre-signal     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
 | :post-signal    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
-
-### 
-
-### Setup
-
-When you first clone this repository, run:
-
-```sh
-lein duct setup
-```
-
-This will create files for local configuration, and prep your system
-for the project.
 
 ### Environment
 
