@@ -1,96 +1,135 @@
-# lapis
+# Sapid
 
-REST APIs generated from DB Schema
+REST APIs from DB Schema
 
-This library reads DB schema (from a running DB or config) → creates routes & handlers → registers them at an app initialization time of [Integrant](https://github.com/weavejester/integrant) thus without run-time overhead.
+Sapid configures REST API endpoints from DB schema at app init time, leveraging [Integrant](https://github.com/weavejester/integrant). No run-time overhead :)
+
+* Auto-registers routes & handlers with [Ataraxy](https://github.com/weavejester/ataraxy) in [Duct](https://github.com/duct-framework/duct) from a single line in config. (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
+
+* DB schema can be retrieved from a running DB or specified with a config map.
+
+* Query filters, sorting and pagination come out of the box.
+
+Notes:
+
+* This project is currently at work-in-progress state.
+
+* Sapid comes with generalizations which are the trade-offs for instantly working endpoints.
 
 ### Schema to REST Endpoints
 
-Example case of a meetup service (simplified):
-
 ![Image of Schema to APIs](./docs/images/db-rest-apis-highlighted.png)
 
-As shown in the diagram above, tables are classified to be either `Root` type or `N-to-N` type and `1-to-N` relationships between tables are identified (yellow tags). Using those attributes identified, corresponding routes are created with handlers (green boxes).
+We can see three types of relationships in the example above: `Root`, `N-to-N` and `1-to-N`. Sapid configures REST endpoints for each type as below:
 
-### Logic for Identifying Table & Relations
+* `Root`
 
-Table types and relations are identified with the logic described as below, however these schema details can also be specified in [config map](#schema-to-rest-config).
+| HTTP methods                               | Routes           |
+|--------------------------------------------|------------------|
+| `GET`, `POST`                              | `/resource`      |
+| `GET`, `DELETE`, `PUT` and `PATCH`         | `/resource/{id}` |
 
-###### Table Types
+* `N-to-1` / `1-to-N`
 
-* `Root` (`:root`) or `N-to-N` (`:n-n`)
-
-	If a table name has `_` (underscore) character, it is classified as `N-to-N` otherwise `Root`.
-	
-	*In other words, all the root entities should be named without using `_` without specifying table types in the config.
-
-* `1-to-N` (`:one-n`)
-
-	If a table is not `N-to-N` and contains a column ending with `_id`, it is classified as `1-to-N`.
-
-(In config: `:relation-types` list in a table map)
-
-###### Linked Table Name
-
-* `1-to-N`
-
-	String before `_id` of a relation column name is used. Table name being plural or singular is handled with `:table-name-plural` config value.
+| HTTP methods                       | Routes                                                   |
+|------------------------------------|----------------------------------------------------------|
+| `GET` and `POST`                   | `/parent-resource/{parent-id}/child-resource`            |
+| `GET`, `DELETE`, `PUT` and `PATCH` | `/parent-resource/{parent-id}/child-resource/{child-id}` |
 
 * `N-to-N`
 
-	Strings separated by `_` from a table name are used. Table name being plural or singular is handled with `:table-name-plural` config value.
+| HTTP methods | Routes                                              |
+|--------------|-----------------------------------------------------|
+| `GET`        | `/resource-a/{id-of-a}/resource-b/`                 |
+| `GET`        | `/resource-b/{id-of-b}/resource-a/`                 |
+| `POST`       | `/resource-a/{id-of-a}/resource-b/{if-of-b}/add`    |
+| `POST`       | `/resource-b/{id-of-b}/resource-a/{if-of-a}/add`    |
+| `POST`       | `/resource-a/{id-of-a}/resource-b/{if-of-b}/delete` |
+| `POST`       | `/resource-b/{id-of-b}/resource-a/{if-of-a}/delete` |
 
-(In config: `:belongs-to` list in a table map)
+### Usage
 
-### Schema-to-REST Config
+##### Schema from DB
+
+Auto-configuration from a running DB follows logics as below:
+
+1. `Root` or `N-to-N` relationship?
+
+	A table name without `_` would be classified as `Root`, and a table name pattern of `resourcea_resourceb` such as `members_groups` is assumed for `N-to-N` tables. 
+
+2. `1-to-N` relationship?
+
+	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-N` relationship is identified per column.
+
+*If other naming patterns are required, table names can be specified in the [config map](#sapid-config).
+
+###### Examples:
+
+* Ataraxy in Duct
 
 ```edn
-{:router :ataraxy ; default value
- :db-config-key :duct.database/sql  ; default value
- :db-key :duct.database.sql/hikaricp  ; default value
- :table-name-plural true  ; default value
- :resource-path-plural true  ; default value
+; at root/module level of duct config
+:sapid.core/register {}
+```
+
+##### Schema Config Map
+
+When `tables` data is provided in the [config](#sapid-config), Sapid uses it for DB schema instead of retrieving from a datbase.
+
+Please refer to [config section](#sapid-config) for the format of schema data.
+
+###### Examples:
+
+* Ataraxy in Duct
+
+```edn
+; at root/module level of duct config
+:sapid.core/register {:router "..." :tables: [{:name "..."}]}
+```
+
+### Sapid Config
+
+```edn
+{:router :ataraxy
+ :db-config-key :duct.database/sql
+ :db-keys ["db-spec"]
+ :table-name-plural true
+ :resource-path-plural true
  :tables [
-   ; example
    {:relation-types [:root :one-n]
     :name "users"
-    :columns [{
-      :name "id"
-      :type "int"
-      ; ... more columns
-      }]
+    :columns [{:name "id"
+       	       :type "text"}
+              {:name "image_id"
+               :type "int"}]  ; ... more columns
     :belongs-to ["image"]
-    :signal-ref #ig/ref :my/signal}
+    :pre-signal #ig/ref :my/pre-signal-fn
+    :post-signal #ig/ref :my/post-signal-fn}
     ; ... more tables
    ]}
 ```
 
-### Route Lists per Relation Types
+Parameter Details:
 
-* Root-level (`:root`)
+| Key                   | Description                                                                | Default Value      |
+|-----------------------|----------------------------------------------------------------------------|--------------------|
+| :router               | Router type.                                                               | :ataraxy           |
+| :db-config-key        | Integrant key for a database.                                              | :duct.database/sql |
+| :db-keys              | Keys to get a connection from a database.                                  | ["db-spec"]        |
+| :table-name-plural    | True if tables uses plural naming like `users` instead of `user`.          | true               |
+| :resource-path-plural | True if plural is desired for URL paths like `/users` instead of `/user`.  | true               |
+| :tables               | DB schema including list of table definitions.                             |                    |
 
-| Routes           | HTTP methods                               |
-|------------------|--------------------------------------------|
-| `/resource`      | `GET`, `POST`                              |
-| `/resource/{id}` | `GET`, `DELETE`, `PUT` and `PATCH` |
+Table Parameter Details:
 
-* `N-to-1` / `1-to-N` relationships (`:one-n`)
-
-| Routes                                                   | HTTP methods                       |
-|----------------------------------------------------------|------------------------------------|
-| `/parent-resource/{parent-id}/child-resource`            | `GET` and `POST`                   |
-| `/parent-resource/{parent-id}/child-resource/{child-id}` | `GET`, `DELETE`, `PUT` and `PATCH` |
-
-* `N-to-N` relationships
-
-| Routes                                              | HTTP methods |
-|-----------------------------------------------------|--------------|
-| `/resource-a/{id-of-a}/resource-b/`                 | `GET`        |
-| `/resource-b/{id-of-b}/resource-a/`                 | `GET`        |
-| `/resource-a/{id-of-a}/resource-b/{if-of-b}/add`    | `POST`       |
-| `/resource-b/{id-of-b}/resource-a/{if-of-a}/add`    | `POST`       |
-| `/resource-a/{id-of-a}/resource-b/{if-of-b}/delete` | `POST`       |
-| `/resource-b/{id-of-b}/resource-a/{if-of-a}/delete` | `POST`       |
+| Key             | Description                                                                                                       |
+|-----------------|-------------------------------------------------------------------------------------------------------------------|
+| :relation-types | Relation types. `:root`, `:one-n` and `:n-n` are supported.                                                       |
+| :name           | Table name.                                                                                                       |
+| :columns        | List of columns. A column can contain `:name` and `:type` parameters.                                             |
+| :belongs-to     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)                |
+| :pre-signal     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
+| :post-signal    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
 
 ### 
 
