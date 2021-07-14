@@ -34,7 +34,7 @@
 (defmethod ig/init-key ::list-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ query] :ataraxy/result}]
-      (let [res (db/list db-con table (query->filters query cols))]
+      (let [res (db/list-up db-con table (query->filters query cols))]
         [::response/ok res]))))
 
 (defmethod ig/init-key ::create-root [_ {:keys [db db-keys table cols]}]
@@ -47,7 +47,7 @@
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id {:as query}] :ataraxy/result}]
       (let [res (db/fetch db-con table id (query->filters query cols))]
-        [::response/ok (first res)]))))
+        [::response/ok res]))))
 
 (defmethod ig/init-key ::delete-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
@@ -75,7 +75,7 @@
     (fn [{[_ p-id {:as query}] :ataraxy/result}]
       (println query p-id)
       (let [filters (query->filters (assoc query p-col p-id) cols)
-            res (db/list db-con table filters)]
+            res (db/list-up db-con table filters)]
         [::response/ok res]))))
 
 (defmethod ig/init-key ::create-one-n [_ {:keys [db db-keys table p-col cols]}]
@@ -91,7 +91,7 @@
     (fn [{[_ p-id id {:as query}] :ataraxy/result}]
       (let [filters (query->filters (assoc query p-col p-id) cols)
             res (db/fetch db-con table id filters)]
-        [::response/ok (first res)]))))
+        [::response/ok res]))))
 
 (defmethod ig/init-key ::delete-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]

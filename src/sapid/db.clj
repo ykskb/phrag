@@ -1,5 +1,7 @@
 (ns sapid.db
-  (:require [clojure.java.jdbc :as jdbc]
+  (:refer-clojure :exclude [group-by update])
+  (:require [clojure.core :as c]
+            [clojure.java.jdbc :as jdbc]
             [honey.sql.helpers :refer
              [select update delete-from from where] :as h]
             [honey.sql :as sql]))
@@ -30,28 +32,33 @@
 
 ;; Resource queries
 
-(defn list [db rsc & [filters]]
+(defn list-up [db rsc & [filters]]
   (println filters (not-empty filters))
   (let [q (-> (select :*) (from (keyword rsc)))
         q (if (not-empty filters) (apply where q filters) q)]
     (println (sql/format q))
-    (jdbc/query db (sql/format q))))
+    (->> (sql/format q)
+         (jdbc/query db))))
 
 (defn fetch [db rsc id & [filters]]
   (let [q (-> (select :*) (from (keyword rsc)))
         q (if (empty? filters) (where q [[:= :id id]])
               (apply where q (conj filters [:= :id id])))]
-    (jdbc/query db (sql/format q))))
+    (->> (sql/format q)
+         (jdbc/query db)
+         first)))
 
 (defn delete! [db rsc id & [p-col p-id]]
   (let [filters (if (nil? p-id) [[:= :id id]]
                     [[:= :id id] [:= (keyword p-col) p-id]])
         q (apply where (delete-from (keyword rsc)) filters)]
-    (jdbc/execute! db (sql/format q))))
+    (->> (sql/format q)
+         (jdbc/execute! db))))
 
 (defn delete-where! [db rsc filters]
   (let [q (apply where (delete-from (keyword rsc)) filters)]
-    (jdbc/execute! db (sql/format q))))
+    (->> (sql/format q)
+         (jdbc/execute! db))))
 
 (defn create! [db rsc raw-map]
   (jdbc/insert! db rsc raw-map))
@@ -60,6 +67,7 @@
   (let [filters (if (nil? p-id) [[:= :id id]]
                     [[:= :id id] [:= (keyword p-col) p-id]])
         q (-> (h/update (keyword rsc)) (h/set raw-map))]
-    (jdbc/execute! db (sql/format (apply where q filters)))))
-
+    (->> (apply where q filters)
+         sql/format
+         (jdbc/execute! db))))
 
