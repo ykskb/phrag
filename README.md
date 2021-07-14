@@ -64,7 +64,7 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 
 ##### Notes:
 
-Auto-configuration from a running DB leverages naming patterns of tables and columns to identify relationships as below:
+Auto-configuration from a running DB leverages naming patterns of tables and columns to identify relationships:
 
 1. `Root` or `N-to-N` relationship?
 
@@ -87,7 +87,7 @@ Auto-configuration from a running DB leverages naming patterns of tables and col
 
 ##### Notes:
 
-When `tables` data is provided in a config, Sapid uses it for DB schema instead of retrieving from a datbase.
+When `tables` data is provided in a config, Sapid uses it for DB schema instead of retrieving from a database.
 
 Please refer to [config section](#sapid-config) for the format of schema data.
 
