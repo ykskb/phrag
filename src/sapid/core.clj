@@ -7,7 +7,7 @@
             [clojure.pprint :as pp]))
 
 (defn handler-key [project-ns action]
-  (let [ns (str project-ns ".handler")] (keyword ns action)))
+  (keyword "sapid.handler" action))
 
 (defn route-key [project-ns resource action]
   (let [ns (str project-ns ".handler." resource)] (keyword ns action)))

@@ -38,36 +38,36 @@
     [:my-project.handler.members/patch-root sym-id sym-b]}])
 
 (def ^:private root-ataraxy-handlers
-  [{[:my-project.handler/list-root
+  [{[:sapid.handler/list-root
      :my-project.handler.members/list-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:my-project.handler/create-root
+   {[:sapid.handler/create-root
      :my-project.handler.members/create-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:my-project.handler/fetch-root
+   {[:sapid.handler/fetch-root
      :my-project.handler.members/fetch-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:my-project.handler/delete-root
+   {[:sapid.handler/delete-root
      :my-project.handler.members/delete-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:my-project.handler/put-root :my-project.handler.members/put-root]
+   {[:sapid.handler/put-root :my-project.handler.members/put-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:my-project.handler/patch-root
+   {[:sapid.handler/patch-root
      :my-project.handler.members/patch-root]
     {:db db-ref
      :db-keys nil
@@ -99,42 +99,42 @@
     [:my-project.handler.countries.members/patch-one-n sym-p-id sym-id sym-b]}])
 
 (def ^:private one-n-ataraxy-handlers
-  [{[:my-project.handler/list-one-n
+  [{[:sapid.handler/list-one-n
      :my-project.handler.countries.members/list-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:my-project.handler/create-one-n
+   {[:sapid.handler/create-one-n
      :my-project.handler.countries.members/create-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:my-project.handler/fetch-one-n
+   {[:sapid.handler/fetch-one-n
      :my-project.handler.countries.members/fetch-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:my-project.handler/delete-one-n
+   {[:sapid.handler/delete-one-n
      :my-project.handler.countries.members/delete-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:my-project.handler/put-one-n
+   {[:sapid.handler/put-one-n
      :my-project.handler.countries.members/put-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:my-project.handler/patch-one-n
+   {[:sapid.handler/patch-one-n
      :my-project.handler.countries.members/patch-one-n]
     {:db db-ref
      :db-keys [:spec]
@@ -166,7 +166,7 @@
     [:my-project.handler.groups.members/list-one-n sym-id sym-q]}])
 
 (def ^:private n-n-ataraxy-handlers
-  [{[:my-project.handler/create-n-n
+  [{[:sapid.handler/create-n-n
      :my-project.handler.members.groups/create-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -174,7 +174,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"id" "email"}}}
-   {[:my-project.handler/create-n-n
+   {[:sapid.handler/create-n-n
      :my-project.handler.groups.members/create-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -182,7 +182,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"id" "email"}}}
-   {[:my-project.handler/delete-n-n
+   {[:sapid.handler/delete-n-n
      :my-project.handler.members.groups/delete-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -190,7 +190,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"id" "email"}}}
-   {[:my-project.handler/delete-n-n
+   {[:sapid.handler/delete-n-n
      :my-project.handler.groups.members/delete-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -198,14 +198,14 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"id" "email"}}}
-   {[:my-project.handler/list-one-n
+   {[:sapid.handler/list-one-n
      :my-project.handler.members.groups/list-one-n]
     {:db db-ref
      :db-keys [:spec]
      :p-col "member_id"
      :table "members_groups"
      :cols #{"id" "email"}}}
-   {[:my-project.handler/list-one-n
+   {[:sapid.handler/list-one-n
      :my-project.handler.groups.members/list-one-n]
     {:db db-ref
      :db-keys [:spec]
