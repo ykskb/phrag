@@ -1,7 +1,7 @@
-(ns lapis.handler
+(ns sapid.handler
   (:require [ataraxy.response :as response]
             [clojure.string :as s]
-            [lapis.db :as db]
+            [sapid.db :as db]
             [integrant.core :as ig]))
 
 (def ^:private operator-map
@@ -33,9 +33,9 @@
 
 (defmethod ig/init-key ::list-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
-  (fn [{[_ query] :ataraxy/result}]
-    (let [res (db/list db-con table (query->filters query cols))]
-      [::response/ok res]))))
+    (fn [{[_ query] :ataraxy/result}]
+      (let [res (db/list db-con table (query->filters query cols))]
+        [::response/ok res]))))
 
 (defmethod ig/init-key ::create-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]

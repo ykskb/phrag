@@ -1,7 +1,7 @@
-(ns lapis.core
+(ns sapid.core
   (:require [clojure.string :as s]
             [duct.core :as core]
-            [lapis.db :as db]
+            [sapid.db :as db]
             [inflections.core :as inf]
             [integrant.core :as ig]
             [clojure.pprint :as pp]))

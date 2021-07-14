@@ -1,7 +1,7 @@
-(ns lapis.core-test
+(ns sapid.core-test
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
-            [lapis.core :as lapis]
+            [sapid.core :as sapid]
             [integrant.core :as ig]))
 
 (def ^:private db-ref (ig/ref :test-db-ref))
@@ -48,30 +48,30 @@
      :my-project.handler.members/create-root]
     {:db db-ref
      :db-keys nil
-     :table "members",
+     :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
    {[:my-project.handler/fetch-root
      :my-project.handler.members/fetch-root]
     {:db db-ref
      :db-keys nil
-     :table "members",
+     :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
    {[:my-project.handler/delete-root
      :my-project.handler.members/delete-root]
     {:db db-ref
      :db-keys nil
-     :table "members",
+     :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
    {[:my-project.handler/put-root :my-project.handler.members/put-root]
     {:db db-ref
      :db-keys nil
-     :table "members",
+     :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
    {[:my-project.handler/patch-root
      :my-project.handler.members/patch-root]
     {:db db-ref
      :db-keys nil
-     :table "members",
+     :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}])
 
 (def ^:private one-n-option
@@ -103,43 +103,43 @@
      :my-project.handler.countries.members/list-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members",
-     :p-col "country_id",
+     :table "members"
+     :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
    {[:my-project.handler/create-one-n
      :my-project.handler.countries.members/create-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members",
-     :p-col "country_id",
+     :table "members"
+     :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
    {[:my-project.handler/fetch-one-n
      :my-project.handler.countries.members/fetch-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members",
-     :p-col "country_id",
+     :table "members"
+     :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
    {[:my-project.handler/delete-one-n
      :my-project.handler.countries.members/delete-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members",
-     :p-col "country_id",
+     :table "members"
+     :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
    {[:my-project.handler/put-one-n
      :my-project.handler.countries.members/put-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members",
-     :p-col "country_id",
+     :table "members"
+     :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
    {[:my-project.handler/patch-one-n
      :my-project.handler.countries.members/patch-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members",
-     :p-col "country_id",
+     :table "members"
+     :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}])
 
 (def ^:private n-n-option
@@ -170,65 +170,65 @@
      :my-project.handler.members.groups/create-n-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members_groups",
-     :col-a "member_id",
-     :col-b "group_id",
+     :table "members_groups"
+     :col-a "member_id"
+     :col-b "group_id"
      :cols #{"id" "email"}}}
    {[:my-project.handler/create-n-n
      :my-project.handler.groups.members/create-n-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members_groups",
-     :col-a "member_id",
-     :col-b "group_id",
+     :table "members_groups"
+     :col-a "member_id"
+     :col-b "group_id"
      :cols #{"id" "email"}}}
    {[:my-project.handler/delete-n-n
      :my-project.handler.members.groups/delete-n-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members_groups",
-     :col-a "member_id",
-     :col-b "group_id",
+     :table "members_groups"
+     :col-a "member_id"
+     :col-b "group_id"
      :cols #{"id" "email"}}}
    {[:my-project.handler/delete-n-n
      :my-project.handler.groups.members/delete-n-n]
     {:db db-ref
      :db-keys [:spec]
-     :table "members_groups",
-     :col-a "member_id",
-     :col-b "group_id",
+     :table "members_groups"
+     :col-a "member_id"
+     :col-b "group_id"
      :cols #{"id" "email"}}}
    {[:my-project.handler/list-one-n
      :my-project.handler.members.groups/list-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :p-col "member_id",
-     :table "members_groups",
+     :p-col "member_id"
+     :table "members_groups"
      :cols #{"id" "email"}}}
    {[:my-project.handler/list-one-n
      :my-project.handler.groups.members/list-one-n]
     {:db db-ref
      :db-keys [:spec]
-     :p-col "group_id",
-     :table "members_groups",
+     :p-col "group_id"
+     :table "members_groups"
      :cols #{"id" "email"}}}])
 
 (deftest ataraxy-routes-creation
   (testing "root type from config"
     (is (= {:routes root-ataraxy-routes
             :handlers root-ataraxy-handlers}
-           (lapis/rest-routes
-            (lapis/make-rest-config {} root-option)))))
+           (sapid/rest-routes
+            (sapid/make-rest-config {} root-option)))))
   (testing "one-to-n relation type from option"
     (is (= {:routes one-n-ataraxy-routes
             :handlers one-n-ataraxy-handlers}
-           (lapis/rest-routes
-            (lapis/make-rest-config {} one-n-option)))))
+           (sapid/rest-routes
+            (sapid/make-rest-config {} one-n-option)))))
   (testing "n-to-n relation type from option"
     (is (= {:routes n-n-ataraxy-routes
             :handlers n-n-ataraxy-handlers}
-           (lapis/rest-routes
-            (lapis/make-rest-config {} n-n-option))))))
+           (sapid/rest-routes
+            (sapid/make-rest-config {} n-n-option))))))
 
 (defn create-database []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
@@ -279,7 +279,7 @@
               {:name "name"}
               {:name "postal_code"}]
     :relation-types [:root]
-    :belongs-to []}     
+    :belongs-to []}
    {:name "meetups"
     :columns [{:name "id"}
               {:name "title"}
@@ -307,7 +307,7 @@
                       (assoc m (:name table)
                              (assoc table :col-names col-names))))
                   {}
-                  (lapis/schema-from-db (create-database)))]
+                  (sapid/schema-from-db (create-database)))]
       (doseq [exp-table expected-schema-map]
         (let [res-table (get res-map (:name exp-table))]
           (is (= (map #(:name %) (:columns exp-table)) (:col-names res-table)))

@@ -1,4 +1,4 @@
-(ns lapis.db
+(ns sapid.db
   (:require [clojure.java.jdbc :as jdbc]
             [honey.sql.helpers :refer
              [select update delete-from from where] :as h]

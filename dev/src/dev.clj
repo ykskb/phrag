@@ -26,6 +26,15 @@
 (defmethod ig/init-key ::app [_ _]
   hello-world)
 
+;;; routes
+
+(defmethod ig/init-key ::routes [_ _]
+  ["/" {"todos" {:get
+                 :post create-todo}
+        ["todos/" :todo-id] {:get fetch-todo
+                             :delete delete-todo
+                             :put update-todo}}])
+
 ;;; API server
 
 (defmethod ig/init-key ::server [_ {:keys [app options]}]
@@ -34,7 +43,8 @@
 (defmethod ig/halt-key! ::server [_ server]
   (.stop server))
 
-(integrant.repl/set-prep! (constantly {::app {}
+(integrant.repl/set-prep! (constantly {::routes {}
+                                       ::app {:routes (ig/ref ::routes)}
                                        ::server {:app (ig/ref ::app)
                                                  :options {:port 3000
                                                            :join? false}}}))
