@@ -6,17 +6,19 @@ Sapid configures REST API endpoints from DB schema at app init time, leveraging 
 
 #### Features:
 
-* Auto-registers routes & handlers from a single line of config for [Ataraxy](https://github.com/weavejester/ataraxy) in [Duct](https://github.com/duct-framework/duct). (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
+* Auto-registers routes & handlers from a single line of config for [Duct](https://github.com/duct-framework/duct) projects with [Ataraxy](https://github.com/weavejester/ataraxy). (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
 
 * DB schema can be retrieved from a running DB or specified with a config map.
 
-* Query filters, sorting and pagination come out of the box.
+* Query [filters](#filters), sorting and pagination come out of the box.
 
 #### Notes:
 
-* This project is currently in state of work-in-progress.
+* This project is currently in POC state and it's not been published to Clojars yet.
 
-* Sapid comes with generalizations which are the trade-offs for instantly working endpoints.
+* Sapid aims to keep itself modular so it works with other libraries.
+
+* GraphQL API is also under consideration.
 
 ### Schema to REST Endpoints
 
@@ -73,8 +75,6 @@ Auto-configuration from a running DB leverages naming patterns of tables and col
 	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-N` relationship is identified per column.
 
 *If other naming patterns are required, table names can be specified in the [config map](#sapid-config).
-
-
 
 #### Schema from a Config Map
 
@@ -138,6 +138,20 @@ Please refer to [config section](#sapid-config) for the format of schema data.
 | :belongs-to     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
 | :pre-signal     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
 | :post-signal    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
+
+### Filters
+
+Sapid uses format of `?column=[operator]:[value]` for filter query params.
+
+* Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
+
+* Operators default to `eq` when omitted.
+
+* Multiple queries are applied with `AND` operator.
+
+##### Example:
+
+`?id=lt:100&id=ne:1` (where `id` is less than `100` `AND` `id` is not equal to `1`.)
 
 ### Environment
 
