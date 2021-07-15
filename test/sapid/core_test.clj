@@ -146,8 +146,8 @@
   {:project-ns "my-project"
    :db-ref db-ref
    :tables [{:name "members_groups"
-             :columns [{:name "id"}
-                       {:name "email"}]
+             :columns [{:name "member_id"}
+                       {:name "group_id"}]
              :relation-types [:n-n]
              :belongs-to ["members" "groups"]}]})
 
@@ -161,9 +161,9 @@
    {[:post "/groups/" sym-id-a "/members/" sym-id-b "/delete"]
     [:my-project.handler.groups.members/delete-n-n sym-id-a sym-id-b]}
    {[:get "/members/" sym-id "/groups" {sym-q :query-params}]
-    [:my-project.handler.members.groups/list-one-n sym-id sym-q]}
+    [:my-project.handler.members.groups/list-n-n sym-id sym-q]}
    {[:get "/groups/" sym-id "/members" {sym-q :query-params}]
-    [:my-project.handler.groups.members/list-one-n sym-id sym-q]}])
+    [:my-project.handler.groups.members/list-n-n sym-id sym-q]}])
 
 (def ^:private n-n-ataraxy-handlers
   [{[:sapid.handler/create-n-n
@@ -173,7 +173,7 @@
      :table "members_groups"
      :col-a "member_id"
      :col-b "group_id"
-     :cols #{"id" "email"}}}
+     :cols #{"group_id" "member_id"}}}
    {[:sapid.handler/create-n-n
      :my-project.handler.groups.members/create-n-n]
     {:db db-ref
@@ -181,7 +181,7 @@
      :table "members_groups"
      :col-a "member_id"
      :col-b "group_id"
-     :cols #{"id" "email"}}}
+     :cols #{"group_id" "member_id"}}}
    {[:sapid.handler/delete-n-n
      :my-project.handler.members.groups/delete-n-n]
     {:db db-ref
@@ -189,7 +189,7 @@
      :table "members_groups"
      :col-a "member_id"
      :col-b "group_id"
-     :cols #{"id" "email"}}}
+     :cols #{"group_id" "member_id"}}}
    {[:sapid.handler/delete-n-n
      :my-project.handler.groups.members/delete-n-n]
     {:db db-ref
@@ -197,21 +197,25 @@
      :table "members_groups"
      :col-a "member_id"
      :col-b "group_id"
-     :cols #{"id" "email"}}}
-   {[:sapid.handler/list-one-n
-     :my-project.handler.members.groups/list-one-n]
+     :cols #{"group_id" "member_id"}}}
+   {[:sapid.handler/list-n-n
+     :my-project.handler.members.groups/list-n-n]
     {:db db-ref
      :db-keys [:spec]
-     :p-col "member_id"
-     :table "members_groups"
-     :cols #{"id" "email"}}}
-   {[:sapid.handler/list-one-n
-     :my-project.handler.groups.members/list-one-n]
+     :nn-p-col "member_id"
+     :nn-join-col "group_id"
+     :table "groups"
+     :nn-table "members_groups"
+     :cols #{"group_id" "member_id"}}}
+   {[:sapid.handler/list-n-n
+     :my-project.handler.groups.members/list-n-n]
     {:db db-ref
      :db-keys [:spec]
-     :p-col "group_id"
-     :table "members_groups"
-     :cols #{"id" "email"}}}])
+     :nn-p-col "group_id"
+     :nn-join-col "member_id"
+     :table "members"
+     :nn-table "members_groups"
+     :cols #{"group_id" "member_id"}}}])
 
 (deftest ataraxy-routes-creation
   (testing "root type from config"

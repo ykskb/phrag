@@ -3,7 +3,7 @@
   (:require [clojure.core :as c]
             [clojure.java.jdbc :as jdbc]
             [honey.sql.helpers :refer
-             [select update delete-from from where] :as h]
+             [select update delete-from from where join] :as h]
             [honey.sql :as sql]))
 
 ;; todo: query handling to be improved with proper formatting
@@ -35,6 +35,15 @@
 (defn list-up [db rsc & [filters]]
   (println filters (not-empty filters))
   (let [q (-> (select :*) (from (keyword rsc)))
+        q (if (not-empty filters) (apply where q filters) q)]
+    (println (sql/format q))
+    (->> (sql/format q)
+         (jdbc/query db))))
+
+(defn list-through [db rsc nn nn-join-col & [filters]]
+  (let [nn-col-key (keyword (str "nn." nn-join-col))
+        q (-> (select :t.*) (from [(keyword nn) :nn])
+              (join [(keyword rsc) :t] [:= nn-col-key :t.id]))
         q (if (not-empty filters) (apply where q filters) q)]
     (println (sql/format q))
     (->> (sql/format q)

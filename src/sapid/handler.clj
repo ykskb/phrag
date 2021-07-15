@@ -116,6 +116,16 @@
 
 ;; n-n
 
+(defmethod ig/init-key ::list-n-n
+  [_ {:keys [db db-keys table nn-table nn-join-col nn-p-col cols]}]
+  (let [db-con (get-in db db-keys)]
+    (fn [{[_ p-id {:as query}] :ataraxy/result}]
+      (let [nn-link-col (str "nn." nn-p-col)
+            cols (conj cols nn-link-col)
+            filters (query->filters (assoc query nn-link-col p-id) cols)
+            res (db/list-through db-con table nn-table nn-join-col filters)]
+        [::response/ok res]))))  
+
 (defmethod ig/init-key ::create-n-n
   [_ {:keys [db db-keys table col-a col-b cols]}]
   (let [db-con (get-in db db-keys)]

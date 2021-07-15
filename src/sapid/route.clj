@@ -125,7 +125,8 @@
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
         rsc-path (str "/" (to-path-rsc rsc config))
         opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :p-col (to-col-name p-rsc) :table table-name
+              :table (to-table-name rsc config) :nn-table table-name
+              :nn-join-col (to-col-name rsc) :nn-p-col (to-col-name p-rsc)
               :cols (col-names table)}]
     (reduce (fn [m [action path param-names]]
               (let [rscs (str p-rsc "." rsc)
@@ -136,7 +137,7 @@
                     (update :handlers conj (handler-map
                                             handler-key route-key opts)))))
             {:routes [] :handlers []}
-            [["list-one-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
+            [["list-n-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
               [^int 'id 'q]]])))
 
 
