@@ -121,8 +121,6 @@
         db-keys (if (contains? options :db-keys) (:db-keys options) [:spec])
         db-ref (or (:db-ref options) (ig/ref db-config-key))
         db (or (:db options) (get-db config db-config-key db-keys))]
-    (println "database: ")
-    (println db)
     (-> {}
         (assoc :project-ns (get-project-ns config options))
         (assoc :router (:router options :ataraxy))
@@ -134,7 +132,7 @@
         (assoc :table-name-plural (:table-name-plural options true))
         (assoc :resource-path-plural (:resource-path-plural options true)))))
 
-(defmethod ig/init-key ::register [_ options]
+(defmethod ig/init-key ::merge-on-duct [_ options]
   (fn [config]
     (let [rest-config (make-rest-config config options)
           routes (rest-routes rest-config)]
