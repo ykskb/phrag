@@ -15,5 +15,5 @@
  :duct.module/logging {}
  :duct.module.web/api {}
  :duct.module/sql {}
- :sapid.core/register {}}
+ :sapid.core/merge-on-duct {}}
 
