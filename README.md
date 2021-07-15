@@ -2,7 +2,7 @@
 
 REST APIs from DB Schema
 
-Sapid configures REST API endpoints from DB schema at app init time, leveraging [Integrant](https://github.com/weavejester/integrant).
+Sapid constructs REST API endpoints from DB schema at app initialization time, leveraging [Integrant](https://github.com/weavejester/integrant).
 
 #### Features:
 
@@ -124,28 +124,28 @@ Config values can be provided for overriding default values.
 
 ##### Parameter Details:
 
-| Key                   | Description                                                                  | Default Value         |
-|-----------------------|------------------------------------------------------------------------------|-----------------------|
-| :project-ns           | Project namespace. It'll be used for route keys.                             | From `:duct.core`     |
-| :router               | Router type.                                                                 | `:ataraxy`            |
-| :db                   | Database connection object. If provided Sapid won't init the :db-config-key. | From `:db-config-key` |
-| :db-ref               | Integrant reference to a database connection for REST handler configs.       | From `:db-config-key` |
-| :db-config-key        | Integrant key for a database connection.                                     | `:duct.database/sql`  |
-| :db-keys              | Keys to get a connection from a database.                                    | [:spec]               |
-| :table-name-plural    | `true` if tables uses plural naming like `users` instead of `user`.          | `true`                |
-| :resource-path-plural | `true` if plural is desired for URL paths like `/users` instead of `/user`.  | `true`                |
-| :tables               | DB schema including list of table definitions.                               | From `:db`            |
+| Key                     | Description                                                                  | Default Value                 |
+|-------------------------|------------------------------------------------------------------------------|-------------------------------|
+| `:project-ns`           | Project namespace. It'll be used for route keys.                             | Loaded from `:duct.core`      |
+| `:router`               | Router type.                                                                 | `:ataraxy`                    |
+| `:db`                   | Database connection object. If provided Sapid won't init the :db-config-key. | Created from `:db-config-key` |
+| `:db-ref`               | Integrant reference to a database connection for REST handler configs.       | Created from `:db-config-key` |
+| `:db-config-key`        | Integrant key for a database connection.                                     | `:duct.database/sql`          |
+| `:db-keys`              | Keys to get a connection from a database.                                    | [:spec]                       |
+| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.          | `true`                        |
+| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.  | `true`                        |
+| `:tables`               | DB schema including list of table definitions.                               | Created from `:db`            |
 
 ##### Table Details:
 
-| Key             | Description                                                                                                       |
-|-----------------|-------------------------------------------------------------------------------------------------------------------|
-| :relation-types | List of relation types. `:root`, `:one-n` and `:n-n` are supported.                                               |
-| :name           | Table name.                                                                                                       |
-| :columns        | List of columns. A column can contain `:name` and `:type` parameters.                                             |
-| :belongs-to     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
-| :pre-signal     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
-| :post-signal    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
+| Key               | Description                                                                                                       |
+|-------------------|-------------------------------------------------------------------------------------------------------------------|
+| `:relation-types` | List of relation types. `:root`, `:one-n` and `:n-n` are supported.                                               |
+| `:name`           | Table name.                                                                                                       |
+| `:columns`        | List of columns. A column can contain `:name` and `:type` parameters.                                             |
+| `:belongs-to`     | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
+| `:pre-signal`     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
+| `:post-signal`    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
 
 ### Filters
 
