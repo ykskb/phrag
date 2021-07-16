@@ -136,4 +136,74 @@
                  (delete-hdlr {:ataraxy/result [nil "1" "1"]}))))
         (testing "list does not return a deleted item"
           (is (= [:ataraxy.response/ok []]
-                 (list-hdlr {:ataraxy/result [nil "1"]}))))))))
+                 (list-hdlr {:ataraxy/result [nil "1"]})))))))
+
+  (testing "n-n resource routes"
+    (let [db (create-database)
+          cols #{"member_id" "group_id"}
+          list-a-opt {:db db :db-keys [] :table "groups"
+                      :nn-table "groups_members" :nn-join-col "group_id"
+                      :nn-p-col "member_id" :cols cols}
+          list-b-opt {:db db :db-keys [] :table "members"
+                      :nn-table "groups_members" :nn-join-col "member_id"
+                      :nn-p-col "group_id" :cols cols}
+          opt {:db db :db-keys [] :table "groups_members"
+               :col-a "member_id" :col-b "group_id" :cols cols}
+          list-a-hdlr (:sapid.handler/list-n-n
+                       (ig/init {:sapid.handler/list-n-n list-a-opt}))
+          list-b-hdlr (:sapid.handler/list-n-n
+                       (ig/init {:sapid.handler/list-n-n list-b-opt}))
+          create-hdlr (:sapid.handler/create-n-n
+                       (ig/init {:sapid.handler/create-n-n opt}))
+          delete-hdlr (:sapid.handler/delete-n-n
+                       (ig/init {:sapid.handler/delete-n-n opt}))]
+      (let [rsc-a-1 {:id 1
+                     :name "clojure meetup"
+                     :created_at nil}
+            rsc-a-2 {:id 2
+                     :name "common lisp meetup"
+                     :created_at nil}
+            rsc-b {:id 1
+                   :first_name "john"
+                   :last_name "doe"
+                   :email "john@test.com"}]
+        (doto db
+          (jdbc/execute! (str "insert into members "
+                              "(first_name, last_name, email) values "
+                              "('john', 'doe', 'john@test.com');"))
+          (jdbc/execute! (str "insert into groups "
+                              "(name) values "
+                              "('clojure meetup');"))
+          (jdbc/execute! (str "insert into groups "
+                              "(name) values "
+                              "('common lisp meetup');")))
+        (testing "list a returns empty list"
+          (is (= [:ataraxy.response/ok []]
+                 (list-a-hdlr {:ataraxy/result [nil "1"]}))))
+        (testing "create n-to-n entry returns 200"
+          (is (= [:ataraxy.response/ok]
+                 (create-hdlr {:ataraxy/result [nil "1" "1"]}))))
+        (testing "list-a returns a linked item"
+          (is (= [:ataraxy.response/ok [rsc-a-1]]
+                 (list-a-hdlr {:ataraxy/result [nil "1"]}))))
+        (testing "list-b returns a linked item"
+          (is (= [:ataraxy.response/ok [rsc-b]]
+                 (list-b-hdlr {:ataraxy/result [nil "1"]}))))
+        (testing "create n-to-n entry with another resource-a returns 200"
+          (is (= [:ataraxy.response/ok]
+                 (create-hdlr {:ataraxy/result [nil "1" "2"]}))))
+        (testing "list a returns all linked items"
+          (is (= [:ataraxy.response/ok [rsc-a-1 rsc-a-2]]
+                 (list-a-hdlr {:ataraxy/result [nil "1"]}))))
+        (testing "list b returns a linked item"
+          (is (= [:ataraxy.response/ok [rsc-b]]
+                 (list-b-hdlr {:ataraxy/result [nil "1"]}))))
+        (testing "delete first n-to-n entry returns 200"
+          (is (= [:ataraxy.response/ok]
+                 (delete-hdlr {:ataraxy/result [nil "1" "1"]}))))
+        (testing "list-a returns a linked item after deletion"
+          (is (= [:ataraxy.response/ok [rsc-a-2]]
+                 (list-a-hdlr {:ataraxy/result [nil "1"]}))))
+        (testing "list-b returns empty list after deletion"
+          (is (= [:ataraxy.response/ok []]
+                 (list-b-hdlr {:ataraxy/result [nil "1"]}))))))))

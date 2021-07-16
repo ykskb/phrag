@@ -29,7 +29,7 @@
           []
           query))
 
-;; root
+;;; root
 
 (defmethod ig/init-key ::list-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
@@ -68,7 +68,7 @@
       (db/update! db-con table id params)
       [::response/ok])))
 
-;; one-n
+;;; one-n
 
 (defmethod ig/init-key ::list-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
@@ -114,7 +114,7 @@
       (println (db/update! db-con table id params p-col p-id))
       [::response/ok])))
 
-;; n-n
+;;; n-n
 
 (defmethod ig/init-key ::list-n-n
   [_ {:keys [db db-keys table nn-table nn-join-col nn-p-col cols]}]
@@ -130,17 +130,17 @@
   [_ {:keys [db db-keys table col-a col-b cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id-a id-b {:as params}] :ataraxy/result}]
-      (println params)
       (let [params (-> params (assoc col-a id-a) (assoc col-b id-b))]
-        (println params table)
-        [::response/ok (db/create! db-con table params)]))))
+        (db/create! db-con table params)
+        [::response/ok]))))
 
 (defmethod ig/init-key ::delete-n-n
   [_ {:keys [db db-keys table col-a col-b cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id-a id-b] :ataraxy/result}]
       (let [filters (query->filters {col-a id-a col-b id-b} cols)]
-        [::response/ok (db/delete-where! db-con table filters)]))))
+        (db/delete-where! db-con table filters)
+        [::response/ok]))))
 
 (defmethod ig/init-key ::static [_ {:keys [db]}]
   (fn [{[c] :ataraxy/result}]
