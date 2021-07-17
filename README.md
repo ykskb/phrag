@@ -6,6 +6,8 @@ Sapid constructs REST API endpoints from DB schema at app initialization time, l
 
 #### Features:
 
+* Supports reasonable sets of APIs for `one-to-one`, `one-to-many` and `many-to-many` relationships as well as `root` entities.
+
 * Auto-registers routes & handlers from a single line of config for [Duct](https://github.com/duct-framework/duct) projects with [Ataraxy](https://github.com/weavejester/ataraxy). (Currently working on [bidi](https://github.com/juxt/bidi) and [reitit](https://github.com/metosin/reitit).)
 
 * DB schema can be retrieved from a running DB or specified with a config map.
@@ -14,7 +16,7 @@ Sapid constructs REST API endpoints from DB schema at app initialization time, l
 
 #### Notes:
 
-* This project is currently in POC state and it's not been published to Clojars yet.
+* This project is currently in POC state and hasn't been published to Clojars yet.
 
 * Sapid aims to keep itself modular so it works with other libraries.
 
@@ -22,9 +24,9 @@ Sapid constructs REST API endpoints from DB schema at app initialization time, l
 
 ### Schema to REST Endpoints
 
-![Image of Schema to APIs](./docs/images/db-rest-apis-highlighted.png)
+![Image of Schema to APIs](./docs/images/sapid-schema.png)
 
-We can see three types of relationships in the example above: `Root`, `N-to-N` and `1-to-N`. Sapid configures REST endpoints for each type as below:
+We can see four types of relationships in the example above: `Root`, `1-to-1`, `1-to-N` and `N-to-N`. Sapid constructs REST endpoints for each type as below:
 
 * `Root`
 
@@ -33,7 +35,7 @@ We can see three types of relationships in the example above: `Root`, `N-to-N` a
 | `GET`, `POST`                              | `/resource`      |
 | `GET`, `DELETE`, `PUT` and `PATCH`         | `/resource/{id}` |
 
-* `1-to-N`
+* `1-to-1`/`1-to-N`
 
 | HTTP methods                       | Routes                                                   |
 |------------------------------------|----------------------------------------------------------|
@@ -70,11 +72,11 @@ Auto-configuration from a running DB leverages naming patterns of tables and col
 
 	A table name without `_` would be classified as `Root`, and a table name pattern of `resourcea_resourceb` such as `members_groups` is assumed for `N-to-N` tables. 
 
-2. `1-to-N` relationship?
+2. `1-to-1`/`1-to-N` relationship?
 
-	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-N` relationship is identified per column.
+	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-1`/`1-to-N` relationship is identified per column.
 
-*If other naming patterns are required, table names can be specified in the [config map](#sapid-config).
+> If other naming patterns are required, table names can be specified in the [config map](#sapid-config).
 
 #### Schema from a Config Map
 
@@ -89,7 +91,7 @@ Auto-configuration from a running DB leverages naming patterns of tables and col
 
 When `tables` data is provided in a config, Sapid uses it for DB schema instead of retrieving from a database.
 
-Please refer to [config section](#sapid-config) for the format of schema data.
+> Please refer to [config section](#sapid-config) for the format of schema data.
 
 ### Sapid Config
 
@@ -103,7 +105,7 @@ Config values can be provided for overriding default values.
  :db {:datasource #object[]}
  :db-ref #ig/ref :my-database
  :db-config-key :duct.database/sql
- :db-keys ["db-spec"]
+ :db-keys [:spec]
  :table-name-plural true
  :resource-path-plural true
  :tables [
