@@ -14,6 +14,7 @@
 
 (def ^:private root-option
   {:project-ns "my-project"
+   :router :ataraxy
    :db-ref db-ref
    :db-keys nil
    :tables [{:name "members"
@@ -76,7 +77,9 @@
 
 (def ^:private one-n-option
   {:project-ns "my-project"
+   :router :ataraxy
    :db-ref db-ref
+   :db-keys [:spec]
    :tables [{:name "members"
              :columns [{:name "id"}
                        {:name "email"}
@@ -144,7 +147,9 @@
 
 (def ^:private n-n-option
   {:project-ns "my-project"
+   :router :ataraxy
    :db-ref db-ref
+   :db-keys [:spec]
    :tables [{:name "members_groups"
              :columns [{:name "member_id"}
                        {:name "group_id"}]
@@ -222,17 +227,17 @@
     (is (= {:routes root-ataraxy-routes
             :handlers root-ataraxy-handlers}
            (sapid/rest-routes
-            (sapid/make-rest-config {} root-option)))))
+            (sapid/make-rest-config root-option)))))
   (testing "one-to-n relation type from option"
     (is (= {:routes one-n-ataraxy-routes
             :handlers one-n-ataraxy-handlers}
            (sapid/rest-routes
-            (sapid/make-rest-config {} one-n-option)))))
+            (sapid/make-rest-config one-n-option)))))
   (testing "n-to-n relation type from option"
     (is (= {:routes n-n-ataraxy-routes
             :handlers n-n-ataraxy-handlers}
            (sapid/rest-routes
-            (sapid/make-rest-config {} n-n-option))))))
+            (sapid/make-rest-config n-n-option))))))
 
 (defn create-database []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}

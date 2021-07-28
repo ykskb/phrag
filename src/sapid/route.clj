@@ -34,7 +34,7 @@
 (defmulti n-n-create-routes (fn [config & _] (:router config)))
 (defmulti n-n-link-routes (fn [config & _] (:router config)))
 
-;;; Ataraxy
+;;; Duct Ataraxy
 
 (defmethod root-routes :ataraxy [config table]
   (let [ns (:project-ns config)
@@ -58,15 +58,16 @@
              ["put-root" [:put rsc-path 'id {'b :params}] [^int 'id 'b]]
              ["patch-root" [:patch rsc-path 'id {'b :params}] [^int 'id 'b]]])))
 
-(defmethod one-n-link-routes :ataraxy [config table table-name p-rsc]
+(defmethod one-n-link-routes :ataraxy [config table p-rsc]
   (let [ns (:project-ns config)
+        c-rsc (:name table)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
-        rsc-path (str "/" (to-path-rsc table-name config) "/")
-        rsc-path-end (str "/" (to-path-rsc table-name config))
+        c-rsc-path (str "/" (to-path-rsc c-rsc config) "/")
+        c-rsc-path-end (str "/" (to-path-rsc c-rsc config))
         opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :table table-name :p-col (to-col-name p-rsc)
+              :table c-rsc :p-col (to-col-name p-rsc)
               :cols (col-names table)}
-        rscs (str p-rsc "." table-name)]
+        rscs (str p-rsc "." c-rsc)]
     (reduce (fn [m [action path param-names]]
               (let [route-key (route-key ns rscs action)
                     handler-key (handler-key ns action)]
@@ -75,17 +76,17 @@
                     (update :handlers conj (handler-map
                                             handler-key route-key opts)))))
             {:routes [] :handlers []}
-            [["list-one-n" [:get p-rsc-path 'id rsc-path-end {'q :query-params}]
-              [^int 'id 'q]]
-             ["create-one-n" [:post p-rsc-path 'id rsc-path-end {'b :params}]
+            [["list-one-n" [:get p-rsc-path 'id c-rsc-path-end
+                            {'q :query-params}] [^int 'id 'q]]
+             ["create-one-n" [:post p-rsc-path 'id c-rsc-path-end {'b :params}]
               [^int 'id 'b]]
-             ["fetch-one-n" [:get p-rsc-path 'p-id rsc-path 'id
+             ["fetch-one-n" [:get p-rsc-path 'p-id c-rsc-path 'id
                              {'q :query-params}] [^int 'p-id ^int 'id 'q]]
-             ["delete-one-n" [:delete p-rsc-path 'p-id rsc-path 'id]
+             ["delete-one-n" [:delete p-rsc-path 'p-id c-rsc-path 'id]
               [^int 'p-id ^int 'id]]
-             ["put-one-n" [:put p-rsc-path 'p-id rsc-path 'id {'b :params}]
+             ["put-one-n" [:put p-rsc-path 'p-id c-rsc-path 'id {'b :params}]
               [^int 'p-id ^int 'id 'b]]
-             ["patch-one-n" [:patch p-rsc-path 'p-id rsc-path 'id {'b :params}]
+             ["patch-one-n" [:patch p-rsc-path 'p-id c-rsc-path 'id {'b :params}]
               [^int 'p-id ^int 'id 'b]]])))
 
 (defmethod n-n-create-routes :ataraxy [config table]
@@ -120,16 +121,16 @@
               [:post rsc-b-path 'id-a rsc-a-path 'id-b "/delete"]
               [^int 'id-a ^int 'id-b]]])))
 
-(defmethod n-n-link-routes :ataraxy [config table table-name p-rsc rsc]
+(defmethod n-n-link-routes :ataraxy [config table p-rsc c-rsc]
   (let [ns (:project-ns config)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
-        rsc-path (str "/" (to-path-rsc rsc config))
+        rsc-path (str "/" (to-path-rsc c-rsc config))
         opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :table (to-table-name rsc config) :nn-table table-name
-              :nn-join-col (to-col-name rsc) :nn-p-col (to-col-name p-rsc)
+              :table (to-table-name c-rsc config) :nn-table (:name table)
+              :nn-join-col (to-col-name c-rsc) :nn-p-col (to-col-name p-rsc)
               :cols (col-names table)}]
     (reduce (fn [m [action path param-names]]
-              (let [rscs (str p-rsc "." rsc)
+              (let [rscs (str p-rsc "." c-rsc)
                     route-key (route-key ns rscs action)
                     handler-key (handler-key ns action)]
                 (-> m

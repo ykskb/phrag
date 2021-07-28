@@ -8,14 +8,13 @@
             [clojure.pprint :as pp]))
 
 (defn one-n-routes [config table]
-  (let [table-name (:name table)]
-    (reduce (fn [m p-rsc]
-              (let [routes (rt/one-n-link-routes config table table-name p-rsc)]
-                (-> m
-                    (update :routes concat (:routes routes))
-                    (update :handlers concat (:handlers routes)))))
-            {:routes [] :handlers []}
-            (:belongs-to table))))
+  (reduce (fn [m p-rsc]
+            (let [routes (rt/one-n-link-routes config table p-rsc)]
+              (-> m
+                  (update :routes concat (:routes routes))
+                  (update :handlers concat (:handlers routes)))))
+          {:routes [] :handlers []}
+          (:belongs-to table)))
 
 (defn n-n-routes [config table]
   (merge-with
@@ -24,9 +23,8 @@
    (let [table-name (:name table)
          rsc-a (first (:belongs-to table))
          rsc-b (second (:belongs-to table))]
-     (reduce (fn [m [p-rsc rsc]]
-               (let [routes (rt/n-n-link-routes config table table-name
-                                                p-rsc rsc)]
+     (reduce (fn [m [p-rsc c-rsc]]
+               (let [routes (rt/n-n-link-routes config table p-rsc c-rsc)]
                  (-> m
                      (update :routes concat (:routes routes))
                      (update :handlers concat (:handlers routes)))))
@@ -93,18 +91,37 @@
              is-n-n (assoc :belongs-to (n-n-belongs-to table)))))
        (db/get-db-schema db)))
 
+(defn- get-ig-db [config db-ig-key db-keys]
+  (ig/load-namespaces config)
+  (let [init-config (ig/init config [db-ig-key])
+        db (or (db-ig-key init-config)
+               (second (first (ig/find-derived init-config db-ig-key))))]
+    (get-in db db-keys)))
+
+(defn make-rest-config [options]
+  (let [db (:db options)]
+    (-> {}
+        (assoc :project-ns (:project-ns options))
+        (assoc :router (:router options))
+        (assoc :db-keys (:db-keys options))
+        (assoc :db-ref (:db-ref options))
+        (assoc :db db)
+        (assoc :tables (or (:tables options) (schema-from-db db)))
+        (assoc :table-name-plural (:table-name-plural options true))
+        (assoc :resource-path-plural (:resource-path-plural options true)))))
+
+;;; Bidi
+
+(defn make-bidi-routes [config]
+  )
+
+(defmethod ig/init-key ::make-bidi-routes [_ options]
+  )
+
+;;; Duct Ataraxy
+
 (defn- get-project-ns [config options]
   (:project-ns options (:duct.core/project-ns config)))
-
-(defn- get-db
-  "Builds database config and returns database map by keys. Required as
-  ig/ref to :duct.database/sql is only built in :duct/profile namespace."
-  [config db-config-key db-keys]
-  (ig/load-namespaces config)
-  (let [init-config (ig/init config [db-config-key])
-        db (or (db-config-key init-config)
-               (second (first (ig/find-derived init-config db-config-key))))]
-    (get-in db db-keys)))
 
 (defmulti merge-rest-routes (fn [config & _] (:router config)))
 
@@ -116,25 +133,19 @@
         (core/merge-configs route-config)
         (core/merge-configs handler-config))))
 
-(defn make-rest-config [config options]
-  (let [db-config-key (:db-config-key options :duct.database/sql)
-        db-keys (if (contains? options :db-keys) (:db-keys options) [:spec])
-        db-ref (or (:db-ref options) (ig/ref db-config-key))
-        db (or (:db options) (get-db config db-config-key db-keys))]
-    (-> {}
-        (assoc :project-ns (get-project-ns config options))
-        (assoc :router (:router options :ataraxy))
-        (assoc :db-config-key db-config-key)
-        (assoc :db-keys db-keys)
-        (assoc :db-ref db-ref)
-        (assoc :db db)
-        (assoc :tables (or (:tables options) (schema-from-db db)))
-        (assoc :table-name-plural (:table-name-plural options true))
-        (assoc :resource-path-plural (:resource-path-plural options true)))))
-
 (defmethod ig/init-key ::merge-on-duct [_ options]
   (fn [config]
-    (let [rest-config (make-rest-config config options)
+    (let [project-ns (get-project-ns config options)
+          db-ig-key (:db-ig-key options :duct.database/sql)
+          db-keys (if (contains? options :db-keys) (:db-keys options) [:spec])
+          db-ref (or (:db-ref options) (ig/ref db-ig-key))
+          db (or (:db options) (get-ig-db config db-ig-key db-keys))
+          rest-config (make-rest-config (-> options
+                                            (assoc :router :ataraxy)
+                                            (assoc :project-ns project-ns)
+                                            (assoc :db-keys db-keys)
+                                            (assoc :db-ref db-ref)
+                                            (assoc :db db)))
           routes (rest-routes rest-config)]
 ;      (pp/pprint rest-config)
 ;      (pp/pprint routes)
