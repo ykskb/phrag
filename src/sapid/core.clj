@@ -132,9 +132,7 @@
 (defn- get-duct-project-ns [config options]
   (:project-ns options (:duct.core/project-ns config)))
 
-(defmulti merge-rest-routes (fn [config & _] (:router config)))
-
-(defmethod merge-rest-routes :ataraxy [config duct-config routes]
+(defn merge-rest-routes [config duct-config routes]
   (let [flat-routes (apply merge (:routes routes))
         route-config {:duct.router/ataraxy {:routes flat-routes}}
         handler-config (apply merge (:handlers routes))]
