@@ -2,7 +2,7 @@
 
 ;;; duct 
 
-(defn dev
+(defn dev-duct
   "Load and switch to the 'dev' namespace."
   []
   (require 'dev-duct)
@@ -11,8 +11,8 @@
 
 ;;; bidi
 
-; (defn dev
-;   []
-;   (require 'dev)
-;   (in-ns 'dev)
-;   :dev-loaded)
+ (defn dev-bidi
+   []
+   (require 'dev-bidi)
+   (in-ns 'dev-bidi)
+   :dev-loaded)

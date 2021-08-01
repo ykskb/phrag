@@ -1,6 +1,7 @@
 (ns sapid.route
   (:require [clojure.string :as s]
-            [inflections.core :as inf]))
+            [inflections.core :as inf]
+            [sapid.handler :as hd]))
 
 (defn- to-path-rsc [rsc config]
   (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
@@ -33,6 +34,89 @@
 (defmulti one-n-link-routes (fn [config & _] (:router config)))
 (defmulti n-n-create-routes (fn [config & _] (:router config)))
 (defmulti n-n-link-routes (fn [config & _] (:router config)))
+
+
+;;; Bidi
+
+(defmethod root-routes :bidi [config table]
+  (let [ns (:project-ns config)
+        db (:db config)
+        table-name (:name table)
+        cols (col-names table)
+        rsc-path (str "/" (to-path-rsc table-name config) "/")
+        rsc-path-end (str "/" (to-path-rsc table-name config))]
+    {:routes [{rsc-path-end {:get (hd/bidi-list-root db table-name cols)
+                             :post (hd/bidi-create-root db table-name cols)}
+               [rsc-path :id] {:get (hd/bidi-fetch-root db table-name cols)
+                               :delete (hd/bidi-delete-root db table-name cols)
+                               :put (hd/bidi-put-root db table-name cols)
+                               :patch (hd/bidi-patch-root db table-name cols)}}]
+     :handlers []}))
+
+(defmethod one-n-link-routes :bidi [config table p-rsc]
+  (let [ns (:project-ns config)
+        c-rsc (:name table)
+        p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
+        c-rsc-path (str "/" (to-path-rsc c-rsc config) "/")
+        c-rsc-path-end (str "/" (to-path-rsc c-rsc config))
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :table c-rsc :p-col (to-col-name p-rsc)
+              :cols (col-names table)}
+        rscs (str p-rsc "." c-rsc)]
+    {:routes []
+     :handlers []}))
+;            [["list-one-n" [:get p-rsc-path 'id c-rsc-path-end
+;                            {'q :query-params}] [^int 'id 'q]]
+;             ["create-one-n" [:post p-rsc-path 'id c-rsc-path-end {'b :params}]
+;              [^int 'id 'b]]
+;             ["fetch-one-n" [:get p-rsc-path 'p-id c-rsc-path 'id
+;                             {'q :query-params}] [^int 'p-id ^int 'id 'q]]
+;             ["delete-one-n" [:delete p-rsc-path 'p-id c-rsc-path 'id]
+;              [^int 'p-id ^int 'id]]
+;             ["put-one-n" [:put p-rsc-path 'p-id c-rsc-path 'id {'b :params}]
+;              [^int 'p-id ^int 'id 'b]]
+;             ["patch-one-n" [:patch p-rsc-path 'p-id c-rsc-path 'id {'b :params}]
+;              [^int 'p-id ^int 'id 'b]]])))
+
+(defmethod n-n-create-routes :bidi [config table]
+  (let [ns (:project-ns config)
+        table-name (:name table)
+        parts (s/split table-name #"_")
+        rsc-a (first (:belongs-to table))
+        rsc-b (second (:belongs-to table))
+        rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
+        rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :table table-name :col-a (to-col-name rsc-a)
+              :col-b (to-col-name rsc-b) :cols (col-names table)}]
+    {:routes []
+     :handlers []}))
+;            [["create-n-n" (str rsc-a "." rsc-b)
+;              [:post rsc-a-path 'id-a rsc-b-path 'id-b "/add" {'b :params}]
+;              [^int 'id-a ^int 'id-b 'b]]
+;             ["create-n-n" (str rsc-b "." rsc-a)
+;              [:post rsc-b-path 'id-a rsc-a-path 'id-b "/add" {'b :params}]
+;              [^int 'id-a ^int 'id-b 'b]]
+;             ["delete-n-n" (str rsc-a "." rsc-b)
+;              [:post rsc-a-path 'id-a rsc-b-path 'id-b "/delete"]
+;              [^int 'id-a ^int 'id-b]]
+;             ["delete-n-n" (str rsc-b "." rsc-a)
+;              [:post rsc-b-path 'id-a rsc-a-path 'id-b "/delete"]
+;              [^int 'id-a ^int 'id-b]]])))
+
+(defmethod n-n-link-routes :bidi [config table p-rsc c-rsc]
+  (let [ns (:project-ns config)
+        p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
+        c-rsc-path (str "/" (to-path-rsc c-rsc config))
+        opts {:db (:db-ref config) :db-keys (:db-keys config)
+              :table (to-table-name c-rsc config) :nn-table (:name table)
+              :nn-join-col (to-col-name c-rsc) :nn-p-col (to-col-name p-rsc)
+              :cols (col-names table)}]
+     {:routes []
+     :handlers []}))
+;            [["list-n-n" [:get p-rsc-path 'id c-rsc-path {'q :query-params}]
+;              [^int 'id 'q]]])))
+
 
 ;;; Duct Ataraxy
 
@@ -124,7 +208,7 @@
 (defmethod n-n-link-routes :ataraxy [config table p-rsc c-rsc]
   (let [ns (:project-ns config)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
-        rsc-path (str "/" (to-path-rsc c-rsc config))
+        c-rsc-path (str "/" (to-path-rsc c-rsc config))
         opts {:db (:db-ref config) :db-keys (:db-keys config)
               :table (to-table-name c-rsc config) :nn-table (:name table)
               :nn-join-col (to-col-name c-rsc) :nn-p-col (to-col-name p-rsc)
@@ -138,7 +222,7 @@
                     (update :handlers conj (handler-map
                                             handler-key route-key opts)))))
             {:routes [] :handlers []}
-            [["list-n-n" [:get p-rsc-path 'id rsc-path {'q :query-params}]
+            [["list-n-n" [:get p-rsc-path 'id c-rsc-path {'q :query-params}]
               [^int 'id 'q]]])))
 
 

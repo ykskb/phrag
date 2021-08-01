@@ -112,15 +112,24 @@
 
 ;;; Bidi
 
-(defn make-bidi-routes [config]
-  )
+(defn make-bidi-routes [options]
+  (let [project-ns (:project-ns options "sapid")
+        db (or (:db options) nil)
+        rest-config (make-rest-config (-> options
+                                          (assoc :router :bidi)
+                                          (assoc :project-ns project-ns)
+                                          (assoc :db db)))
+        ;]
+        routes (rest-routes rest-config)]
+    (println (apply merge (:routes routes)))
+    ["" (apply merge (:routes routes))]))
 
-(defmethod ig/init-key ::make-bidi-routes [_ options]
-  )
+(defmethod ig/init-key ::bidi-routes [_ options]
+  (make-bidi-routes options))
 
 ;;; Duct Ataraxy
 
-(defn- get-project-ns [config options]
+(defn- get-duct-project-ns [config options]
   (:project-ns options (:duct.core/project-ns config)))
 
 (defmulti merge-rest-routes (fn [config & _] (:router config)))
@@ -135,7 +144,7 @@
 
 (defmethod ig/init-key ::merge-on-duct [_ options]
   (fn [config]
-    (let [project-ns (get-project-ns config options)
+    (let [project-ns (get-duct-project-ns config options)
           db-ig-key (:db-ig-key options :duct.database/sql)
           db-keys (if (contains? options :db-keys) (:db-keys options) [:spec])
           db-ref (or (:db-ref options) (ig/ref db-ig-key))

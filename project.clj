@@ -24,9 +24,12 @@
    :profiles/dev {}
    :project/dev  {:source-paths   ["dev/src"]
                   :resource-paths ["dev/resources"]
-                  :dependencies   [[integrant/repl "0.3.2"]
+                  :dependencies   [[bidi "2.1.6"]
+                                   [integrant/repl "0.3.2"]
                                    [hawk "0.2.11"]
                                    [eftest "0.5.9"]
                                    [kerodon "0.9.1"]
+                                   [com.github.seancorfield/next.jdbc "1.2.674"]
                                    [ring/ring-core "1.9.3"]
+                                   [ring/ring-json "0.5.1"]
                                    [ring/ring-jetty-adapter "1.9.3"]]}})
