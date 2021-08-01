@@ -55,28 +55,22 @@
 
 (defmethod one-n-link-routes :bidi [config table p-rsc]
   (let [ns (:project-ns config)
-        c-rsc (:name table)
+        db (:db config)
+        table-name (:name table)
+        p-col (to-col-name p-rsc)
+        cols (col-names table)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
-        c-rsc-path (str "/" (to-path-rsc c-rsc config) "/")
-        c-rsc-path-end (str "/" (to-path-rsc c-rsc config))
-        opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :table c-rsc :p-col (to-col-name p-rsc)
-              :cols (col-names table)}
-        rscs (str p-rsc "." c-rsc)]
-    {:routes []
+        c-rsc-path (str "/" (to-path-rsc table-name config) "/")
+        c-rsc-path-end (str "/" (to-path-rsc table-name config))]
+    {:routes [{[p-rsc-path :p-id c-rsc-path-end]
+               {:get (hd/bidi-list-one-n db table-name p-col cols)
+                :post (hd/bidi-create-one-n db table-name p-col cols)}
+               [p-rsc-path :p-id c-rsc-path :id]
+               {:get (hd/bidi-fetch-one-n db table-name p-col cols)
+                :delete (hd/bidi-delete-one-n db table-name p-col cols)
+                :put (hd/bidi-put-one-n db table-name p-col cols)
+                :patch (hd/bidi-patch-one-n db table-name p-col cols)}}]
      :handlers []}))
-;            [["list-one-n" [:get p-rsc-path 'id c-rsc-path-end
-;                            {'q :query-params}] [^int 'id 'q]]
-;             ["create-one-n" [:post p-rsc-path 'id c-rsc-path-end {'b :params}]
-;              [^int 'id 'b]]
-;             ["fetch-one-n" [:get p-rsc-path 'p-id c-rsc-path 'id
-;                             {'q :query-params}] [^int 'p-id ^int 'id 'q]]
-;             ["delete-one-n" [:delete p-rsc-path 'p-id c-rsc-path 'id]
-;              [^int 'p-id ^int 'id]]
-;             ["put-one-n" [:put p-rsc-path 'p-id c-rsc-path 'id {'b :params}]
-;              [^int 'p-id ^int 'id 'b]]
-;             ["patch-one-n" [:patch p-rsc-path 'p-id c-rsc-path 'id {'b :params}]
-;              [^int 'p-id ^int 'id 'b]]])))
 
 (defmethod n-n-create-routes :bidi [config table]
   (let [ns (:project-ns config)

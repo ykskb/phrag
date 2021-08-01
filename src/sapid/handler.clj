@@ -40,20 +40,23 @@
   (db/list-up db-con table (query->filters query cols)))
 
 (defn create-root [params db-con table]
-  (db/create! db-con table params))
+  (db/create! db-con table params)
+  nil)
 
 (defn fetch-root [id query db-con table cols]
   (db/fetch db-con table id (query->filters query cols)))
 
 (defn delete-root [id db-con table]
-  (db/delete! db-con table id))
+  (db/delete! db-con table id)
+  nil)
 
 (defn put-root [id params db-con table]
-  (db/update! db-con table id params))
+  (db/update! db-con table id params)
+  nil)
 
 (defn patch-root [id params db-con table]
-  (db/update! db-con table id params))
-                
+  (db/update! db-con table id params)
+  nil)
 
 ;; bidi
 
@@ -64,8 +67,7 @@
 
 (defn bidi-create-root [db-con table cols]
   (fn [req]
-    (create-root (:params req) db-con table)
-    (ring-res/response nil)))
+    (ring-res/response (create-root (:params req) db-con table))))
 
 (defn bidi-fetch-root [db-con table cols]
   (fn [req]
@@ -76,20 +78,17 @@
 (defn bidi-delete-root [db-con table cols]
   (fn [req]
     (let [id (-> (:route-params req) :id)]
-      (delete-root id db-con table)
-      (ring-res/response nil))))
+      (ring-res/response (delete-root id db-con table)))))
 
 (defn bidi-put-root [db-con table cols]
   (fn [req]
     (let [id (-> (:route-params req) :id)]
-      (put-root id (:params req) db-con table)
-      (ring-res/response nil))))
+      (ring-res/response (put-root id (:params req) db-con table)))))
 
 (defn bidi-patch-root [db-con table cols]
   (fn [req]
     (let [id (-> (:route-params req) :id)]
-      (patch-root id (:params req) db-con table)
-      (ring-res/response nil))))
+      (ring-res/response (patch-root id (:params req) db-con table)))))
 
 ;; duct ataraxy
 
@@ -101,8 +100,7 @@
 (defmethod ig/init-key ::create-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ params] :ataraxy/result}]
-      (create-root params db-con table)
-      [::atr-res/ok])))
+      [::atr-res/ok (create-root params db-con table)])))
 
 (defmethod ig/init-key ::fetch-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
@@ -112,67 +110,119 @@
 (defmethod ig/init-key ::delete-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id] :ataraxy/result}]
-      (delete-root id db-con table)
-      [::atr-res/ok])))
+      [::atr-res/ok (delete-root id db-con table)])))
 
 (defmethod ig/init-key ::put-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id {:as params}] :ataraxy/result}]
-      ; TODO: params to be cover all the attributes as PUT spec
-      (put-root id params db-con table)
-      [::atr-res/ok])))
+                                        ; TODO: params to be cover all the attributes as PUT spec
+      [::atr-res/ok (put-root id params db-con table)])))
 
 (defmethod ig/init-key ::patch-root [_ {:keys [db db-keys table cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ id {:as params}] :ataraxy/result}]
-      (patch-root id params db-con table)
-      [::atr-res/ok])))
+      [::atr-res/ok (patch-root id params db-con table)])))
 
 ;;; one-n
+
+(defn list-one-n [p-col p-id query db-con table cols]
+  (let [filters (query->filters (assoc query p-col p-id) cols)]
+    (db/list-up db-con table filters)))
+
+(defn create-one-n [p-col p-id params db-con table cols]
+  (let [params (assoc params p-col p-id)]
+    (db/create! db-con table params)
+    nil))
+
+(defn fetch-one-n [id p-col p-id query db-con table cols]
+  (let [filters (query->filters (assoc query p-col p-id) cols)]
+    (db/fetch db-con table id filters)))
+
+(defn delete-one-n [id p-col p-id db-con table]
+  (db/delete! db-con table id p-col p-id)
+  nil)
+
+(defn put-one-n [id p-col p-id params db-con table]
+  (db/update! db-con table id params p-col p-id)
+  nil)
+
+(defn patch-one-n [id p-col p-id params db-con table]
+  (db/update! db-con table id params p-col p-id)
+  nil)
+
+;; bidi one-n
+
+(defn bidi-list-one-n [db-con table p-col cols]
+  (fn [req]
+    (let [p-id (-> (:route-params req) :p-id)
+          query (ring-query req)]
+      (ring-res/response (list-one-n p-col p-id query db-con table cols)))))
+
+(defn bidi-create-one-n [db-con table p-col cols]
+  (fn [req]
+    (let [p-id (-> (:route-params req) :p-id)
+          params (:params req)]
+      (ring-res/response (create-one-n p-col p-id params db-con table)))))
+
+(defn bidi-fetch-one-n [db-con table p-col cols]
+  (fn [req]
+    (let [id (-> (:route-params req) :id)
+          p-id (-> (:route-params req) :p-id)
+          query (ring-query req)]
+      (ring-res/response (fetch-one-n id p-col p-id query db-con table cols)))))
+
+(defn bidi-delete-one-n [db-con table p-col cols]
+  (fn [req]
+    (let [id (-> (:route-params req) :id)
+          p-id (-> (:route-params req) :p-id)]
+      (ring-res/response (delete-one-n id p-col p-id db-con table)))))
+
+(defn bidi-put-one-n [db-con table p-col cols]
+  (fn [req]
+    (let [id (-> (:route-params req) :id)
+          p-id (-> (:route-params req) :p-id)
+          params (:params req)]
+      (ring-res/response (put-one-n id p-col p-id params db-con table)))))
+
+(defn bidi-patch-one-n [db-con table p-col cols]
+  (fn [req]
+    (let [id (-> (:route-params req) :id)
+          p-id (-> (:route-params req) :p-id)
+          params (:params req)]
+      (ring-res/response (patch-one-n id p-col p-id params db-con table)))))
+
+;; duct ataraxy one-n
 
 (defmethod ig/init-key ::list-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ p-id {:as query}] :ataraxy/result}]
-      (println query p-id)
-      (let [filters (query->filters (assoc query p-col p-id) cols)
-            res (db/list-up db-con table filters)]
-        [::atr-res/ok res]))))
+      [::atr-res/ok (list-one-n p-col p-id query db-con table cols)])))
 
 (defmethod ig/init-key ::create-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ p-id {:as params}] :ataraxy/result}]
-      (println params)
-      (let [params (assoc params p-col p-id)
-            res (db/create! db-con table params)]
-        [::atr-res/ok]))))
+      [::atr-res/ok (create-one-n p-col p-id params db-con table cols)])))
 
 (defmethod ig/init-key ::fetch-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ p-id id {:as query}] :ataraxy/result}]
-      (let [filters (query->filters (assoc query p-col p-id) cols)
-            res (db/fetch db-con table id filters)]
-        [::atr-res/ok res]))))
+      [::atr-res/ok (fetch-one-n id p-col p-id query db-con table cols)])))
 
 (defmethod ig/init-key ::delete-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ p-id id] :ataraxy/result}]
-      ; TODO: handle p-id check
-      (let [res (db/delete! db-con table id p-col p-id)]
-        [::atr-res/ok]))))
+      [::atr-res/ok (delete-one-n id p-col p-id db-con table)])))
 
 (defmethod ig/init-key ::put-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ p-id id {:as params}] :ataraxy/result}]
-      ; TODO: params to be cover all the attributes for PUT 
-      (println "ID: " id "DATA:" params)
-      (println (db/update! db-con table id params p-col p-id))
-      [::atr-res/ok])))
+                                        ; TODO: params to be cover all the attributes for PUT 
+      [::atr-res/ok (put-one-n id p-col p-id params db-con table)])))
 
 (defmethod ig/init-key ::patch-one-n [_ {:keys [db db-keys table p-col cols]}]
   (let [db-con (get-in db db-keys)]
     (fn [{[_ p-id id {:as params}] :ataraxy/result}]
-      (println (db/update! db-con table id params p-col p-id))
-      [::atr-res/ok])))
+      [::atr-res/ok (patch-one-n id p-col p-id params db-con table)])))
 
 ;;; n-n
 

@@ -36,10 +36,10 @@
           (is (= [:ataraxy.response/ok []]
                  (list-hdlr {}))))
         (testing "create returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (create-hdlr {:ataraxy/result [nil params-a]}))))
         (testing "create returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (create-hdlr {:ataraxy/result [nil params-b]}))))
         (testing "list returns created two items"
           (is (= [:ataraxy.response/ok [created-a created-b]]
@@ -51,13 +51,13 @@
           (is (= [:ataraxy.response/ok created-a]
                  (fetch-hdlr {:ataraxy/result [nil 1]}))))
         (testing "patch returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (patch-hdlr {:ataraxy/result [nil 1 update-kv]}))))
         (testing "list returns list including updated entry"
           (is (= [:ataraxy.response/ok [updated-a created-b]]
                  (list-hdlr {}))))
         (testing "delete by id returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (delete-hdlr {:ataraxy/result [nil 1]}))))
         (testing "list does not return deleted item"
           (is (= [:ataraxy.response/ok [created-b]]
@@ -103,10 +103,10 @@
           (is (= [:ataraxy.response/ok []]
                  (list-hdlr {:ataraxy/result [nil "1"]}))))
         (testing "create under first parent returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (create-hdlr {:ataraxy/result [nil "1" params-a]}))))
         (testing "create under second parent returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (create-hdlr {:ataraxy/result [nil "2" params-b]}))))
         (testing "list returns items under first parent"
           (is (= [:ataraxy.response/ok [created-a]]
@@ -126,13 +126,13 @@
           (is (= [:ataraxy.response/ok created-a]
                  (fetch-hdlr {:ataraxy/result [nil "1" "1"]}))))
         (testing "patch returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (patch-hdlr {:ataraxy/result [nil "1" "1" update-kv]}))))
         (testing "list returns updated items under updated parent"
           (is (= [:ataraxy.response/ok [updated-a created-b]]
                  (list-hdlr {:ataraxy/result [nil "2"]}))))
         (testing "delete returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (delete-hdlr {:ataraxy/result [nil "1" "1"]}))))
         (testing "list does not return a deleted item"
           (is (= [:ataraxy.response/ok []]
