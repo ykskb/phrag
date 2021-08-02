@@ -1,4 +1,4 @@
-(ns sapid.hander-test
+(ns sapid.handler-duct-ataraxy-test
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
             [integrant.core :as ig]
