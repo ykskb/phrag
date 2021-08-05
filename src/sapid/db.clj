@@ -41,9 +41,9 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn list-through [db rsc nn nn-join-col & [filters]]
+(defn list-through [db rsc nn-table nn-join-col & [filters]]
   (let [nn-col-key (keyword (str "nn." nn-join-col))
-        q (-> (select :t.*) (from [(keyword nn) :nn])
+        q (-> (select :t.*) (from [(keyword nn-table) :nn])
               (join [(keyword rsc) :t] [:= nn-col-key :t.id]))
         q (if (not-empty filters) (apply where q filters) q)]
     (println (sql/format q))

@@ -39,8 +39,7 @@
 ;;; Bidi
 
 (defmethod root-routes :bidi [config table]
-  (let [ns (:project-ns config)
-        db (:db config)
+  (let [db (:db config)
         table-name (:name table)
         cols (col-names table)
         rsc-path (str "/" (to-path-rsc table-name config) "/")
@@ -54,8 +53,7 @@
      :handlers []}))
 
 (defmethod one-n-link-routes :bidi [config table p-rsc]
-  (let [ns (:project-ns config)
-        db (:db config)
+  (let [db (:db config)
         table-name (:name table)
         p-col (to-col-name p-rsc)
         cols (col-names table)
@@ -73,44 +71,38 @@
      :handlers []}))
 
 (defmethod n-n-create-routes :bidi [config table]
-  (let [ns (:project-ns config)
+  (let [db (:db config)
         table-name (:name table)
         parts (s/split table-name #"_")
         rsc-a (first (:belongs-to table))
         rsc-b (second (:belongs-to table))
+        col-a (to-col-name rsc-a)
+        col-b (to-col-name rsc-b)
+        cols (col-names table)
         rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
-        rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")
-        opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :table table-name :col-a (to-col-name rsc-a)
-              :col-b (to-col-name rsc-b) :cols (col-names table)}]
-    {:routes []
+        rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")]
+    {:routes [{[rsc-a-path :id-a rsc-b-path :id-b "/add"]
+               {:post (hd/bidi-create-n-n db table-name col-a col-b cols)}
+               [rsc-b-path :id-a rsc-a-path :id-b "/add"]
+               {:post (hd/bidi-create-n-n db table-name col-a col-b cols)}
+               [rsc-a-path :id-a rsc-b-path :id-b "/delete"]
+               {:post (hd/bidi-delete-n-n db table-name col-a col-b cols)}
+               [rsc-b-path :id-a rsc-a-path :id-b "/delete"]
+               {:post (hd/bidi-delete-n-n db table-name col-a col-b cols)}}]
      :handlers []}))
-;            [["create-n-n" (str rsc-a "." rsc-b)
-;              [:post rsc-a-path 'id-a rsc-b-path 'id-b "/add" {'b :params}]
-;              [^int 'id-a ^int 'id-b 'b]]
-;             ["create-n-n" (str rsc-b "." rsc-a)
-;              [:post rsc-b-path 'id-a rsc-a-path 'id-b "/add" {'b :params}]
-;              [^int 'id-a ^int 'id-b 'b]]
-;             ["delete-n-n" (str rsc-a "." rsc-b)
-;              [:post rsc-a-path 'id-a rsc-b-path 'id-b "/delete"]
-;              [^int 'id-a ^int 'id-b]]
-;             ["delete-n-n" (str rsc-b "." rsc-a)
-;              [:post rsc-b-path 'id-a rsc-a-path 'id-b "/delete"]
-;              [^int 'id-a ^int 'id-b]]])))
 
 (defmethod n-n-link-routes :bidi [config table p-rsc c-rsc]
-  (let [ns (:project-ns config)
+  (let [db (:db config)
+        nn-table (:name table)
+        table (to-table-name c-rsc config)
+        nn-join-col (to-col-name c-rsc)
+        nn-p-col (to-col-name p-rsc)
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
-        c-rsc-path (str "/" (to-path-rsc c-rsc config))
-        opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :table (to-table-name c-rsc config) :nn-table (:name table)
-              :nn-join-col (to-col-name c-rsc) :nn-p-col (to-col-name p-rsc)
-              :cols (col-names table)}]
-     {:routes []
+        c-rsc-path (str "/" (to-path-rsc c-rsc config))]
+    {:routes [{[p-rsc-path :p-id c-rsc-path]
+               {:get (hd/bidi-list-n-n db table nn-table nn-join-col nn-p-col
+                                       (col-names table))}}]
      :handlers []}))
-;            [["list-n-n" [:get p-rsc-path 'id c-rsc-path {'q :query-params}]
-;              [^int 'id 'q]]])))
-
 
 ;;; Duct Ataraxy
 

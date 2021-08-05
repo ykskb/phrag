@@ -20,8 +20,8 @@
 (defn test []
   (eftest/run-tests (eftest/find-tests "test")))
 
-(clojure.tools.namespace.repl/set-refresh-dirs "dev/src/dev_bidi.clj"
-                                               "src" "test")
+(clojure.tools.namespace.repl/set-refresh-dirs
+ "dev/src/dev_bidi.clj" "src" "test")
 
 ;;; handlers
 
@@ -48,8 +48,7 @@
  (constantly {:database.sql/connection
               {:connection-uri "jdbc:sqlite:db/dev.sqlite"}
               ;{:dbtype "sqlite" :dbname "dev.sqlite"}
-              :sapid.core/bidi-routes {:project-ns "my-test-proj"
-                                       :db (ig/ref :database.sql/connection)}
+              :sapid.core/bidi-routes {:db (ig/ref :database.sql/connection)}
               ::app {:routes (ig/ref :sapid.core/bidi-routes)}
               ::server {:app (ig/ref ::app)
                         :options {:port 3000

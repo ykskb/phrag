@@ -1,11 +1,11 @@
-(ns sapid.handler-duct-ataraxy-test
+(ns sapid.duct-ataraxy-test
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
             [integrant.core :as ig]
             [sapid.handler :refer :all]
             [sapid.core-test :refer [create-database]]))
 
-(deftest handlers
+(deftest duct-ataraxy-handlers
   (testing "root resource routes"
     (let [db (create-database)
           cols #{"first_name" "last_name" "email"}
@@ -99,7 +99,7 @@
                               "(name, postal_code) values "
                               "('office two', '23456');")))
 
-        (testing "list returns items under a parent id"
+        (testing "list returns empty list under a parent id"
           (is (= [:ataraxy.response/ok []]
                  (list-hdlr {:ataraxy/result [nil "1"]}))))
         (testing "create under first parent returns 200"
@@ -181,7 +181,7 @@
           (is (= [:ataraxy.response/ok []]
                  (list-a-hdlr {:ataraxy/result [nil "1"]}))))
         (testing "create n-to-n entry returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (create-hdlr {:ataraxy/result [nil "1" "1"]}))))
         (testing "list-a returns a linked item"
           (is (= [:ataraxy.response/ok [rsc-a-1]]
@@ -190,7 +190,7 @@
           (is (= [:ataraxy.response/ok [rsc-b]]
                  (list-b-hdlr {:ataraxy/result [nil "1"]}))))
         (testing "create n-to-n entry with another resource-a returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (create-hdlr {:ataraxy/result [nil "1" "2"]}))))
         (testing "list a returns all linked items"
           (is (= [:ataraxy.response/ok [rsc-a-1 rsc-a-2]]
@@ -199,7 +199,7 @@
           (is (= [:ataraxy.response/ok [rsc-b]]
                  (list-b-hdlr {:ataraxy/result [nil "1"]}))))
         (testing "delete first n-to-n entry returns 200"
-          (is (= [:ataraxy.response/ok]
+          (is (= [:ataraxy.response/ok nil]
                  (delete-hdlr {:ataraxy/result [nil "1" "1"]}))))
         (testing "list-a returns a linked item after deletion"
           (is (= [:ataraxy.response/ok [rsc-a-2]]

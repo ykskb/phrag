@@ -113,13 +113,10 @@
 ;;; Bidi
 
 (defn make-bidi-routes [options]
-  (let [project-ns (:project-ns options "sapid")
-        db (or (:db options) nil)
+  (let [db (or (:db options) nil)
         rest-config (make-rest-config (-> options
                                           (assoc :router :bidi)
-                                          (assoc :project-ns project-ns)
                                           (assoc :db db)))
-        ;]
         routes (rest-routes rest-config)]
     (println (apply merge (:routes routes)))
     ["" (apply merge (:routes routes))]))
