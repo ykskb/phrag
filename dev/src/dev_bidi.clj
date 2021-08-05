@@ -21,7 +21,7 @@
   (eftest/run-tests (eftest/find-tests "test")))
 
 (clojure.tools.namespace.repl/set-refresh-dirs
- "dev/src/dev_bidi.clj" "src" "test")
+ "src" "test") ; "dev/src/dev_bidi.clj" 
 
 ;;; handlers
 
