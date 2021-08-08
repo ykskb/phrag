@@ -9,5 +9,5 @@
  :duct.module/logging {}
  :duct.module.web/api {}
  :duct.module/sql {}
- :sapid.core/merge-on-duct {}}
+ :sapid.core/duct-routes {}}
 

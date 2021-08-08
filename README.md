@@ -6,7 +6,7 @@ Sapid constructs REST API endpoints from DB schema at app initialization time, l
 
 #### Features:
 
-* Auto-configures routes & ring handlers from a single line for [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy). (Currently working on [reitit](https://github.com/metosin/reitit).)
+* Auto-configures REST routes & [ring](https://github.com/ring-clojure/ring) handlers from a single line for [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy). (Currently working on [reitit](https://github.com/metosin/reitit).)
 
 * Supports APIs for `one-to-one`, `one-to-many` and `many-to-many` relationships as well as `root` entities.
 
@@ -18,7 +18,7 @@ Sapid constructs REST API endpoints from DB schema at app initialization time, l
 
 * This project is currently in POC state and hasn't been published to Clojars yet.
 
-### Schema to REST Endpoints
+### Schema to REST endpoints
 
 Here's an example schema showing how Sapid creates endpoints according to four types of relationships: `Root`, `1-to-1`, `1-to-N` and `N-to-N`. (Please refer to [Routes per relationship types](#routes-per-relationship-types) for geneic rules.)
 
@@ -31,18 +31,24 @@ Here's an example schema showing how Sapid creates endpoints according to four t
 
 * bidi
 
-```edn
-:sapid.core/bidi-routes {:db #ig/ref :your-db/connection}
+```clojure
+; Example with Integrant in Clojure codes
+{:sapid.core/bidi-routes {:db (ig/ref :my-db/connection)} ; bidi routes created from DB
+ ::app {:routes (ig/ref :sapid.core)} ; ::app key to call bidi.ring/make-handler with middleware
+ ::server {:app (ig/ref ::app)}} ; ::server key to run jetty or equivalent server process
+
+; Direct function call returns bidi routes created from DB
+(sapid.core/make-bidi-routes (jdbc/get-connection my-db-spec)) 
 ```
 
 ```clojure
-(sapid.core/make-bidi-routes (jdbc/get-connection db-spec)) ; direct function call is also possible
 ```
 
 * Duct Ataraxy
 
 ```edn
-:sapid.core/merge-on-duct {} ; at root level of duct config
+; at root/module level of duct config edn
+:sapid.core/duct-routes {} 
 ```
 
 ##### Notes:
@@ -76,17 +82,17 @@ Auto-configuration from a running DB leverages naming patterns of tables/columns
 
 ##### Notes:
 
-When `tables` data is provided, Sapid uses it for DB schema instead of retrieving from a database.
+When `tables` data is provided, Sapid uses it for table schema instead of retrieving from a DB.
 
 > Please refer to [config section](#sapid-config-map) for the format of schema data.
 
 ### Sapid config map
 
-Though configurable parameters vary by router types, Sapid doesn't require many config values generally. Some key concepts & list of parameters are as below:
+Though configurable parameters vary by router types, Sapid doesn't require many config values in general. Some key concepts & list of parameters are as below:
 
 #### Schema data
 
-Schema data is used to specify custom DB schema to construct REST APIs without querying a DB. It is specified with a list of tables under `:tables` key in the config map.
+Schema data is used to specify custom table schema to construct REST APIs without querying a DB. It is specified with a list of tables under `:tables` key in the config map.
 
 ```edn
 {:tables [
@@ -107,18 +113,18 @@ Schema data is used to specify custom DB schema to construct REST APIs without q
 }
 ```
 
-##### Table Details:
+##### Table details:
 
 | Key              	 | Description                                                                                                       |
 |------------------------|-------------------------------------------------------------------------------------------------------------------|
-| `:relation-types`      | List of relation types. `:root`, `:one-n` and `:n-n` are supported.                                               |
 | `:name`              	 | Table name.                                                                                                       |
 | `:columns`             | List of columns. A column can contain `:name` and `:type` parameters.                                             |
+| `:relation-types`      | List of relation types. `:root`, `:one-n` and `:n-n` are supported.                                               |
 | `:belongs-to`          | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
 | `:pre-save-signal`     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
 | `:post-save-signal`    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
 
-#### Parameter Details:
+#### Config parameter details:
 
 | Key                     | Description                                                                  | Default Value                 |
 |-------------------------|------------------------------------------------------------------------------|-------------------------------|
@@ -137,7 +143,7 @@ Schema data is used to specify custom DB schema to construct REST APIs without q
 | `:db-ref`               | Integrant reference to a database connection for REST handler configs.       | Created from `:db-config-key` |
 | `:db-keys`              | Keys to get a connection from a database map.                                    | [:spec]                       |
 
-### REST API Filters
+### REST API filters
 
 Sapid uses format of `?column=[operator]:[value]` for filter query params.
 

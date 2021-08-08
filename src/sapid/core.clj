@@ -137,7 +137,7 @@
         (core/merge-configs route-config)
         (core/merge-configs handler-config))))
 
-(defmethod ig/init-key ::merge-on-duct [_ options]
+(defmethod ig/init-key ::duct-routes [_ options]
   (fn [config]
     (let [project-ns (get-duct-project-ns config options)
           db-ig-key (:db-ig-key options :duct.database/sql)
