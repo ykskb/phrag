@@ -1,12 +1,6 @@
 {:duct.profile/base
- {:duct.core/project-ns sapid
-
-  :duct.router/ataraxy
-  {:routes {[:get "/static"]
-            [:sapid.handler/static]}}
-
-  :sapid.handler/static
-  {:db #ig/ref :duct.database/sql}}
+ {:duct.core/project-ns "my-project"
+  :duct.router/ataraxy {}}
 
  :duct.profile/dev   #duct/include "dev"
  :duct.profile/local #duct/include "local"

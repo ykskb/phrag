@@ -1,8 +1,8 @@
-(ns sapid.duct-ataraxy-test
+(ns sapid.handlers.duct-ataraxy-test
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
             [integrant.core :as ig]
-            [sapid.handler :refer :all]
+            [sapid.handlers.duct-ataraxy :refer :all]
             [sapid.core-test :refer [create-database]]))
 
 (deftest duct-ataraxy-handlers
@@ -10,18 +10,18 @@
     (let [db (create-database)
           cols #{"first_name" "last_name" "email"}
           opt {:db db :db-keys [] :table "members" :cols cols}
-          list-hdlr (:sapid.handler/list-root
-                     (ig/init {:sapid.handler/list-root opt}))
-          create-hdlr (:sapid.handler/create-root
-                       (ig/init {:sapid.handler/create-root opt}))
-          fetch-hdlr (:sapid.handler/fetch-root
-                      (ig/init {:sapid.handler/fetch-root opt}))
-          put-hdlr (:sapid.handler/put-root
-                    (ig/init {:sapid.handler/put-root opt}))
-          patch-hdlr (:sapid.handler/patch-root
-                      (ig/init {:sapid.handler/patch-root opt}))
-          delete-hdlr (:sapid.handler/delete-root
-                       (ig/init {:sapid.handler/delete-root opt}))]
+          list-hdlr (:sapid.handlers.duct-ataraxy/list-root
+                     (ig/init {:sapid.handlers.duct-ataraxy/list-root opt}))
+          create-hdlr (:sapid.handlers.duct-ataraxy/create-root
+                       (ig/init {:sapid.handlers.duct-ataraxy/create-root opt}))
+          fetch-hdlr (:sapid.handlers.duct-ataraxy/fetch-root
+                      (ig/init {:sapid.handlers.duct-ataraxy/fetch-root opt}))
+          put-hdlr (:sapid.handlers.duct-ataraxy/put-root
+                    (ig/init {:sapid.handlers.duct-ataraxy/put-root opt}))
+          patch-hdlr (:sapid.handlers.duct-ataraxy/patch-root
+                      (ig/init {:sapid.handlers.duct-ataraxy/patch-root opt}))
+          delete-hdlr (:sapid.handlers.duct-ataraxy/delete-root
+                       (ig/init {:sapid.handlers.duct-ataraxy/delete-root opt}))]
       (let [params-a {:first_name "john"
                       :last_name "doe"
                       :email "john@test.com"}
@@ -67,18 +67,18 @@
     (let [db (create-database)
           cols #{"title" "start_at" "venue_id" "group_id"}
           opt {:db db :db-keys [] :table "meetups" :p-col "venue_id" :cols cols}
-          list-hdlr (:sapid.handler/list-one-n
-                     (ig/init {:sapid.handler/list-one-n opt}))
-          create-hdlr (:sapid.handler/create-one-n
-                       (ig/init {:sapid.handler/create-one-n opt}))
-          fetch-hdlr (:sapid.handler/fetch-one-n
-                      (ig/init {:sapid.handler/fetch-one-n opt}))
-          put-hdlr (:sapid.handler/put-one-n
-                    (ig/init {:sapid.handler/put-one-n opt}))
-          patch-hdlr (:sapid.handler/patch-one-n
-                      (ig/init {:sapid.handler/patch-one-n opt}))
-          delete-hdlr (:sapid.handler/delete-one-n
-                       (ig/init {:sapid.handler/delete-one-n opt}))]
+          list-hdlr (:sapid.handlers.duct-ataraxy/list-one-n
+                     (ig/init {:sapid.handlers.duct-ataraxy/list-one-n opt}))
+          create-hdlr (:sapid.handlers.duct-ataraxy/create-one-n
+                       (ig/init {:sapid.handlers.duct-ataraxy/create-one-n opt}))
+          fetch-hdlr (:sapid.handlers.duct-ataraxy/fetch-one-n
+                      (ig/init {:sapid.handlers.duct-ataraxy/fetch-one-n opt}))
+          put-hdlr (:sapid.handlers.duct-ataraxy/put-one-n
+                    (ig/init {:sapid.handlers.duct-ataraxy/put-one-n opt}))
+          patch-hdlr (:sapid.handlers.duct-ataraxy/patch-one-n
+                      (ig/init {:sapid.handlers.duct-ataraxy/patch-one-n opt}))
+          delete-hdlr (:sapid.handlers.duct-ataraxy/delete-one-n
+                       (ig/init {:sapid.handlers.duct-ataraxy/delete-one-n opt}))]
       (let [params-a {:title "user group meetup Jan"
                       :start_at "2020-01-01 12:00:00"
                       :venue_id 1
@@ -149,14 +149,14 @@
                       :nn-p-col "group_id" :cols cols}
           opt {:db db :db-keys [] :table "groups_members"
                :col-a "member_id" :col-b "group_id" :cols cols}
-          list-a-hdlr (:sapid.handler/list-n-n
-                       (ig/init {:sapid.handler/list-n-n list-a-opt}))
-          list-b-hdlr (:sapid.handler/list-n-n
-                       (ig/init {:sapid.handler/list-n-n list-b-opt}))
-          create-hdlr (:sapid.handler/create-n-n
-                       (ig/init {:sapid.handler/create-n-n opt}))
-          delete-hdlr (:sapid.handler/delete-n-n
-                       (ig/init {:sapid.handler/delete-n-n opt}))]
+          list-a-hdlr (:sapid.handlers.duct-ataraxy/list-n-n
+                       (ig/init {:sapid.handlers.duct-ataraxy/list-n-n list-a-opt}))
+          list-b-hdlr (:sapid.handlers.duct-ataraxy/list-n-n
+                       (ig/init {:sapid.handlers.duct-ataraxy/list-n-n list-b-opt}))
+          create-hdlr (:sapid.handlers.duct-ataraxy/create-n-n
+                       (ig/init {:sapid.handlers.duct-ataraxy/create-n-n opt}))
+          delete-hdlr (:sapid.handlers.duct-ataraxy/delete-n-n
+                       (ig/init {:sapid.handlers.duct-ataraxy/delete-n-n opt}))]
       (let [rsc-a-1 {:id 1
                      :name "clojure meetup"
                      :created_at nil}

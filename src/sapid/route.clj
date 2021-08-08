@@ -1,7 +1,7 @@
 (ns sapid.route
   (:require [clojure.string :as s]
             [inflections.core :as inf]
-            [sapid.handler :as hd]))
+            [sapid.handlers.bidi :as bd]))
 
 (defn- to-path-rsc [rsc config]
   (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
@@ -15,26 +15,10 @@
 (defn- col-names [table]
   (set (map :name (:columns table))))
 
-(defn handler-key [project-ns action]
-  (keyword "sapid.handler" action))
-
-(defn route-key [project-ns resource action]
-  (let [ns (str project-ns ".handler." resource)] (keyword ns action)))
-
-(defn handler-map [handler-key route-key opts]
-  (derive route-key handler-key)
-  {[handler-key route-key] opts})
-
-(defn route-map [path route-key param-names]
-  (if (coll? param-names)
-    {path (into [] (concat [route-key] param-names))}
-    {path [route-key]}))
-
 (defmulti root-routes (fn [config & _] (:router config)))
 (defmulti one-n-link-routes (fn [config & _] (:router config)))
 (defmulti n-n-create-routes (fn [config & _] (:router config)))
 (defmulti n-n-link-routes (fn [config & _] (:router config)))
-
 
 ;;; Bidi
 
@@ -44,12 +28,12 @@
         cols (col-names table)
         rsc-path (str "/" (to-path-rsc table-name config) "/")
         rsc-path-end (str "/" (to-path-rsc table-name config))]
-    {:routes [{rsc-path-end {:get (hd/bidi-list-root db table-name cols)
-                             :post (hd/bidi-create-root db table-name cols)}
-               [rsc-path :id] {:get (hd/bidi-fetch-root db table-name cols)
-                               :delete (hd/bidi-delete-root db table-name cols)
-                               :put (hd/bidi-put-root db table-name cols)
-                               :patch (hd/bidi-patch-root db table-name cols)}}]
+    {:routes [{rsc-path-end {:get (bd/list-root db table-name cols)
+                             :post (bd/create-root db table-name cols)}
+               [rsc-path :id] {:get (bd/fetch-root db table-name cols)
+                               :delete (bd/delete-root db table-name cols)
+                               :put (bd/put-root db table-name cols)
+                               :patch (bd/patch-root db table-name cols)}}]
      :handlers []}))
 
 (defmethod one-n-link-routes :bidi [config table p-rsc]
@@ -61,13 +45,13 @@
         c-rsc-path (str "/" (to-path-rsc table-name config) "/")
         c-rsc-path-end (str "/" (to-path-rsc table-name config))]
     {:routes [{[p-rsc-path :p-id c-rsc-path-end]
-               {:get (hd/bidi-list-one-n db table-name p-col cols)
-                :post (hd/bidi-create-one-n db table-name p-col cols)}
+               {:get (bd/list-one-n db table-name p-col cols)
+                :post (bd/create-one-n db table-name p-col cols)}
                [p-rsc-path :p-id c-rsc-path :id]
-               {:get (hd/bidi-fetch-one-n db table-name p-col cols)
-                :delete (hd/bidi-delete-one-n db table-name p-col cols)
-                :put (hd/bidi-put-one-n db table-name p-col cols)
-                :patch (hd/bidi-patch-one-n db table-name p-col cols)}}]
+               {:get (bd/fetch-one-n db table-name p-col cols)
+                :delete (bd/delete-one-n db table-name p-col cols)
+                :put (bd/put-one-n db table-name p-col cols)
+                :patch (bd/patch-one-n db table-name p-col cols)}}]
      :handlers []}))
 
 (defmethod n-n-create-routes :bidi [config table]
@@ -82,13 +66,13 @@
         rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
         rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")]
     {:routes [{[rsc-a-path :id-a rsc-b-path :id-b "/add"]
-               {:post (hd/bidi-create-n-n db table-name col-a col-b cols)}
+               {:post (bd/create-n-n db table-name col-a col-b cols)}
                [rsc-b-path :id-a rsc-a-path :id-b "/add"]
-               {:post (hd/bidi-create-n-n db table-name col-a col-b cols)}
+               {:post (bd/create-n-n db table-name col-a col-b cols)}
                [rsc-a-path :id-a rsc-b-path :id-b "/delete"]
-               {:post (hd/bidi-delete-n-n db table-name col-a col-b cols)}
+               {:post (bd/delete-n-n db table-name col-a col-b cols)}
                [rsc-b-path :id-a rsc-a-path :id-b "/delete"]
-               {:post (hd/bidi-delete-n-n db table-name col-a col-b cols)}}]
+               {:post (bd/delete-n-n db table-name col-a col-b cols)}}]
      :handlers []}))
 
 (defmethod n-n-link-routes :bidi [config table p-rsc c-rsc]
@@ -100,11 +84,26 @@
         p-rsc-path (str "/" (to-path-rsc p-rsc config) "/")
         c-rsc-path (str "/" (to-path-rsc c-rsc config))]
     {:routes [{[p-rsc-path :p-id c-rsc-path]
-               {:get (hd/bidi-list-n-n db table nn-table nn-join-col nn-p-col
-                                       (col-names table))}}]
+               {:get (bd/list-n-n db table nn-table nn-join-col nn-p-col
+                                  (col-names table))}}]
      :handlers []}))
 
 ;;; Duct Ataraxy
+
+(defn handler-key [project-ns action]
+  (keyword "sapid.handlers.duct-ataraxy" action))
+
+(defn route-key [project-ns resource action]
+  (let [ns (str project-ns ".handler." resource)] (keyword ns action)))
+
+(defn handler-map [handler-key route-key opts]
+  (derive route-key handler-key)
+  {[handler-key route-key] opts})
+
+(defn route-map [path route-key param-names]
+  (if (coll? param-names)
+    {path (into [] (concat [route-key] param-names))}
+    {path [route-key]}))
 
 (defmethod root-routes :ataraxy [config table]
   (let [ns (:project-ns config)

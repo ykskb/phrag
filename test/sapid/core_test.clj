@@ -39,36 +39,36 @@
     [:my-project.handler.members/patch-root sym-id sym-b]}])
 
 (def ^:private root-ataraxy-handlers
-  [{[:sapid.handler/list-root
+  [{[:sapid.handlers.duct-ataraxy/list-root
      :my-project.handler.members/list-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:sapid.handler/create-root
+   {[:sapid.handlers.duct-ataraxy/create-root
      :my-project.handler.members/create-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:sapid.handler/fetch-root
+   {[:sapid.handlers.duct-ataraxy/fetch-root
      :my-project.handler.members/fetch-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:sapid.handler/delete-root
+   {[:sapid.handlers.duct-ataraxy/delete-root
      :my-project.handler.members/delete-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:sapid.handler/put-root :my-project.handler.members/put-root]
+   {[:sapid.handlers.duct-ataraxy/put-root :my-project.handler.members/put-root]
     {:db db-ref
      :db-keys nil
      :table "members"
      :cols #{"id" "email" "last_name" "first_name"}}}
-   {[:sapid.handler/patch-root
+   {[:sapid.handlers.duct-ataraxy/patch-root
      :my-project.handler.members/patch-root]
     {:db db-ref
      :db-keys nil
@@ -102,42 +102,42 @@
     [:my-project.handler.countries.members/patch-one-n sym-p-id sym-id sym-b]}])
 
 (def ^:private one-n-ataraxy-handlers
-  [{[:sapid.handler/list-one-n
+  [{[:sapid.handlers.duct-ataraxy/list-one-n
      :my-project.handler.countries.members/list-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:sapid.handler/create-one-n
+   {[:sapid.handlers.duct-ataraxy/create-one-n
      :my-project.handler.countries.members/create-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:sapid.handler/fetch-one-n
+   {[:sapid.handlers.duct-ataraxy/fetch-one-n
      :my-project.handler.countries.members/fetch-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:sapid.handler/delete-one-n
+   {[:sapid.handlers.duct-ataraxy/delete-one-n
      :my-project.handler.countries.members/delete-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:sapid.handler/put-one-n
+   {[:sapid.handlers.duct-ataraxy/put-one-n
      :my-project.handler.countries.members/put-one-n]
     {:db db-ref
      :db-keys [:spec]
      :table "members"
      :p-col "country_id"
      :cols #{"id" "email" "country_id"}}}
-   {[:sapid.handler/patch-one-n
+   {[:sapid.handlers.duct-ataraxy/patch-one-n
      :my-project.handler.countries.members/patch-one-n]
     {:db db-ref
      :db-keys [:spec]
@@ -171,7 +171,7 @@
     [:my-project.handler.groups.members/list-n-n sym-id sym-q]}])
 
 (def ^:private n-n-ataraxy-handlers
-  [{[:sapid.handler/create-n-n
+  [{[:sapid.handlers.duct-ataraxy/create-n-n
      :my-project.handler.members.groups/create-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -179,7 +179,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"group_id" "member_id"}}}
-   {[:sapid.handler/create-n-n
+   {[:sapid.handlers.duct-ataraxy/create-n-n
      :my-project.handler.groups.members/create-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -187,7 +187,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"group_id" "member_id"}}}
-   {[:sapid.handler/delete-n-n
+   {[:sapid.handlers.duct-ataraxy/delete-n-n
      :my-project.handler.members.groups/delete-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -195,7 +195,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"group_id" "member_id"}}}
-   {[:sapid.handler/delete-n-n
+   {[:sapid.handlers.duct-ataraxy/delete-n-n
      :my-project.handler.groups.members/delete-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -203,7 +203,7 @@
      :col-a "member_id"
      :col-b "group_id"
      :cols #{"group_id" "member_id"}}}
-   {[:sapid.handler/list-n-n
+   {[:sapid.handlers.duct-ataraxy/list-n-n
      :my-project.handler.members.groups/list-n-n]
     {:db db-ref
      :db-keys [:spec]
@@ -212,7 +212,7 @@
      :table "groups"
      :nn-table "members_groups"
      :cols #{"group_id" "member_id"}}}
-   {[:sapid.handler/list-n-n
+   {[:sapid.handlers.duct-ataraxy/list-n-n
      :my-project.handler.groups.members/list-n-n]
     {:db db-ref
      :db-keys [:spec]
