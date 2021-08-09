@@ -1,7 +1,9 @@
 (ns sapid.route
   (:require [clojure.string :as s]
+            [clojure.spec.alpha :as spc]
             [inflections.core :as inf]
-            [sapid.handlers.bidi :as bd]))
+            [sapid.handlers.bidi :as bd]
+            [sapid.handlers.reitit :as rtt]))
 
 (defn- to-path-rsc [rsc config]
   (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
@@ -19,6 +21,96 @@
 (defmulti one-n-link-routes (fn [config & _] (:router config)))
 (defmulti n-n-create-routes (fn [config & _] (:router config)))
 (defmulti n-n-link-routes (fn [config & _] (:router config)))
+
+;;; reitit
+
+;;; TODO: Add spec possibly. Dyamic creation might be anti-pattern though.
+
+(def ^:private col-checks
+  {"int" int?
+   "integer" int?
+   "text" string?
+   "timestamp" string?})
+
+(defn param-type [col-type]
+  (get col-checks col-type))
+
+(defn- table->param-spec [table]
+  (reduce (fn [m col]
+               (assoc m (keyword (:name col)) (param-type (:type col))))
+             {} (:columns table)))
+
+(defn- table->query-spec [table]
+  (reduce (fn [m col]
+               (assoc m (keyword (:name col)) string?))
+             {} (:columns table)))
+
+(defmethod root-routes :reitit [config table]
+  (let [db (:db config)
+        table-name (:name table)
+        query-spec (table->query-spec table)
+        param-spec (table->param-spec table)
+        cols (col-names table)
+        rsc-path-end (str "/" (to-path-rsc table-name config))
+        rsc-path-id (str "/" (to-path-rsc table-name config) "/:id")]
+    {:routes [[rsc-path-end {:get {:handler (rtt/list-root db table-name cols)}
+                             ;; :parameters {:query query-spec}
+                             ;; :responses {200 {:body [param-spec]}}
+                             :post {:handler (rtt/create-root db table-name cols)}}]
+              [rsc-path-id {:get {:handler (rtt/fetch-root db table-name cols)}
+                            :delete {:handler (rtt/delete-root db table-name cols)}
+                            :put {:handler (rtt/put-root db table-name cols)}
+                            :patch {:handler (rtt/patch-root db table-name cols)}}]]
+     :handlers []}))
+
+
+(defmethod one-n-link-routes :reitit [config table p-rsc]
+  (let [db (:db config)
+        table-name (:name table)
+        p-col (to-col-name p-rsc)
+        cols (col-names table)
+        p-rsc-path (to-path-rsc p-rsc config)
+        c-rsc-path (to-path-rsc table-name config)
+        rsc-path (str "/" p-rsc-path "/:p-id/" c-rsc-path)
+        rsc-path-id (str "/" p-rsc-path "/:p-id/" c-rsc-path "/:id")]
+    {:routes [[rsc-path {:get {:handler (rtt/list-one-n db table-name p-col cols)}
+                         :post {:handler (rtt/create-one-n db table-name p-col cols)}}]
+               [rsc-path-id {:get {:handler (rtt/fetch-one-n db table-name p-col cols)}
+                             :delete {:handler (rtt/delete-one-n db table-name p-col cols)}
+                             :put {:handler (rtt/put-one-n db table-name p-col cols)}
+                             :patch {:handler (rtt/patch-one-n db table-name p-col cols)}}]]
+     :handlers []}))
+
+(defmethod n-n-create-routes :reitit [config table]
+  (let [db (:db config)
+        table-name (:name table)
+        rsc-a (first (:belongs-to table))
+        rsc-b (second (:belongs-to table))
+        col-a (to-col-name rsc-a)
+        col-b (to-col-name rsc-b)
+        cols (col-names table)
+        rsc-a-path (to-path-rsc rsc-a config)
+        rsc-b-path (to-path-rsc rsc-b config)
+        a-add-path (str "/" rsc-a-path "/:id-a/" rsc-b-path "/:id-b/add")
+        b-add-path (str "/" rsc-b-path "/:id-b/" rsc-a-path "/:id-a/add")
+        a-del-path (str "/" rsc-a-path "/:id-a/" rsc-b-path "/:id-b/delete")
+        b-del-path (str "/" rsc-b-path "/:id-b/" rsc-a-path "/:id-a/delete")]
+    {:routes [[a-add-path {:post {:handler (rtt/create-n-n db table-name col-a col-b cols)}}]
+              [b-add-path {:post {:handler (rtt/create-n-n db table-name col-a col-b cols)}}]
+              [a-del-path {:post {:handler (rtt/delete-n-n db table-name col-a col-b cols)}}]
+              [b-del-path {:post {:handler (rtt/delete-n-n db table-name col-a col-b cols)}}]]
+     :handlers []}))
+
+(defmethod n-n-link-routes :reitit [config table p-rsc c-rsc]
+  (let [db (:db config)
+        nn-table (:name table)
+        table (to-table-name c-rsc config)
+        nn-join-col (to-col-name c-rsc)
+        nn-p-col (to-col-name p-rsc)
+        rsc-path (str "/" (to-path-rsc p-rsc config) "/:p-id/" (to-path-rsc c-rsc config))]
+    {:routes [[rsc-path {:get {:handler (rtt/list-n-n db table nn-table nn-join-col nn-p-col
+                                                      (col-names table))}}]]
+     :handlers []}))
 
 ;;; Bidi
 
@@ -57,7 +149,6 @@
 (defmethod n-n-create-routes :bidi [config table]
   (let [db (:db config)
         table-name (:name table)
-        parts (s/split table-name #"_")
         rsc-a (first (:belongs-to table))
         rsc-b (second (:belongs-to table))
         col-a (to-col-name rsc-a)
@@ -67,11 +158,11 @@
         rsc-b-path (str "/" (to-path-rsc rsc-b config) "/")]
     {:routes [{[rsc-a-path :id-a rsc-b-path :id-b "/add"]
                {:post (bd/create-n-n db table-name col-a col-b cols)}
-               [rsc-b-path :id-a rsc-a-path :id-b "/add"]
+               [rsc-b-path :id-b rsc-a-path :id-a "/add"]
                {:post (bd/create-n-n db table-name col-a col-b cols)}
                [rsc-a-path :id-a rsc-b-path :id-b "/delete"]
                {:post (bd/delete-n-n db table-name col-a col-b cols)}
-               [rsc-b-path :id-a rsc-a-path :id-b "/delete"]
+               [rsc-b-path :id-b rsc-a-path :id-a "/delete"]
                {:post (bd/delete-n-n db table-name col-a col-b cols)}}]
      :handlers []}))
 

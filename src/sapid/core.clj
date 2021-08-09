@@ -5,7 +5,8 @@
             [sapid.route :as rt]
             [inflections.core :as inf]
             [integrant.core :as ig]
-            [clojure.pprint :as pp]))
+            [clojure.pprint :as pp]
+            [reitit.swagger :as swagger]))
 
 (defn one-n-routes [config table]
   (reduce (fn [m p-rsc]
@@ -101,16 +102,36 @@
 (defn make-rest-config [options]
   (let [db (:db options)]
     (-> {}
-        (assoc :project-ns (:project-ns options))
         (assoc :router (:router options))
-        (assoc :db-keys (:db-keys options))
-        (assoc :db-ref (:db-ref options))
         (assoc :db db)
         (assoc :tables (or (:tables options) (schema-from-db db)))
         (assoc :table-name-plural (:table-name-plural options true))
-        (assoc :resource-path-plural (:resource-path-plural options true)))))
+        (assoc :resource-path-plural (:resource-path-plural options true))
+        (assoc :project-ns (:project-ns options))
+        (assoc :db-keys (:db-keys options))
+        (assoc :db-ref (:db-ref options)))))
 
-;;; Bidi
+;;; reitit
+
+(defn- add-rtt-swgr-route [routes]
+  (conj routes ["/swagger.json"
+                {:get {:no-doc true
+                       :swagger {:info {:title "my-api"}
+                                 :basePath "/"} 
+                       :handler (swagger/create-swagger-handler)}}]))
+
+(defn make-reitit-routes [options]
+  (let [db (or (:db options) nil)
+        rest-config (make-rest-config (-> options
+                                          (assoc :router :reitit)
+                                          (assoc :db db)))
+        routes (rest-routes rest-config)]
+    (add-rtt-swgr-route (:routes routes))))
+
+(defmethod ig/init-key ::reitit-routes [_ options]
+  (make-reitit-routes options))
+
+;;; bidi
 
 (defn make-bidi-routes [options]
   (let [db (or (:db options) nil)

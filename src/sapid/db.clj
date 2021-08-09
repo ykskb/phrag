@@ -34,10 +34,8 @@
 ;; Resource queries
 
 (defn list-up [db rsc & [filters]]
-  (println filters (not-empty filters))
   (let [q (-> (select :*) (from (keyword rsc)))
         q (if (not-empty filters) (apply where q filters) q)]
-    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
@@ -46,7 +44,6 @@
         q (-> (select :t.*) (from [(keyword nn-table) :nn])
               (join [(keyword rsc) :t] [:= nn-col-key :t.id]))
         q (if (not-empty filters) (apply where q filters) q)]
-    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 

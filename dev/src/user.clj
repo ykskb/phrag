@@ -1,9 +1,17 @@
 (ns user)
 
-;;; duct 
+;;; retit
+
+(defn dev-reitit
+  "Load and switch to the 'dev' namespace."
+  []
+  (require 'dev-reitit)
+  (in-ns 'dev-reitit)
+  :dev-reitit-loaded)
+
+;;; duct
 
 (defn dev-duct
-  "Load and switch to the 'dev' namespace."
   []
   (require 'dev-duct)
   (in-ns 'dev-duct)

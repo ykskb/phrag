@@ -92,7 +92,7 @@
     (db/list-through db-con table nn-table nn-join-col filters)))
 
 (defn create-n-n [col-a id-a col-b id-b params db-con table cols]
-  (let [params (-> params (assoc col-a id-a) (assoc col-b id-b))]
+  (let [params (-> params (assoc col-a id-a) (assoc col-b id-b) (select-keys cols))]
     (db/create! db-con table params)
     nil))
 
