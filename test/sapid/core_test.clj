@@ -4,7 +4,7 @@
             [sapid.core :as sapid]
             [integrant.core :as ig]))
 
-(def ^:private db-ref (ig/ref :test-db-ref))
+(def ^:private db-ref (gen-sym 'test-db-ref))
 (def ^:private sym-q (symbol 'q))
 (def ^:private sym-b (symbol 'b))
 (def ^:private sym-id (symbol 'id))
