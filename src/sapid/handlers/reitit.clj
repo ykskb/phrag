@@ -120,5 +120,3 @@
       {:status 200
        :body (c/delete-n-n col-a id-a col-b id-b db-con
                            table cols)})))
-
-

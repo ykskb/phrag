@@ -3,45 +3,60 @@
             [duct.core :as core]
             [sapid.db :as db]
             [sapid.route :as rt]
+            [sapid.swagger :as sw]
             [inflections.core :as inf]
             [integrant.core :as ig]
             [clojure.pprint :as pp]
             [reitit.swagger :as swagger]))
 
+(defn- concat-routes [m routes swagger]
+  (-> m
+      (update :routes concat (:routes routes))
+      (update :handlers concat (:handlers routes))
+      (update :swag-paths concat (:swag-paths swagger))
+      (update :swag-defs concat (:swag-defs swagger))))
+
+(defn root-routes [config table]
+  (let [swagger (sw/root config table)]
+    (-> (rt/root-routes config table)
+        (assoc :swag-paths (:swag-paths swagger))
+        (assoc :swag-defs (:swag-defs swagger)))))
+
 (defn one-n-routes [config table]
   (reduce (fn [m p-rsc]
-            (let [routes (rt/one-n-link-routes config table p-rsc)]
-              (-> m
-                  (update :routes concat (:routes routes))
-                  (update :handlers concat (:handlers routes)))))
-          {:routes [] :handlers []}
+            (let [routes (rt/one-n-link-routes config table p-rsc)
+                  swagger (sw/one-n config table p-rsc)]
+              (concat-routes m routes swagger)))
+          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
           (:belongs-to table)))
 
 (defn n-n-routes [config table]
-  (merge-with
-   into
-   (rt/n-n-create-routes config table)
-   (let [table-name (:name table)
-         rsc-a (first (:belongs-to table))
-         rsc-b (second (:belongs-to table))]
-     (reduce (fn [m [p-rsc c-rsc]]
-               (let [routes (rt/n-n-link-routes config table p-rsc c-rsc)]
-                 (-> m
-                     (update :routes concat (:routes routes))
-                     (update :handlers concat (:handlers routes)))))
-             {:routes [] :handlers []}
-             [[rsc-a rsc-b] [rsc-b rsc-a]]))))
+  (let [create-routes (rt/n-n-create-routes config table)
+        create-swagger (sw/n-n-create config table)]
+    (merge-with
+     into
+     (-> create-routes
+         (assoc :swag-paths (:swag-paths create-swagger))
+         (assoc :swag-defs (:swag-defs create-swagger)))
+     (let [table-name (:name table)
+           rsc-a (first (:belongs-to table))
+           rsc-b (second (:belongs-to table))]
+       (reduce (fn [m [p-rsc c-rsc]]
+                 (let [routes (rt/n-n-link-routes config table p-rsc c-rsc)]
+                   (-> m
+                       (update :routes concat (:routes routes))
+                       (update :handlers concat (:handlers routes)))))
+               {:routes [] :handlers [] :swag-paths [] :swag-defs []}
+               [[rsc-a rsc-b] [rsc-b rsc-a]])))))
 
 (defn table-routes [table config]
   (reduce (fn [m relation-type]
             (let [routes (case relation-type
-                           :root (rt/root-routes config table)
+                           :root (root-routes config table)
                            :one-n (one-n-routes config table)
                            :n-n (n-n-routes config table))]
-              (-> m
-                  (update :routes concat (:routes routes))
-                  (update :handlers concat (:handlers routes)))))
-          {:routes [] :handlers []}
+              (concat-routes m routes routes)))
+          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
           (:relation-types table)))
 
 (defn rest-routes
@@ -49,10 +64,8 @@
   [config]
   (reduce (fn [m table]
             (let [routes (table-routes table config)]
-              (-> m
-                  (update :routes concat (:routes routes))
-                  (update :handlers concat (:handlers routes)))))
-          {:routes [] :handlers []}
+              (concat-routes m routes routes)))
+          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
           (:tables config)))
 
 (defn is-relation-column? [name]
@@ -111,14 +124,9 @@
         (assoc :db-keys (:db-keys options))
         (assoc :db-ref (:db-ref options)))))
 
-;;; reitit
 
-(defn- add-rtt-swgr-route [routes]
-  (conj routes ["/swagger.json"
-                {:get {:no-doc true
-                       :swagger {:info {:title "my-api"}
-                                 :basePath "/"} 
-                       :handler (swagger/create-swagger-handler)}}]))
+
+;;; reitit
 
 (defn make-reitit-routes [options]
   (let [db (or (:db options) nil)
@@ -126,7 +134,7 @@
                                           (assoc :router :reitit)
                                           (assoc :db db)))
         routes (rest-routes rest-config)]
-    (add-rtt-swgr-route (:routes routes))))
+    (rt/add-swag-route rest-config routes)))
 
 (defmethod ig/init-key ::reitit-routes [_ options]
   (make-reitit-routes options))

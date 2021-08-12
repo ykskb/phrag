@@ -226,18 +226,18 @@
   (testing "root type from config"
     (is (= {:routes root-ataraxy-routes
             :handlers root-ataraxy-handlers}
-           (sapid/rest-routes
-            (sapid/make-rest-config root-option)))))
+           (dissoc (sapid/rest-routes (sapid/make-rest-config root-option))
+                   :swag-paths :swag-defs))))
   (testing "one-to-n relation type from option"
     (is (= {:routes one-n-ataraxy-routes
             :handlers one-n-ataraxy-handlers}
-           (sapid/rest-routes
-            (sapid/make-rest-config one-n-option)))))
+           (dissoc (sapid/rest-routes (sapid/make-rest-config one-n-option))
+                   :swag-paths :swag-defs))))
   (testing "n-to-n relation type from option"
     (is (= {:routes n-n-ataraxy-routes
             :handlers n-n-ataraxy-handlers}
-           (sapid/rest-routes
-            (sapid/make-rest-config n-n-option))))))
+           (dissoc (sapid/rest-routes (sapid/make-rest-config n-n-option))
+                   :swag-paths :swag-defs)))))
 
 (defn create-database []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}

@@ -1,9 +1,11 @@
 (ns sapid.route
   (:require [clojure.string :as s]
             [clojure.spec.alpha :as spc]
+            [clojure.pprint :as pp]
             [inflections.core :as inf]
             [sapid.handlers.bidi :as bd]
-            [sapid.handlers.reitit :as rtt]))
+            [sapid.handlers.reitit :as rtt]
+            [sapid.swagger :as sw]))
 
 (defn- to-path-rsc [rsc config]
   (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
@@ -21,6 +23,8 @@
 (defmulti one-n-link-routes (fn [config & _] (:router config)))
 (defmulti n-n-create-routes (fn [config & _] (:router config)))
 (defmulti n-n-link-routes (fn [config & _] (:router config)))
+
+(defmulti add-swag-route (fn [config & _] (:router config)))
 
 ;;; reitit
 
@@ -112,6 +116,11 @@
                                                       (col-names table))}}]]
      :handlers []}))
 
+(defmethod add-swag-route :reitit [config swag]
+  (let [{:keys [routes swag-paths swag-defs]} swag]
+    (conj routes ["/swagger.json"
+                  {:get {:handler (fn [_] {:status 200
+                                           :body (sw/schema swag-paths swag-defs)})}}])))
 ;;; Bidi
 
 (defmethod root-routes :bidi [config table]
@@ -252,7 +261,6 @@
 (defmethod n-n-create-routes :ataraxy [config table]
   (let [ns (:project-ns config)
         table-name (:name table)
-        parts (s/split table-name #"_")
         rsc-a (first (:belongs-to table))
         rsc-b (second (:belongs-to table))
         rsc-a-path (str "/" (to-path-rsc rsc-a config) "/")
