@@ -11,6 +11,8 @@
 (defn- to-path-rsc [rsc config]
   (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
 
+;;; params & responses
+
 (defn- ref-responses
   ([rsc-def list?]
    (let [ref {"$ref" (str "#/definitions/" rsc-def)}]
@@ -45,6 +47,8 @@
              (= swag-type "integer") (assoc :format "int32"))))
        (:columns table)))
 
+;;; path details
+
 (defn- method-details
   ([tag summary params responses]
    {:tags [tag]
@@ -60,7 +64,7 @@
 
 (defn- path-details
   ([table rsc tag path-params]
-   (let [def-name (s/capitalize rsc)
+   (let [def-name rsc ; (s/capitalize rsc)
          get-params (apply conj (query-params table) path-params)
          post-params (apply conj (body-params def-name) path-params)]
      {:get (method-details tag (str "List " def-name)
@@ -70,7 +74,7 @@
    (path-details table rsc tag [])))
 
 (defn- id-path-details [table rsc tag path-params]
-  (let [def-name (s/capitalize rsc)
+  (let [def-name rsc ; (s/capitalize rsc)
         get-params (apply conj (query-params table) path-params)
         update-params (apply conj (body-params def-name) path-params)
         get-smry (str "Fetch " def-name)
@@ -82,48 +86,62 @@
      :patch (method-details tag update-smry update-params)}))
 
 (defn- n-n-create-details [table rsc-a rsc-b path-params post?]
-  (let [def-name (s/capitalize (:name table))
-        post-params (apply conj (if post? (body-params def-name) nil) path-params)
+  (let [def-name (:name table) ; (s/capitalize (:name table))
+        bd-prms (if post? (body-params def-name) nil)
+        post-params (apply conj bd-prms path-params)
         post-smry (if post? (str "Add " rsc-b " to " rsc-a)
                       (str "Delete " rsc-b " from " rsc-a))]
     {:post (method-details rsc-a post-smry post-params)}))
 
 (defn- n-n-link-details [table p-rsc c-rsc path-params]
-  (let [params (apply conj (query-params table) path-params)
+  (let [def-name c-rsc ; (s/capitalize c-rsc)
+        params (apply conj (query-params table) path-params)
         smry (str "List " c-rsc " under " p-rsc)]
-    {:get (method-details p-rsc smry params)}))
+    {:get (method-details p-rsc smry params (ref-responses def-name true))}))
+
+;;; paths
 
 (defn- root-paths [config table]
   (let [rsc (to-path-rsc (:name table) config)
-        id-param (path-param "id")]
+        id-name (str rsc "Id")
+        id-param (path-param id-name)]
     {(str "/" rsc) (path-details table rsc rsc)
-     (str "/" rsc "/{id}") (id-path-details table rsc rsc [id-param])}))
+     (str "/" rsc "/{" id-name "}") (id-path-details table rsc rsc [id-param])}))
 
 (defn- one-n-paths [config table p-rsc]
   (let [c-rsc (to-path-rsc (:name table) config)
         p-rsc (to-path-rsc p-rsc config)
-        id-param (path-param "id")
-        p-id-param (path-param "pId")]
-    {(str "/" p-rsc "/{pId}/" c-rsc) (path-details table c-rsc p-rsc [p-id-param])
-     (str "/" p-rsc "/{pId}/" c-rsc "/{id}") (id-path-details table c-rsc p-rsc
-                                                              [id-param p-id-param])}))
+        id-name (str c-rsc "Id")
+        p-id-name (str p-rsc "Id")
+        id-param (path-param id-name)
+        p-id-param (path-param p-id-name)
+        path (str "/" p-rsc "/{" p-id-name "}/" c-rsc)
+        id-path (str "/" p-rsc "/{" p-id-name "}/" c-rsc "/{" id-name "}")]
+    {path (path-details table c-rsc p-rsc [p-id-param])
+     id-path (id-path-details table c-rsc p-rsc [id-param p-id-param])}))
 
 (defn- n-n-create-paths [config table]
   (let [rsc-a (to-path-rsc (first (:belongs-to table)) config)
         rsc-b (to-path-rsc (second (:belongs-to table)) config)
-        a-add-path (str "/" rsc-a "/{pId}/" rsc-b "/{id}/add")
-        b-add-path (str "/" rsc-b "/{pId}/" rsc-a "/{id}/add")
-        a-del-path (str "/" rsc-a "/{pId}/" rsc-b "/{id}/delete")
-        b-del-path (str "/" rsc-b "/{pId}/" rsc-a "/{id}/delete")
-        path-params [(path-param "id") (path-param "pId")]]
+        rsc-a-id (str rsc-a "Id")
+        rsc-b-id (str rsc-b "Id")
+        a-add-path (str "/" rsc-a "/{" rsc-a-id "}/" rsc-b "/{" rsc-b-id "}/add")
+        b-add-path (str "/" rsc-b "/{" rsc-b-id "}/" rsc-a "/{" rsc-a-id "}/add")
+        a-del-path (str "/" rsc-a "/{" rsc-a-id "}/" rsc-b "/{" rsc-b-id "}/delete")
+        b-del-path (str "/" rsc-b "/{" rsc-b-id "}/" rsc-a "/{" rsc-a-id "}/delete")
+        path-params [(path-param rsc-a-id) (path-param rsc-b-id)]]
     {a-add-path (n-n-create-details table rsc-a rsc-b path-params true)
      b-add-path (n-n-create-details table rsc-b rsc-a path-params true)
      a-del-path (n-n-create-details table rsc-a rsc-b path-params false)
      b-del-path (n-n-create-details table rsc-b rsc-a path-params false)}))
 
 (defn- n-n-link-paths [config table p-rsc c-rsc]
-  (let [p-id-param (path-param "pId")]
-  {(str "/" p-rsc "/{pId}/" c-rsc) (n-n-link-details table p-rsc c-rsc [p-id-param])}))
+  (let [p-id-name (str p-rsc "Id")
+        p-id-param (path-param p-id-name)]
+    {(str "/" p-rsc "/{" p-id-name "}/" c-rsc) (n-n-link-details table p-rsc c-rsc
+                                                                 [p-id-param])}))
+
+;;; columns
 
 (defn- cols->required [cols]
   (reduce (fn [v col]
@@ -142,8 +160,10 @@
                                   (= swag-type "integer") (assoc :format "int64")))))
           {} cols))
 
+;;; public
+
 (defn swag-def [config table]
-  (let [def-name (s/capitalize (:name table))
+  (let [def-name (:name table) ; (s/capitalize (:name table))
         cols (:columns table)]
     {def-name {:type "object"
                :required (cols->required cols)
