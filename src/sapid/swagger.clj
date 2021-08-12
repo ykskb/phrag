@@ -47,12 +47,12 @@
 
 (defn- method-details
   ([tag summary params responses]
-  {:tags [tag]
-   :summary summary
-   :consumes ["application/json"]
-   :produces ["application/json"]
-   :parameters params
-   :responses responses})
+   {:tags [tag]
+    :summary summary
+    :consumes ["application/json"]
+    :produces ["application/json"]
+    :parameters params
+    :responses responses})
   ([tag action params]
    (method-details tag action params []))
   ([tag action]
@@ -83,10 +83,15 @@
 
 (defn- n-n-create-details [table rsc-a rsc-b path-params post?]
   (let [def-name (s/capitalize (:name table))
-        post-params (apply conj (body-params def-name) path-params)
+        post-params (apply conj (if post? (body-params def-name) nil) path-params)
         post-smry (if post? (str "Add " rsc-b " to " rsc-a)
                       (str "Delete " rsc-b " from " rsc-a))]
     {:post (method-details rsc-a post-smry post-params)}))
+
+(defn- n-n-link-details [table p-rsc c-rsc path-params]
+  (let [params (apply conj (query-params table) path-params)
+        smry (str "List " c-rsc " under " p-rsc)]
+    {:get (method-details p-rsc smry params)}))
 
 (defn- root-paths [config table]
   (let [rsc (to-path-rsc (:name table) config)
@@ -115,6 +120,10 @@
      b-add-path (n-n-create-details table rsc-b rsc-a path-params true)
      a-del-path (n-n-create-details table rsc-a rsc-b path-params false)
      b-del-path (n-n-create-details table rsc-b rsc-a path-params false)}))
+
+(defn- n-n-link-paths [config table p-rsc c-rsc]
+  (let [p-id-param (path-param "pId")]
+  {(str "/" p-rsc "/{pId}/" c-rsc) (n-n-link-details table p-rsc c-rsc [p-id-param])}))
 
 (defn- cols->required [cols]
   (reduce (fn [v col]
@@ -152,20 +161,23 @@
   {:swag-paths [(n-n-create-paths config table)]
    :swag-defs [(swag-def config table)]})
 
+(defn n-n-link [config table p-rsc c-rsc]
+  {:swag-paths [(n-n-link-paths config table p-rsc c-rsc)]
+   :swag-defs []})
+
 (defn schema
   ([swag-paths swag-defs info host secDefs]
-  (let [paths (into (sorted-map) (apply merge swag-paths))
-        defs (into (sorted-map) (apply merge swag-defs))
-        tags (map s/lower-case (keys defs))]
-    (println "fdsa" (keys paths))
-    {:swagger "2.0"
-     :info info
-     :host host
-     :basePath ""
-     :tags tags
-     :schemes ["http"]
-     :paths paths
-     :securityDefinitions secDefs
-     :definitions defs}))
+   (let [paths (into (sorted-map) (apply merge swag-paths))
+         defs (into (sorted-map) (apply merge swag-defs))
+         tags (map s/lower-case (keys defs))]
+     {:swagger "2.0"
+      :info info
+      :host host
+      :basePath ""
+      :tags tags
+      :schemes ["http"]
+      :paths paths
+      :securityDefinitions secDefs
+      :definitions defs}))
   ([swag-paths swag-defs]
    (schema swag-paths swag-defs {} "localhost:3000" {})))

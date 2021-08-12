@@ -42,10 +42,9 @@
            rsc-a (first (:belongs-to table))
            rsc-b (second (:belongs-to table))]
        (reduce (fn [m [p-rsc c-rsc]]
-                 (let [routes (rt/n-n-link-routes config table p-rsc c-rsc)]
-                   (-> m
-                       (update :routes concat (:routes routes))
-                       (update :handlers concat (:handlers routes)))))
+                 (let [link-routes (rt/n-n-link-routes config table p-rsc c-rsc)
+                       link-swagger (sw/n-n-link config table p-rsc c-rsc)]
+                   (concat-routes m link-routes link-swagger)))
                {:routes [] :handlers [] :swag-paths [] :swag-defs []}
                [[rsc-a rsc-b] [rsc-b rsc-a]])))))
 
