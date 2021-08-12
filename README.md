@@ -6,13 +6,13 @@ Sapid constructs REST API endpoints from DB schema at app initialization time, l
 
 #### Features:
 
-* Auto-configures REST routes & [ring](https://github.com/ring-clojure/ring) handlers from a single line for [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy). (Currently working on [reitit](https://github.com/metosin/reitit).)
+* Auto-configures REST routes & [ring](https://github.com/ring-clojure/ring) handlers from a single line for [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
 
 * Supports APIs for `one-to-one`, `one-to-many` and `many-to-many` relationships as well as `root` entities.
 
 * DB schema can be retrieved from a running DB or specified with a config map.
 
-* Query [filters](#filters), sorting and pagination come out of the box.
+* Swagger UI, query [filters](#filters), sorting and pagination come out of the box.
 
 #### Notes:
 

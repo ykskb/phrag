@@ -124,8 +124,6 @@
         (assoc :db-keys (:db-keys options))
         (assoc :db-ref (:db-ref options)))))
 
-
-
 ;;; reitit
 
 (defn make-reitit-routes [options]
