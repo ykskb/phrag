@@ -96,14 +96,17 @@
 (defn- n-n-link-details [table p-rsc c-rsc path-params]
   (let [def-name c-rsc ; (s/capitalize c-rsc)
         params (apply conj (query-params table) path-params)
-        smry (str "List " c-rsc " under " p-rsc)]
+        smry (str "List " c-rsc " per " p-rsc)]
     {:get (method-details p-rsc smry params (ref-responses def-name true))}))
 
 ;;; paths
 
+(defn- id-path [rsc]
+  (str (inf/singular rsc) "Id"))
+
 (defn- root-paths [config table]
   (let [rsc (to-path-rsc (:name table) config)
-        id-name (str rsc "Id")
+        id-name (id-path rsc)
         id-param (path-param id-name)]
     {(str "/" rsc) (path-details table rsc rsc)
      (str "/" rsc "/{" id-name "}") (id-path-details table rsc rsc [id-param])}))
@@ -111,20 +114,20 @@
 (defn- one-n-paths [config table p-rsc]
   (let [c-rsc (to-path-rsc (:name table) config)
         p-rsc (to-path-rsc p-rsc config)
-        id-name (str c-rsc "Id")
-        p-id-name (str p-rsc "Id")
-        id-param (path-param id-name)
+        c-id-name (id-path c-rsc)
+        p-id-name (id-path p-rsc)
+        c-id-param (path-param c-id-name)
         p-id-param (path-param p-id-name)
         path (str "/" p-rsc "/{" p-id-name "}/" c-rsc)
-        id-path (str "/" p-rsc "/{" p-id-name "}/" c-rsc "/{" id-name "}")]
+        id-path (str "/" p-rsc "/{" p-id-name "}/" c-rsc "/{" c-id-name "}")]
     {path (path-details table c-rsc p-rsc [p-id-param])
-     id-path (id-path-details table c-rsc p-rsc [id-param p-id-param])}))
+     id-path (id-path-details table c-rsc p-rsc [c-id-param p-id-param])}))
 
 (defn- n-n-create-paths [config table]
   (let [rsc-a (to-path-rsc (first (:belongs-to table)) config)
         rsc-b (to-path-rsc (second (:belongs-to table)) config)
-        rsc-a-id (str rsc-a "Id")
-        rsc-b-id (str rsc-b "Id")
+        rsc-a-id (id-path rsc-a)
+        rsc-b-id (id-path rsc-b)
         a-add-path (str "/" rsc-a "/{" rsc-a-id "}/" rsc-b "/{" rsc-b-id "}/add")
         b-add-path (str "/" rsc-b "/{" rsc-b-id "}/" rsc-a "/{" rsc-a-id "}/add")
         a-del-path (str "/" rsc-a "/{" rsc-a-id "}/" rsc-b "/{" rsc-b-id "}/delete")
@@ -136,7 +139,7 @@
      b-del-path (n-n-create-details table rsc-b rsc-a path-params false)}))
 
 (defn- n-n-link-paths [config table p-rsc c-rsc]
-  (let [p-id-name (str p-rsc "Id")
+  (let [p-id-name (id-path p-rsc)
         p-id-param (path-param p-id-name)]
     {(str "/" p-rsc "/{" p-id-name "}/" c-rsc) (n-n-link-details table p-rsc c-rsc
                                                                  [p-id-param])}))
