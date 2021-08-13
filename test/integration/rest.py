@@ -19,8 +19,8 @@ def req(method, url, data):
 def test_endpoint(test):
     method, url, data, expected = test
     logger.info('------------------------')
-    logger.info('* Testing {} {} with {}'.format(method, url, data))
-    res = req(method, url, data)
+    logger.info(' * Testing {} {} with {}'.format(method, url, data))
+    res = req(method, HOST + url, data)
     if res.status_code != 200:
         logger.error('Status code was not 200.')
         logger.error('Status: {} Text: {}'.format(res.status_code, res.text))
@@ -51,15 +51,15 @@ def test_root():
     updated.update(to_update)
     updated.update({'id': 1})
 
-    tests = [('post', HOST + '/members', to_create, None),
-             ('get', HOST + '/members', None, [created]),
-             ('get', HOST + '/members/1', None, created),
-             ('patch', HOST + '/members/1', to_update, None),
-             ('get', HOST + '/members/1', None, updated),
-             ('put', HOST + '/members/1', to_create, None),
-             ('get', HOST + '/members/1', None, created),
-             ('delete', HOST + '/members/1', None, None),
-             ('get', HOST + '/members', None, [])]
+    tests = [('post', '/members', to_create, None),
+             ('get', '/members', None, [created]),
+             ('get', '/members/1', None, created),
+             ('patch', '/members/1', to_update, None),
+             ('get', '/members/1', None, updated),
+             ('put', '/members/1', to_create, None),
+             ('get', '/members/1', None, created),
+             ('delete', '/members/1', None, None),
+             ('get', '/members', None, [])]
 
     for t in tests:
         test_endpoint(t)
@@ -90,17 +90,18 @@ def test_one_n():
     meetup_2nd_updated.update(meetup_created)
     meetup_2nd_updated.update({'venue_id': 2})
 
-    tests = [('post', HOST + '/venues', venue_to_create, None),
-             ('get', HOST + '/venues', None, [venue_created]),
-             ('post', HOST + '/venues/1/meetups', meetup_to_create, None),
-             ('get', HOST + '/venues/1/meetups', None, [meetup_created]),
-             ('get', HOST + '/venues/1/meetups/1', None, meetup_created),
-             ('patch', HOST + '/venues/1/meetups/1', meetup_to_update, None),
-             ('get', HOST + '/venues/2/meetups/1', None, meetup_updated),
-             ('put', HOST + '/venues/2/meetups/1', meetup_to_create, None),
-             ('get', HOST + '/venues/2/meetups/1', None, meetup_2nd_updated),
-             ('delete', HOST + '/venues/2/meetups/1', None, None),
-             ('get', HOST + '/venues/2/meetups/1', None, [])]
+    tests = [('post', '/venues', venue_to_create, None),
+             ('get', '/venues', None, [venue_created]),
+             ('post', '/venues/1/meetups', meetup_to_create, None),
+             ('get', '/venues/1/meetups', None, [meetup_created]),
+             ('get', '/venues/1/meetups/1', None, meetup_created),
+             ('patch', '/venues/1/meetups/1', meetup_to_update, None),
+             ('get', '/venues/2/meetups/1', None, meetup_updated),
+             ('put', '/venues/2/meetups/1', meetup_to_create, None),
+             ('get', '/venues/2/meetups/1', None, meetup_2nd_updated),
+             ('delete', '/venues/2/meetups/1', None, None),
+             ('get', '/venues/2/meetups/1', None, []),
+             ('delete', '/venues/1', None, None)]
 
     for t in tests:
         test_endpoint(t)
