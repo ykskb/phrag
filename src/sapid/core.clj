@@ -9,77 +9,21 @@
             [clojure.pprint :as pp]
             [reitit.swagger :as swagger]))
 
-(defn- concat-routes [m routes swagger]
-  (-> m
-      (update :routes concat (:routes routes))
-      (update :handlers concat (:handlers routes))
-      (update :swag-paths concat (:swag-paths swagger))
-      (update :swag-defs concat (:swag-defs swagger))))
+;;; schema from database
 
-(defn root-routes [config table]
-  (let [swagger (sw/root config table)]
-    (-> (rt/root-routes config table)
-        (assoc :swag-paths (:swag-paths swagger))
-        (assoc :swag-defs (:swag-defs swagger)))))
-
-(defn one-n-routes [config table]
-  (reduce (fn [m p-rsc]
-            (let [routes (rt/one-n-link-routes config table p-rsc)
-                  swagger (sw/one-n config table p-rsc)]
-              (concat-routes m routes swagger)))
-          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
-          (:belongs-to table)))
-
-(defn n-n-routes [config table]
-  (let [create-routes (rt/n-n-create-routes config table)
-        create-swagger (sw/n-n-create config table)]
-    (merge-with
-     into
-     (-> create-routes
-         (assoc :swag-paths (:swag-paths create-swagger))
-         (assoc :swag-defs (:swag-defs create-swagger)))
-     (let [table-name (:name table)
-           rsc-a (first (:belongs-to table))
-           rsc-b (second (:belongs-to table))]
-       (reduce (fn [m [p-rsc c-rsc]]
-                 (let [link-routes (rt/n-n-link-routes config table p-rsc c-rsc)
-                       link-swagger (sw/n-n-link config table p-rsc c-rsc)]
-                   (concat-routes m link-routes link-swagger)))
-               {:routes [] :handlers [] :swag-paths [] :swag-defs []}
-               [[rsc-a rsc-b] [rsc-b rsc-a]])))))
-
-(defn table-routes [table config]
-  (reduce (fn [m relation-type]
-            (let [routes (case relation-type
-                           :root (root-routes config table)
-                           :one-n (one-n-routes config table)
-                           :n-n (n-n-routes config table))]
-              (concat-routes m routes routes)))
-          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
-          (:relation-types table)))
-
-(defn rest-routes
-  "Makes routes and handlers from database schema map."
-  [config]
-  (reduce (fn [m table]
-            (let [routes (table-routes table config)]
-              (concat-routes m routes routes)))
-          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
-          (:tables config)))
-
-(defn is-relation-column? [name]
+(defn- is-relation-column? [name]
   (s/ends-with? (s/lower-case name) "_id"))
 
-(defn has-relation-column? [table]
+(defn- has-relation-column? [table]
   (some (fn [column] (is-relation-column? (:name column)))
         (:columns table)))
 
-(defn n-n-belongs-to [table]
+(defn- n-n-belongs-to [table]
   (let [table-name (:name table)
         parts (s/split table-name #"_" 2)]
     [(first parts) (second parts)]))
 
-(defn links-to [table]
+(defn- links-to [table]
   (reduce (fn [v column]
             (let [name (:name column)]
               (if (is-relation-column? name)
@@ -110,6 +54,68 @@
         db (or (db-ig-key init-config)
                (second (first (ig/find-derived init-config db-ig-key))))]
     (get-in db db-keys)))
+
+;;; routes per relationship types
+
+(defn- concat-routes [m routes swagger]
+  (-> m
+      (update :routes concat (:routes routes))
+      (update :handlers concat (:handlers routes))
+      (update :swag-paths concat (:swag-paths swagger))
+      (update :swag-defs concat (:swag-defs swagger))))
+
+(defn- root-routes [config table]
+  (let [swagger (sw/root config table)]
+    (-> (rt/root-routes config table)
+        (assoc :swag-paths (:swag-paths swagger))
+        (assoc :swag-defs (:swag-defs swagger)))))
+
+(defn- one-n-routes [config table]
+  (reduce (fn [m p-rsc]
+            (let [routes (rt/one-n-link-routes config table p-rsc)
+                  swagger (sw/one-n config table p-rsc)]
+              (concat-routes m routes swagger)))
+          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
+          (:belongs-to table)))
+
+(defn- n-n-routes [config table]
+  (let [create-routes (rt/n-n-create-routes config table)
+        create-swagger (sw/n-n-create config table)]
+    (merge-with
+     into
+     (-> create-routes
+         (assoc :swag-paths (:swag-paths create-swagger))
+         (assoc :swag-defs (:swag-defs create-swagger)))
+     (let [table-name (:name table)
+           rsc-a (first (:belongs-to table))
+           rsc-b (second (:belongs-to table))]
+       (reduce (fn [m [p-rsc c-rsc]]
+                 (let [link-routes (rt/n-n-link-routes config table p-rsc c-rsc)
+                       link-swagger (sw/n-n-link config table p-rsc c-rsc)]
+                   (concat-routes m link-routes link-swagger)))
+               {:routes [] :handlers [] :swag-paths [] :swag-defs []}
+               [[rsc-a rsc-b] [rsc-b rsc-a]])))))
+
+;;; routes 
+
+(defn- table-routes [table config]
+  (reduce (fn [m relation-type]
+            (let [routes (case relation-type
+                           :root (root-routes config table)
+                           :one-n (one-n-routes config table)
+                           :n-n (n-n-routes config table))]
+              (concat-routes m routes routes)))
+          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
+          (:relation-types table)))
+
+(defn rest-routes
+  "Makes routes and handlers from database schema map."
+  [config]
+  (reduce (fn [m table]
+            (let [routes (table-routes table config)]
+              (concat-routes m routes routes)))
+          {:routes [] :handlers [] :swag-paths [] :swag-defs []}
+          (:tables config)))
 
 (defn make-rest-config [options]
   (let [db (:db options)]
@@ -177,6 +183,4 @@
                                             (assoc :db-ref db-ref)
                                             (assoc :db db)))
           routes (rest-routes rest-config)]
-;      (pp/pprint rest-config)
-;      (pp/pprint routes)
       (merge-rest-routes rest-config config routes))))
