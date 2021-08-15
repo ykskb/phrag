@@ -1,2 +1,0 @@
-{:duct.database/sql
- {:connection-uri "jdbc:sqlite:db/dev.sqlite"}}
