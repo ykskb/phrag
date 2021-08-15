@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [group-by update])
   (:require [clojure.core :as c]
             [clojure.java.jdbc :as jdbc]
-;            [next.jdbc :as jdbc]
+                                        ;            [next.jdbc :as jdbc]
             [honey.sql.helpers :refer
              [select update delete-from from where join order-by
               limit offset] :as h]
@@ -41,7 +41,6 @@
               (limit (:limit filters)) (offset (:offset filters)))
         q (if (not-empty fltrs) (apply where q fltrs) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
-    (println (sql/format q) filters)
     (->> (sql/format q)
          (jdbc/query db))))
 

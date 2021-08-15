@@ -30,9 +30,7 @@
         (assoc :direc (if (nil? direc) :desc (keyword direc))))))
 
 (defn- query->filters [query cols]
-  (println query)
   (reduce (fn [m [k v]]
-            (println k v "rewq")
             (cond
               (contains? cols k) (update m :filters conj (parse-filter-val k v))
               (= k "order-by") (parse-order-by m v)

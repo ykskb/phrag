@@ -47,6 +47,23 @@
              (= swag-type "integer") (assoc :format "int32"))))
        (:columns table)))
 
+(def ^:private filter-params
+  [{:in "query"
+    :name "order-by"
+    :description "Format of [column]:asc or [column]:desc is supported."
+    :required false
+    :type "string"}
+   {:in "query"
+    :name "limit"
+    :description "Number of items to limit."
+    :required false
+    :type "integer"}
+   {:in "query"
+    :name "offset"
+    :description "Number of items to offset."
+    :required false
+    :type "integer"}])
+
 ;;; path details
 
 (defn- method-details
@@ -65,7 +82,7 @@
 (defn- path-details
   ([table rsc tag path-params]
    (let [def-name rsc ; (s/capitalize rsc)
-         get-params (apply conj (query-params table) path-params)
+         get-params (apply conj (query-params table) path-params filter-params)
          post-params (apply conj (body-params def-name) path-params)]
      {:get (method-details tag (str "List " def-name)
                            get-params (ref-responses def-name true))
@@ -95,7 +112,7 @@
 
 (defn- n-n-link-details [table p-rsc c-rsc path-params]
   (let [def-name c-rsc ; (s/capitalize c-rsc)
-        params (apply conj (query-params table) path-params)
+        params (apply conj (query-params table) path-params filter-params)
         smry (str "List " c-rsc " per " p-rsc)]
     {:get (method-details p-rsc smry params (ref-responses def-name true))}))
 
