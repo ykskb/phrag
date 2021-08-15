@@ -4,7 +4,8 @@
             [clojure.java.jdbc :as jdbc]
 ;            [next.jdbc :as jdbc]
             [honey.sql.helpers :refer
-             [select update delete-from from where join] :as h]
+             [select update delete-from from where join order-by
+              limit offset] :as h]
             [honey.sql :as sql]))
 
 ;; todo: query handling to be improved with proper formatting
@@ -34,23 +35,32 @@
 ;; Resource queries
 
 (defn list-up [db rsc & [filters]]
-  (let [q (-> (select :*) (from (keyword rsc)))
-        q (if (not-empty filters) (apply where q filters) q)]
+  (let [fltrs (:filters filters)
+        o-col (:order-col filters)
+        q (-> (select :*) (from (keyword rsc))
+              (limit (:limit filters)) (offset (:offset filters)))
+        q (if (not-empty fltrs) (apply where q fltrs) q)
+        q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
+    (println (sql/format q) filters)
     (->> (sql/format q)
          (jdbc/query db))))
 
 (defn list-through [db rsc nn-table nn-join-col & [filters]]
   (let [nn-col-key (keyword (str "nn." nn-join-col))
+        fltrs (:filters filters)
+        o-col (:order-col filters)
         q (-> (select :t.*) (from [(keyword nn-table) :nn])
               (join [(keyword rsc) :t] [:= nn-col-key :t.id]))
-        q (if (not-empty filters) (apply where q filters) q)]
+        q (if (not-empty fltrs) (apply where q fltrs) q)
+        q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
     (->> (sql/format q)
          (jdbc/query db))))
 
 (defn fetch [db rsc id & [filters]]
-  (let [q (-> (select :*) (from (keyword rsc)))
-        q (if (empty? filters) (where q [[:= :id id]])
-              (apply where q (conj filters [:= :id id])))]
+  (let [fltrs (:filters filters)
+        q (-> (select :*) (from (keyword rsc)))
+        q (if (empty? fltrs) (where q [[:= :id id]])
+              (apply where q (conj fltrs [:= :id id])))]
     (->> (sql/format q)
          (jdbc/query db)
          first)))
@@ -63,7 +73,8 @@
          (jdbc/execute! db))))
 
 (defn delete-where! [db rsc filters]
-  (let [q (apply where (delete-from (keyword rsc)) filters)]
+  (let [fltrs (:filters filters)
+        q (apply where (delete-from (keyword rsc)) fltrs)]
     (->> (sql/format q)
          (jdbc/execute! db))))
 

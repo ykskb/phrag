@@ -15,17 +15,31 @@
 
 (defn- parse-filter-val [k v]
   (let [parts (s/split v #":" 2)
+        c (count parts)
         op (get operator-map (first parts))]
-    (if (or (nil? op) (< (count parts) 2))
+    (if (or (nil? op) (< c 2))
       [:= (keyword k) v]
       [op (keyword k) (second parts)])))
 
+(defn- parse-order-by [m v]
+  (let [parts (s/split v #":" 2)
+        c (count parts)
+        direc (second parts)]
+    (-> m
+        (assoc :order-col (keyword (first parts)))
+        (assoc :direc (if (nil? direc) :desc (keyword direc))))))
+
 (defn- query->filters [query cols]
-  (reduce (fn [vec [k v]]
-            (if (contains? cols k)
-              (conj vec (parse-filter-val k v))
-              vec))
-          []
+  (println query)
+  (reduce (fn [m [k v]]
+            (println k v "rewq")
+            (cond
+              (contains? cols k) (update m :filters conj (parse-filter-val k v))
+              (= k "order-by") (parse-order-by m v)
+              (= k "limit") (assoc m :limit v)
+              (= k "offset") (assoc m :offset v)
+              :else m))
+          {:filters [] :limit 20 :offset 0}
           query))
 
 (defn ring-query [req]
