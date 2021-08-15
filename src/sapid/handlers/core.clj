@@ -37,7 +37,7 @@
               (= k "limit") (assoc m :limit v)
               (= k "offset") (assoc m :offset v)
               :else m))
-          {:filters [] :limit 20 :offset 0}
+          {:filters [] :limit 100 :offset 0}
           query))
 
 (defn ring-query [req]
