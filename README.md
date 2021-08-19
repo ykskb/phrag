@@ -1,18 +1,18 @@
 # Sapid
 
-REST APIs from DB Schema
+GraphQL / REST APIs from DB Schema Data
 
-Sapid constructs REST API endpoints from DB schema at app initialization time, leveraging [Integrant](https://github.com/weavejester/integrant).
+Sapid constructs GraphQL and/or REST API endpoints from DB schema data.
 
 #### Features:
 
-* Auto-configures REST routes & [ring](https://github.com/ring-clojure/ring) handlers from a single line for [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
+* Auto-configures GraphQL/REST routes, [ring](https://github.com/ring-clojure/ring) handlers, and database layer from a single line for [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
 
 * Supports APIs for `one-to-one`, `one-to-many` and `many-to-many` relationships as well as `root` entities.
 
-* DB schema can be retrieved from a running DB or specified with a config map.
+* DB schema data can be retrieved from a running DB or specified with a config map.
 
-* Swagger UI, query [filters](#filters), sorting and pagination come out of the box.
+* GraphiQL, Swagger UI, query [filters](#rest-api-filters), [sorting](#rest-api-sorting) and [pagination](#rest-api-pagination) for REST APIs come out of the box.
 
 #### Notes:
 
@@ -145,7 +145,7 @@ Schema data is used to specify custom table schema to construct REST APIs withou
 
 ### REST API filters
 
-Sapid uses format of `?column=[operator]:[value]` for filter query params.
+Sapid uses format of `?column=[operator]:[value]` for filtering query params.
 
 * Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
 
@@ -156,6 +156,31 @@ Sapid uses format of `?column=[operator]:[value]` for filter query params.
 ##### Example:
 
 `?id=lt:100&id=ne:1` (where `id` is less than `100` `AND` `id` is not equal to `1`.)
+
+### REST API sorting
+
+Sapid uses format of `?order-by=[column]:[direction]` for sorting query params.
+
+* Supported directions are `asc` and `desc`.
+
+* Direction defaults to `desc` when omitted.
+
+##### Example:
+
+`?order-by=id:desc` (order by `id` column in descending order.)
+
+### REST API pagination
+
+Sapid supports `limit` and `offset` params for paginating query params.
+
+* They can be used independently.
+
+* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
+
+##### Example:
+
+`?limit=20&id=gt:20` (retrieve 20 items after/greater than `id`:`20`.)
+
 
 ### Routes per relationship types
 
