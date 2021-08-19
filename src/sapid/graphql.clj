@@ -4,11 +4,11 @@
 (defn- has-rels [table config]
   (let [table-name (:name table)]
     (reduce (fn [m blg-to]
-              (assoc m (tbl/to-table-name blg-to config) table-name)))))
+              (assoc m (tbl/to-table-name blg-to config) table-name))
+            {} (:belongs-to table))))
 
 (defn- has-rel-map [tables config]
   (reduce (fn [m table]
             (merge-with into m (has-rels table config)))
-          {}
-          tables))
+          {} tables))
 
