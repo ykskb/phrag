@@ -1,15 +1,13 @@
 (ns sapid.swagger
   (:require [clojure.string :as s]
-            [inflections.core :as inf]))
+            [inflections.core :as inf]
+            [sapid.table :as tbl]))
 
 (def ^:private swag-types
   {"int" "integer"
    "integer" "integer"
    "text" "string"
    "timestamp" "string"})
-
-(defn- to-path-rsc [rsc config]
-  (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
 
 ;;; params & responses
 
@@ -122,15 +120,15 @@
   (str (inf/singular rsc) "Id"))
 
 (defn- root-paths [config table]
-  (let [rsc (to-path-rsc (:name table) config)
+  (let [rsc (tbl/to-path-rsc (:name table) config)
         id-name (id-path rsc)
         id-param (path-param id-name)]
     {(str "/" rsc) (path-details table rsc rsc)
      (str "/" rsc "/{" id-name "}") (id-path-details table rsc rsc [id-param])}))
 
 (defn- one-n-paths [config table p-rsc]
-  (let [c-rsc (to-path-rsc (:name table) config)
-        p-rsc (to-path-rsc p-rsc config)
+  (let [c-rsc (tbl/to-path-rsc (:name table) config)
+        p-rsc (tbl/to-path-rsc p-rsc config)
         c-id-name (id-path c-rsc)
         p-id-name (id-path p-rsc)
         c-id-param (path-param c-id-name)
@@ -141,8 +139,8 @@
      id-path (id-path-details table c-rsc p-rsc [c-id-param p-id-param])}))
 
 (defn- n-n-create-paths [config table]
-  (let [rsc-a (to-path-rsc (first (:belongs-to table)) config)
-        rsc-b (to-path-rsc (second (:belongs-to table)) config)
+  (let [rsc-a (tbl/to-path-rsc (first (:belongs-to table)) config)
+        rsc-b (tbl/to-path-rsc (second (:belongs-to table)) config)
         rsc-a-id (id-path rsc-a)
         rsc-b-id (id-path rsc-b)
         a-add-path (str "/" rsc-a "/{" rsc-a-id "}/" rsc-b "/{" rsc-b-id "}/add")

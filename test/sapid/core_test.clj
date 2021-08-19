@@ -2,6 +2,8 @@
   (:require [clojure.java.jdbc :as jdbc]
             [clojure.test :refer :all]
             [sapid.core :as sapid]
+            [sapid.rest :as rest]
+            [sapid.table :as tbl]
             [integrant.core :as ig]))
 
 (def ^:private db-ref (gensym 'test-db-ref))
@@ -226,17 +228,17 @@
   (testing "root type from config"
     (is (= {:routes root-ataraxy-routes
             :handlers root-ataraxy-handlers}
-           (dissoc (sapid/rest-routes (sapid/make-rest-config root-option))
+           (dissoc (rest/rest-routes (rest/make-rest-config root-option))
                    :swag-paths :swag-defs))))
   (testing "one-to-n relation type from option"
     (is (= {:routes one-n-ataraxy-routes
             :handlers one-n-ataraxy-handlers}
-           (dissoc (sapid/rest-routes (sapid/make-rest-config one-n-option))
+           (dissoc (rest/rest-routes (rest/make-rest-config one-n-option))
                    :swag-paths :swag-defs))))
   (testing "n-to-n relation type from option"
     (is (= {:routes n-n-ataraxy-routes
             :handlers n-n-ataraxy-handlers}
-           (dissoc (sapid/rest-routes (sapid/make-rest-config n-n-option))
+           (dissoc (rest/rest-routes (rest/make-rest-config n-n-option))
                    :swag-paths :swag-defs)))))
 
 (defn create-database []
@@ -316,7 +318,7 @@
                       (assoc m (:name table)
                              (assoc table :col-names col-names))))
                   {}
-                  (sapid/schema-from-db (create-database)))]
+                  (tbl/schema-from-db (create-database)))]
       (doseq [exp-table expected-schema-map]
         (let [res-table (get res-map (:name exp-table))]
           (is (= (map #(:name %) (:columns exp-table)) (:col-names res-table)))
