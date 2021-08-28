@@ -26,25 +26,30 @@
           {:routes [] :handlers [] :swag-paths [] :swag-defs []}
           (:belongs-to table)))
 
-(defn- n-n-routes [config table]
+(defn- n-n-create-routes [config table]
   (let [create-routes (rt/n-n-create-routes config table)
         create-swagger (sw/n-n-create config table)]
-    (merge-with
-     into
      (-> create-routes
          (assoc :swag-paths (:swag-paths create-swagger))
-         (assoc :swag-defs (:swag-defs create-swagger)))
-     (let [table-name (:name table)
-           rsc-a (first (:belongs-to table))
-           rsc-b (second (:belongs-to table))]
-       (reduce (fn [m [p-rsc c-rsc]]
-                 (let [link-routes (rt/n-n-link-routes config table p-rsc c-rsc)
-                       link-swagger (sw/n-n-link config table p-rsc c-rsc)]
-                   (concat-routes m link-routes link-swagger)))
-               {:routes [] :handlers [] :swag-paths [] :swag-defs []}
-               [[rsc-a rsc-b] [rsc-b rsc-a]])))))
+         (assoc :swag-defs (:swag-defs create-swagger)))))
 
-;;; routes 
+(defn- n-n-link-routes [config table]
+  (let [table-name (:name table)
+        rsc-a (first (:belongs-to table))
+        rsc-b (second (:belongs-to table))]
+    (reduce (fn [m [p-rsc c-rsc]]
+              (let [link-routes (rt/n-n-link-routes config table p-rsc c-rsc)
+                    link-swagger (sw/n-n-link config table p-rsc c-rsc)]
+                (concat-routes m link-routes link-swagger)))
+            {:routes [] :handlers [] :swag-paths [] :swag-defs []}
+            [[rsc-a rsc-b] [rsc-b rsc-a]])))
+
+(defn- n-n-routes [config table]
+  (merge-with into
+              (n-n-create-routes config table)
+              (n-n-link-routes config table)))
+
+;;; routes
 
 (defn- table-routes [table config]
   (reduce (fn [m relation-type]
@@ -66,14 +71,12 @@
           (:tables config)))
 
 (defn make-rest-config [options]
-  (let [db (:db options)]
-    (-> {}
-        (assoc :router (:router options))
-        (assoc :db db)
-        (assoc :tables (or (:tables options) (tbl/schema-from-db db)))
-        (assoc :table-name-plural (:table-name-plural options true))
-        (assoc :resource-path-plural (:resource-path-plural options true))
-        (assoc :project-ns (:project-ns options))
-        (assoc :db-keys (:db-keys options))
-        (assoc :db-ref (:db-ref options)))))
-
+  (let [db (:db options)
+        config {:router (:router options)
+                :db db
+                :table-name-plural (:table-name-plural options true)
+                :resource-path-plural (:resource-path-plural options true)
+                :project-ns (:project-ns options)
+                :db-keys (:db-keys options)
+                :db-ref (:db-ref options)}]
+    (assoc config :tables (or (:tables options) (tbl/schema-from-db config db)))))

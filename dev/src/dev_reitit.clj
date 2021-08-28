@@ -22,6 +22,7 @@
             [reitit.ring.middleware.multipart :as multipart]
             [reitit.ring.middleware.parameters :as parameters]
             [ring.middleware.params :as params]
+            [ring-graphql-ui.core :as gql]
             [muuntaja.core :as m]
             [clojure.java.io :as io]
             ))
@@ -31,55 +32,6 @@
 
 (clojure.tools.namespace.repl/set-refresh-dirs
  "src" "test" "dev/src/dev_reitit.clj")
-
-(defmethod ig/init-key ::m-app [_ _]
-  (ring/ring-handler
-   (ring/router
-    [["/swagger.json"
-      {:get {:no-doc true
-             :swagger {:info {:title "my-api"}
-                       :basePath "/"} ;; prefix for all paths
-             :handler (swagger/create-swagger-handler)}}]
-
-     ["/math"
-      {:swagger {:tags ["math"]}}
-
-      ["/plus"
-       {:get {:summary "plus with spec query parameters"
-              :parameters {:query {:x int?, :y int?}}
-              :responses {200 {:body {:total int?}}}
-              :handler (fn [{{{:keys [x y]} :query} :parameters :as p}]
-                         (println (:parameters p))
-                         {:status 200
-                          :body {:total (+ x y)}})}
-        :post {:summary "plus with spec body parameters"
-               :parameters {:body {:x int?, :y int?}}
-               :responses {200 {:body {:total int?}}}
-               :handler (fn [{{{:keys [x y]} :body} :parameters}]
-                          {:status 200
-                           :body {:total (+ x y)}})}}]]]
-
-    {:data {:coercion reitit.coercion.spec/coercion
-            :muuntaja m/instance
-            :middleware [;; query-params & form-params
-                         parameters/parameters-middleware
-                         ;; content-negotiation
-                         muuntaja/format-negotiate-middleware
-                         ;; encoding response body
-                         muuntaja/format-response-middleware
-                         ;; exception handling
-                         exception/exception-middleware
-                         ;; decoding request body
-                         muuntaja/format-request-middleware
-                         ;; coercing response bodys
-                         coercion/coerce-response-middleware
-                         ;; coercing request parameters
-                         coercion/coerce-request-middleware
-                         ;; multipart
-                         multipart/multipart-middleware]}})
-   (ring/routes
-    (swagger-ui/create-swagger-ui-handler {:path "/"})
-    (ring/create-default-handler))))
 
 ;;; handlers
 
@@ -93,13 +45,14 @@
                :middleware [parameters/parameters-middleware
                             muuntaja/format-negotiate-middleware
                             muuntaja/format-response-middleware
-                            exception/exception-middleware
+;                            exception/exception-middleware
                             muuntaja/format-request-middleware
-                            coercion/coerce-response-middleware
+;                            coercion/coerce-response-middleware
                             coercion/coerce-request-middleware
                             multipart/multipart-middleware]}})
       (ring/routes
        (swagger-ui/create-swagger-ui-handler {:path "/"})
+       (gql/graphiql {:endpoint "/graphql"})
        (ring/create-default-handler))
   ))
 

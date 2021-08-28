@@ -44,12 +44,16 @@
   (if (is-n-n-table? table) [:n-n]
       (if (has-relation-column? table) [:one-n :root] [:root])))
 
-(defn schema-from-db [db]
+(defn identify-relations [tables]
   (map (fn [table]
          (let [is-n-n (is-n-n-table? table)]
            (cond-> table
              true (assoc :relation-types (relation-types table))
              (not is-n-n) (assoc :belongs-to (belongs-to table))
              is-n-n (assoc :belongs-to (n-n-belongs-to table)))))
-       (db/get-db-schema db)))
+       tables))
+
+(defn schema-from-db [config db]
+  (->> (db/get-db-schema db)
+      identify-relations))
 

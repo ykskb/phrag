@@ -21,7 +21,9 @@
                                                (assoc :router :reitit)
                                                (assoc :db db)))
         routes (rest/rest-routes rest-config)]
-    (rt/add-swag-route rest-config routes)))
+    (pp/pprint rest-config)
+    (->> (rt/add-swag-route rest-config routes)
+         (rt/add-graphql-route rest-config))))
 
 (defmethod ig/init-key ::reitit-routes [_ options]
   (make-reitit-routes options))

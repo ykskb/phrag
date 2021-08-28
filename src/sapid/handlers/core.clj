@@ -14,7 +14,7 @@
    "ne"  :!=})
 
 (defn- parse-filter-val [k v]
-  (let [parts (s/split v #":" 2)
+  (let [parts (s/split (str v) #":" 2)
         c (count parts)
         op (get operator-map (first parts))]
     (if (or (nil? op) (< c 2))

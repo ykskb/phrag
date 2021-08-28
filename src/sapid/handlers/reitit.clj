@@ -1,7 +1,9 @@
 (ns sapid.handlers.reitit
   (:require [clojure.string :as s]
             [clojure.walk :as w]
+            [com.walmartlabs.lacinia :as lcn]
             [sapid.handlers.core :as c]
+            [sapid.swagger :as sw]
             [ring.util.response :as ring-res]))
 
 (defn- param-data [req]
@@ -120,3 +122,20 @@
       {:status 200
        :body (c/delete-n-n col-a id-a col-b id-b db-con
                            table cols)})))
+
+;;; swagger
+
+(defn swagger [swag-paths swag-defs]
+  (fn [_] {:status 200
+           :body (sw/schema swag-paths swag-defs)}))
+
+;;; graphQL
+
+(defn graphql [schema]
+  (fn [req]
+    (let [params (param-data req)
+          query (get params "query")
+          vars (get params "variables")
+          result (lcn/execute schema query vars nil)]
+      {:status 200
+       :body result})))

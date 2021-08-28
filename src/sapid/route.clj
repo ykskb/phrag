@@ -1,8 +1,8 @@
 (ns sapid.route
   (:require [sapid.handlers.bidi :as bd]
             [sapid.handlers.reitit :as rtt]
-            [sapid.swagger :as sw]
-            [sapid.table :as tbl]))
+            [sapid.table :as tbl]
+            [sapid.graphql :as gql]))
 
 (defn- col-names [table]
   (set (map :name (:columns table))))
@@ -13,6 +13,7 @@
 (defmulti n-n-link-routes (fn [config & _] (:router config)))
 
 (defmulti add-swag-route (fn [config & _] (:router config)))
+(defmulti add-graphql-route (fn [config & _] (:router config)))
 
 ;;; reitit
 
@@ -107,8 +108,12 @@
 (defmethod add-swag-route :reitit [config swag]
   (let [{:keys [routes swag-paths swag-defs]} swag]
     (conj routes ["/swagger.json"
-                  {:get {:handler (fn [_] {:status 200
-                                           :body (sw/schema swag-paths swag-defs)})}}])))
+                  {:get {:handler (rtt/swagger swag-paths swag-defs)}}])))
+
+(defmethod add-graphql-route :reitit [config routes]
+  (let [schema (gql/schema config)]
+    (conj routes ["/graphql"
+                  {:post {:handler (rtt/graphql schema)}}])))
 ;;; Bidi
 
 (defmethod root-routes :bidi [config table]
