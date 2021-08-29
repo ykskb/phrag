@@ -1,6 +1,7 @@
 (ns sapid.handlers.reitit
   (:require [clojure.string :as s]
             [clojure.walk :as w]
+            [clojure.pprint :as pp]
             [com.walmartlabs.lacinia :as lcn]
             [sapid.handlers.core :as c]
             [sapid.swagger :as sw]
@@ -19,7 +20,6 @@
 
 (defn create-root [db-con table cols]
   (fn [req]
-    (println (param-data req))
     {:status 200
      :body (c/create-root (param-data req) db-con table cols)}))
 

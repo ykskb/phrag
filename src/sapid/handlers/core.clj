@@ -99,7 +99,7 @@
 
 (defn list-n-n [nn-join-col nn-p-col p-id query db-con nn-table table cols]
   (let [nn-link-col (str "nn." nn-p-col)
-        cols (conj cols nn-link-col)
+        cols (conj (or cols #{})nn-link-col)
         filters (query->filters (assoc query nn-link-col p-id) cols)]
     (db/list-through db-con table nn-table nn-join-col filters)))
 
@@ -112,4 +112,3 @@
   (let [filters (query->filters {col-a id-a col-b id-b} cols)]
     (db/delete-where! db-con table filters)
     nil))
-

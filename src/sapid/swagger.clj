@@ -80,8 +80,8 @@
 (defn- path-details
   ([table rsc tag path-params]
    (let [def-name rsc ; (s/capitalize rsc)
-         get-params (apply conj (query-params table) path-params filter-params)
-         post-params (apply conj (body-params def-name) path-params)]
+         get-params (concat (query-params table) path-params filter-params)
+         post-params (concat (body-params def-name) path-params)]
      {:get (method-details tag (str "List " def-name)
                            get-params (ref-responses def-name true))
       :post (method-details tag (str "Create " def-name) post-params)}))
@@ -90,8 +90,8 @@
 
 (defn- id-path-details [table rsc tag path-params]
   (let [def-name rsc ; (s/capitalize rsc)
-        get-params (apply conj (query-params table) path-params)
-        update-params (apply conj (body-params def-name) path-params)
+        get-params (concat (query-params table) path-params)
+        update-params (concat (body-params def-name) path-params)
         get-smry (str "Fetch " def-name)
         del-smry(str "Delete " def-name)
         update-smry (str "Update " def-name)]
@@ -103,14 +103,14 @@
 (defn- n-n-create-details [table rsc-a rsc-b path-params post?]
   (let [def-name (:name table) ; (s/capitalize (:name table))
         bd-prms (if post? (body-params def-name) nil)
-        post-params (apply conj bd-prms path-params)
+        post-params (concat bd-prms path-params)
         post-smry (if post? (str "Add " rsc-b " to " rsc-a)
                       (str "Delete " rsc-b " from " rsc-a))]
     {:post (method-details rsc-a post-smry post-params)}))
 
 (defn- n-n-link-details [table p-rsc c-rsc path-params]
   (let [def-name c-rsc ; (s/capitalize c-rsc)
-        params (apply conj (query-params table) path-params filter-params)
+        params (concat (query-params table) path-params filter-params)
         smry (str "List " c-rsc " per " p-rsc)]
     {:get (method-details p-rsc smry params (ref-responses def-name true))}))
 
