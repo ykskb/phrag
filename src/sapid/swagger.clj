@@ -42,7 +42,7 @@
                     :required false
                     :type swag-type}
              (= type "timestamp") (assoc :format "date-time")
-             (= swag-type "integer") (assoc :format "int32"))))
+             (= swag-type "integer") (assoc :format "int64"))))
        (:columns table)))
 
 (def ^:private filter-params

@@ -312,13 +312,14 @@
 
 (deftest schema-map-from-db
   (testing "all relation types"
-    (let [res-map
+    (let [config (rest/make-rest-config one-n-option)
+          res-map
           (reduce (fn [m table]
                     (let [col-names (map #(:name %) (:columns table))]
                       (assoc m (:name table)
                              (assoc table :col-names col-names))))
                   {}
-                  (tbl/schema-from-db (create-database)))]
+                  (tbl/schema-from-db config (create-database)))]
       (doseq [exp-table expected-schema-map]
         (let [res-table (get res-map (:name exp-table))]
           (is (= (map #(:name %) (:columns exp-table)) (:col-names res-table)))
