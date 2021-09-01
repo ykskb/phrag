@@ -64,7 +64,7 @@
                 m)))
           {:objects {} :queries {} :resolvers {}} (:tables config)))
 
-(defn- add-one-n [schema config table]
+(defn- add-one-n-schema [schema config table]
   (let [table-name (tbl/to-table-name (:name table) config)
         rsc-name (inf/singular table-name)
         rsc-key (keyword rsc-name)
@@ -77,6 +77,7 @@
                     blg-to-rsc-id (keyword (str blg-to-rsc-name "_id"))
                     blg-to-rscs-name (inf/plural blg-to)
                     blg-to-rscs-key (keyword blg-to-rscs-name)
+                    blg-to-table-name (tbl/to-table-name blg-to-rsc-name config)
                     rsc-rslv-key (keyword rsc-name blg-to-rsc-name)
                     blg-to-rscs-rslv-key (keyword blg-to-rsc-name rscs-name)]
                 (-> m
@@ -91,10 +92,10 @@
                               {:type blg-to-rsc-key
                                :resolve rsc-rslv-key})
                     (assoc-in [:resolvers rsc-rslv-key]
-                              (partial resolve-has-one blg-to-rsc-id db table-name)))))
+                              (partial resolve-has-one blg-to-rsc-id db blg-to-table-name)))))
             schema (:belongs-to table))))
 
-(defn- add-n-n [schema config table]
+(defn- add-n-n-schema [schema config table]
   (let [tbl-name (tbl/to-table-name (:name table) config)
         rsc-a-tbl-name (first (:belongs-to table))
         rsc-b-tbl-name (second (:belongs-to table))
@@ -126,8 +127,8 @@
 (defn- add-relationships [config schema]
   (reduce (fn [m table]
             (cond
-              (has-rel-type? :one-n table) (add-one-n m config table)
-              (has-rel-type? :n-n table) (add-n-n m config table)
+              (has-rel-type? :one-n table) (add-one-n-schema m config table)
+              (has-rel-type? :n-n table) (add-n-n-schema m config table)
               :else m))
           schema (:tables config)))
 
@@ -137,7 +138,6 @@
 
 (defn schema [config]
   (let [schema-w-resolvers (schema-with-resolvers config)]
-    (pp/pprint schema-w-resolvers)
   (-> (dissoc schema-w-resolvers :resolvers)
       (util/attach-resolvers (:resolvers schema-w-resolvers))
       schema/compile)))

@@ -1,6 +1,5 @@
 (ns sapid.swagger-test
-  (:require [clojure.java.jdbc :as jdbc]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [sapid.swagger :as swg]))
 
 (def ^:private config
