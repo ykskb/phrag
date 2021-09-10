@@ -46,8 +46,7 @@
             (let [table-name (tbl/to-table-name (:name table) config)
                   rsc-name (inf/singular table-name)
                   rsc-key (keyword rsc-name)
-                  id-q-key (keyword (str rsc-name "_by_id"))
-                  id-q-rslv-key (keyword "query" (str rsc-name "-by-id"))
+                  id-q-key (keyword rsc-name)
                   db (:db config)]
               (if (has-rel-type? :root table)
                 (-> m
@@ -58,9 +57,7 @@
                               {:type rsc-key
                                :description (str "Query " rsc-name " by id.")
                                :args {:id {:type '(non-null ID)}}
-                               :resolve id-q-rslv-key})
-                    (assoc-in [:resolvers id-q-rslv-key]
-                              (partial resolve-id-query db table-name)))
+                               :resolve (partial resolve-id-query db table-name)}))
                 m)))
           {:objects {} :queries {} :resolvers {}} (:tables config)))
 
@@ -77,22 +74,17 @@
                     blg-to-rsc-id (keyword (str blg-to-rsc-name "_id"))
                     blg-to-rscs-name (inf/plural blg-to)
                     blg-to-rscs-key (keyword blg-to-rscs-name)
-                    blg-to-table-name (tbl/to-table-name blg-to-rsc-name config)
-                    rsc-rslv-key (keyword rsc-name blg-to-rsc-name)
-                    blg-to-rscs-rslv-key (keyword blg-to-rsc-name rscs-name)]
+                    blg-to-table-name (tbl/to-table-name blg-to-rsc-name config)]
                 (-> m
                     ;; has many
                     (assoc-in [:objects blg-to-rsc-key :fields rscs-key]
                               {:type `(~'list ~rsc-key)
-                               :resolve blg-to-rscs-rslv-key})
-                    (assoc-in [:resolvers blg-to-rscs-rslv-key]
-                              (partial resolve-has-many blg-to-rsc-id db table-name))
+                               :resolve (partial resolve-has-many blg-to-rsc-id db table-name)})
                     ;; has one
                     (assoc-in [:objects rsc-key :fields blg-to-rsc-key]
                               {:type blg-to-rsc-key
-                               :resolve rsc-rslv-key})
-                    (assoc-in [:resolvers rsc-rslv-key]
-                              (partial resolve-has-one blg-to-rsc-id db blg-to-table-name)))))
+                               :resolve (partial resolve-has-one blg-to-rsc-id
+                                                 db blg-to-table-name)}))))
             schema (:belongs-to table))))
 
 (defn- add-n-n-schema [schema config table]
@@ -109,20 +101,16 @@
         rscs-b-name (inf/plural rsc-b-tbl-name)
         rscs-a-key (keyword rscs-a-name)
         rscs-b-key (keyword rscs-b-name)
-        rsc-a-rslv-key (keyword rsc-a-name rscs-b-name)
-        rsc-b-rslv-key (keyword rsc-b-name rscs-a-name)
         db (:db config)]
     (-> schema
         (assoc-in [:objects rsc-a-key :fields rscs-b-key]
                   {:type `(~'list ~rsc-b-key)
-                   :resolve rsc-b-rslv-key})
-        (assoc-in [:resolvers rsc-b-rslv-key]
-                  (partial resolve-nn rsc-b-col rsc-a-col db tbl-name rsc-b-tbl-name))
+                   :resolve (partial resolve-nn rsc-b-col rsc-a-col db
+                                     tbl-name rsc-b-tbl-name)})
         (assoc-in [:objects rsc-b-key :fields rscs-a-key]
                   {:type `(~'list ~rsc-a-key)
-                   :resolve rsc-a-rslv-key })
-        (assoc-in [:resolvers rsc-a-rslv-key]
-                  (partial resolve-nn rsc-a-col rsc-b-col db tbl-name rsc-a-tbl-name )))))
+                   :resolve (partial resolve-nn rsc-a-col rsc-b-col
+                                     db tbl-name rsc-a-tbl-name)}))))
 
 (defn- add-relationships [config schema]
   (reduce (fn [m table]
@@ -132,13 +120,8 @@
               :else m))
           schema (:tables config)))
 
-(defn- schema-with-resolvers [config]
-  (->> (root-schema config)
-       (add-relationships config)))
-
 (defn schema [config]
-  (let [schema-w-resolvers (schema-with-resolvers config)]
-  (-> (dissoc schema-w-resolvers :resolvers)
-      (util/attach-resolvers (:resolvers schema-w-resolvers))
-      schema/compile)))
+  (->> (root-schema config)
+       (add-relationships config)
+       schema/compile))
 
