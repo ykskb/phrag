@@ -29,6 +29,9 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
+(defn- resolve-list-query [db table ctx args val]
+  (c/list-root nil db table nil))
+
 (defn- resolve-id-query [db table ctx args val]
   (c/fetch-root (:id args) nil db table nil))
 
@@ -45,14 +48,20 @@
   (reduce (fn [m table]
             (let [table-name (tbl/to-table-name (:name table) config)
                   rsc-name (inf/singular table-name)
+                  rscs-name (inf/plural table-name)
                   rsc-key (keyword rsc-name)
                   id-q-key (keyword rsc-name)
+                  list-q-key (keyword rscs-name)
                   db (:db config)]
               (if (has-rel-type? :root table)
                 (-> m
                     (assoc-in [:objects rsc-key]
                               {:description rsc-name
                                :fields (root-fields table)})
+                    (assoc-in [:queries list-q-key]
+                              {:type `(~'list ~rsc-key)
+                               :description (str "List " rsc-name ".")
+                               :resolve (partial resolve-list-query db table-name)})
                     (assoc-in [:queries id-q-key]
                               {:type rsc-key
                                :description (str "Query " rsc-name " by id.")

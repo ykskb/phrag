@@ -58,6 +58,13 @@
                           "values (1,1);"))
       (jdbc/execute! (str "insert into meetups_members (meetup_id, member_id)"
                           "values (1,2);")))
+    (testing "list root type entity"
+      (let [q "{ members { id email first_name }}"
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 1 :email "jim@test.com" :first_name "jim"}
+                {:id 2 :email "yoshi@test.com" :first_name "yoshi"}]
+               (-> result :data :members)))))
+
     (testing "fetch root type entity"
       (let [q "{ member(id: 1) { id email first_name }}"
             result (lcn/execute schema q nil nil)]
