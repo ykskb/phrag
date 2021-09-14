@@ -1,59 +1,17 @@
 (ns sapid.handlers.core
-  (:require [clojure.string :as s]
-            [sapid.db :as db]
-            [ring.middleware.params :as prm]))
-
-(def ^:private operator-map
-  {"eq"  :=
-   "lt"  :<
-   "le"  :<=
-   "lte" :<=
-   "gt"  :>
-   "ge"  :>=
-   "gte" :>=
-   "ne"  :!=})
-
-(defn- parse-filter-val [k v]
-  (let [parts (s/split (str v) #":" 2)
-        c (count parts)
-        op (get operator-map (first parts))]
-    (if (or (nil? op) (< c 2))
-      [:= (keyword k) v]
-      [op (keyword k) (second parts)])))
-
-(defn- parse-order-by [m v]
-  (let [parts (s/split v #":" 2)
-        c (count parts)
-        direc (second parts)]
-    (-> m
-        (assoc :order-col (keyword (first parts)))
-        (assoc :direc (if (nil? direc) :desc (keyword direc))))))
-
-(defn- query->filters [query cols]
-  (reduce (fn [m [k v]]
-            (cond
-              (contains? cols k) (update m :filters conj (parse-filter-val k v))
-              (= k "order-by") (parse-order-by m v)
-              (= k "limit") (assoc m :limit v)
-              (= k "offset") (assoc m :offset v)
-              :else m))
-          {:filters [] :limit 100 :offset 0}
-          query))
-
-(defn ring-query [req]
-  (:query-params (prm/params-request req)))
+  (:require [sapid.db :as db]))
 
 ;;; root
 
-(defn list-root [query db-con table cols]
-  (db/list-up db-con table (query->filters query cols)))
+(defn list-root [db-con table filters]
+  (db/list-up db-con table filters))
 
 (defn create-root [params db-con table cols]
   (db/create! db-con table (select-keys params cols))
   nil)
 
-(defn fetch-root [id query db-con table cols]
-  (db/fetch db-con table id (query->filters query cols)))
+(defn fetch-root [id db-con table filters]
+  (db/fetch db-con table id filters))
 
 (defn delete-root [id db-con table]
   (db/delete! db-con table id)
@@ -69,8 +27,8 @@
 
 ;;; one-n
 
-(defn list-one-n [p-col p-id query db-con table cols]
-  (let [filters (query->filters (assoc query p-col p-id) cols)]
+(defn list-one-n [p-col p-id db-con table filters]
+  (let [filters (update filters :filters conj [:= (keyword p-col) p-id])]
     (db/list-up db-con table filters)))
 
 (defn create-one-n [p-col p-id params db-con table cols]
@@ -79,8 +37,8 @@
     (db/create! db-con table params)
     nil))
 
-(defn fetch-one-n [id p-col p-id query db-con table cols]
-  (let [filters (query->filters (assoc query p-col p-id) cols)]
+(defn fetch-one-n [id p-col p-id db-con table filters]
+  (let [filters (update filters :filters conj [:= (keyword p-col) p-id])]
     (db/fetch db-con table id filters)))
 
 (defn delete-one-n [id p-col p-id db-con table]
@@ -97,10 +55,9 @@
 
 ;;; n-n
 
-(defn list-n-n [nn-join-col nn-p-col p-id query db-con nn-table table cols]
+(defn list-n-n [nn-join-col nn-p-col p-id db-con nn-table table filters]
   (let [nn-link-col (str "nn." nn-p-col)
-        cols (conj (or cols #{})nn-link-col)
-        filters (query->filters (assoc query nn-link-col p-id) cols)]
+        filters (update filters :filters conj [:= (keyword nn-link-col) p-id])]
     (db/list-through db-con table nn-table nn-join-col filters)))
 
 (defn create-n-n [col-a id-a col-b id-b params db-con table cols]
@@ -108,7 +65,9 @@
     (db/create! db-con table params)
     nil))
 
-(defn delete-n-n [col-a id-a col-b id-b db-con table cols]
-  (let [filters (query->filters {col-a id-a col-b id-b} cols)]
+(defn delete-n-n [col-a id-a col-b id-b db-con table]
+  (let [where-a [:= (keyword col-a) id-a]
+        where-b [:= (keyword col-b) id-b]
+        filters {:filters [where-a where-b]}]
     (db/delete-where! db-con table filters)
     nil))
