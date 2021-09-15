@@ -7,9 +7,20 @@
 
 ;; Resolvers
 
+(def ^:private sort-ops
+  {:eq  :=
+   :lt  :<
+   :le  :<=
+   :lte :<=
+   :gt  :>
+   :ge  :>=
+   :gte :>=
+   :ne  :!=})
+
 (defn- parse-filter [fltr]
   (map (fn [[k v]]
-         [(:operator v) k (:value v)])
+         (let [op ((:operator v) sort-ops)]
+           [op k (:value v)]))
        fltr))
 
 (defn- parse-sort [m v]
@@ -34,7 +45,6 @@
 
 (defn- resolve-list-query [db table _ctx args _val]
   (let [filters (args->filters args)]
-    (println filters args)
     (c/list-root db table filters)))
 
 (defn- resolve-id-query [db table _ctx args _val]
@@ -101,7 +111,7 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
-; Input object descriptions
+;; Input object descriptions
 
 (def ^:private filter-desc
   (str "Filter format is {operator: [op] value: [val]}. Supported operators are "
@@ -115,11 +125,11 @@
 
 (def ^:private filter-inputs
   {:StringFilter {:fields {:operator {:type :FilterOp}
-                            :value {:type 'String}}}
+                           :value {:type 'String}}}
    :FloatFilter {:fields {:operator {:type :FilterOp}
-                           :value {:type 'Float}}}
+                          :value {:type 'Float}}}
    :IntFilter {:fields {:operator {:type :FilterOp}
-                         :value {:type 'Int}}}})
+                        :value {:type 'Int}}}})
 
 ;; Enums
 
@@ -186,12 +196,17 @@
               (let [blg-to-rsc-name (inf/singular blg-to)
                     blg-to-rsc-key (keyword blg-to-rsc-name)
                     blg-to-rsc-id (keyword (str blg-to-rsc-name "_id"))
-                    blg-to-rscs-name (inf/plural blg-to)
-                    blg-to-table-name (tbl/to-table-name blg-to-rsc-name config)]
+                    blg-to-table-name (tbl/to-table-name blg-to-rsc-name config)
+                    rsc-flt-key (keyword (str rsc-name "Filter"))
+                    rsc-sort-key (keyword (str rsc-name "Sort"))]
                 (-> m
                     ;; has many
                     (assoc-in [:objects blg-to-rsc-key :fields rscs-key]
                               {:type `(~'list ~rsc-key)
+                               :args {:filter {:type rsc-flt-key}
+                                      :sort {:type rsc-sort-key}
+                                      :limit {:type 'Int}
+                                      :offset {:type 'Int}}
                                :resolve (partial resolve-has-many blg-to-rsc-id
                                                  db table-name)})
                     ;; has one
@@ -219,10 +234,14 @@
     (-> schema
         (assoc-in [:objects rsc-a-key :fields rscs-b-key]
                   {:type `(~'list ~rsc-b-key)
+                   :args {:limit {:type 'Int}
+                          :offset {:type 'Int}}
                    :resolve (partial resolve-nn rsc-b-col rsc-a-col db
                                      tbl-name rsc-b-tbl-name)})
         (assoc-in [:objects rsc-b-key :fields rscs-a-key]
                   {:type `(~'list ~rsc-a-key)
+                   :args {:limit {:type 'Int}
+                          :offset {:type 'Int}}
                    :resolve (partial resolve-nn rsc-a-col rsc-b-col
                                      db tbl-name rsc-a-tbl-name)}))))
 

@@ -49,7 +49,8 @@
         fltrs (:filters filters)
         o-col (:order-col filters)
         q (-> (select :t.*) (from [(keyword nn-table) :nn])
-              (join [(keyword rsc) :t] [:= nn-col-key :t.id]))
+              (join [(keyword rsc) :t] [:= nn-col-key :t.id])
+              (limit (:limit filters)) (offset (:offset filters)))
         q (if (not-empty fltrs) (apply where q fltrs) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
     (->> (sql/format q)
