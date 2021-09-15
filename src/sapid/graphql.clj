@@ -1,6 +1,7 @@
 (ns sapid.graphql
   (:require [sapid.table :as tbl]
             [sapid.handlers.core :as c]
+            [camel-snake-kebab.core :as csk]
             [com.walmartlabs.lacinia.schema :as schema]
             ;; [clojure.pprint :as pp]
             [inflections.core :as inf]))
@@ -114,12 +115,12 @@
 ;; Input object descriptions
 
 (def ^:private filter-desc
-  (str "Filter format is {operator: [op] value: [val]}. Supported operators are "
-       "eq, ne, lt, le/lte, gt, and ge/gte. Multiple filters are applied with "
-       "`AND` operators."))
+  (str "Filter format is {[column]: {operator: [op] value: [val]}}. "
+       "Supported operators are eq, ne, lt, le/lte, gt, and ge/gte. "
+       "Multiple filters are applied with `AND` operators."))
 
 (def ^:private sort-desc
-  (str "Sort format is {[key]: [asc or desc]}."))
+  (str "Sort format is {[column]: [\"asc\" or \"desc\"]}."))
 
 ;; Input objects
 
@@ -144,19 +145,19 @@
 (defn- root-schema [config]
   (reduce (fn [m table]
             (let [table-name (tbl/to-table-name (:name table) config)
-                  rsc-name (inf/singular table-name)
-                  rscs-name (inf/plural table-name)
-                  rsc-flt-name (str rsc-name "Filter")
-                  rsc-sort-name (str rsc-name "Sort")
-                  rsc-key (keyword rsc-name)
-                  rsc-flt-key (keyword rsc-flt-name)
-                  rsc-sort-key (keyword rsc-sort-name)
-                  id-q-key (keyword rsc-name)
-                  list-q-key (keyword rscs-name)
+                  rsc (inf/singular table-name)
+                  rscs (inf/plural table-name)
+                  rsc-name (csk/->PascalCase rsc)
+                  rscs-name (csk/->PascalCase rscs)
+                  rsc-flt-key (str rsc-name "Filter")
+                  rsc-sort-key (str rsc-name "Sort")
+                  rsc-name-key (keyword rsc-name)
+                  id-q-key (keyword rsc)
+                  list-q-key (keyword rscs)
                   db (:db config)]
               (if (has-rel-type? :root table)
                 (-> m
-                    (assoc-in [:objects rsc-key]
+                    (assoc-in [:objects rsc-name-key]
                               {:description rsc-name
                                :fields (root-fields table)})
                     (assoc-in [:input-objects rsc-flt-key]
@@ -166,7 +167,7 @@
                               {:description sort-desc
                                :fields (sort-fields table)})
                     (assoc-in [:queries list-q-key]
-                              {:type `(~'list ~rsc-key)
+                              {:type `(~'list ~rsc-name-key)
                                :description (str "List " rscs-name ".")
                                :args {:filter {:type rsc-flt-key}
                                       :sort {:type rsc-sort-key}
@@ -175,7 +176,7 @@
                                :resolve (partial resolve-list-query
                                                  db table-name)})
                     (assoc-in [:queries id-q-key]
-                              {:type rsc-key
+                              {:type rsc-name-key
                                :description (str "Query " rsc-name " by id.")
                                :args {:id {:type '(non-null ID)}}
                                :resolve (partial resolve-id-query
@@ -187,22 +188,25 @@
 
 (defn- add-one-n-schema [schema config table]
   (let [table-name (tbl/to-table-name (:name table) config)
-        rsc-name (inf/singular table-name)
-        rsc-key (keyword rsc-name)
-        rscs-name (inf/plural table-name)
-        rscs-key (keyword rscs-name)
+        rsc (inf/singular table-name)
+        rscs (inf/plural table-name)
+        rsc-name (csk/->PascalCase rsc)
+        rscs-key (keyword rscs)
+        rsc-name-key (keyword rsc-name)
+        rsc-flt-key (keyword (str rsc-name "Filter"))
+        rsc-sort-key (keyword (str rsc-name "Sort"))
         db (:db config)]
     (reduce (fn [m blg-to]
-              (let [blg-to-rsc-name (inf/singular blg-to)
-                    blg-to-rsc-key (keyword blg-to-rsc-name)
-                    blg-to-rsc-id (keyword (str blg-to-rsc-name "_id"))
-                    blg-to-table-name (tbl/to-table-name blg-to-rsc-name config)
-                    rsc-flt-key (keyword (str rsc-name "Filter"))
-                    rsc-sort-key (keyword (str rsc-name "Sort"))]
+              (let [blg-to-rsc (inf/singular blg-to)
+                    blg-to-rsc-name (csk/->PascalCase blg-to-rsc)
+                    blg-to-rsc-name-key (keyword blg-to-rsc-name)
+                    blg-to-rsc-key (keyword blg-to-rsc)
+                    blg-to-rsc-id (keyword (str blg-to-rsc "_id"))
+                    blg-to-table-name (tbl/to-table-name blg-to-rsc config)]
                 (-> m
                     ;; has many
-                    (assoc-in [:objects blg-to-rsc-key :fields rscs-key]
-                              {:type `(~'list ~rsc-key)
+                    (assoc-in [:objects blg-to-rsc-name-key :fields rscs-key]
+                              {:type `(~'list ~rsc-name-key)
                                :args {:filter {:type rsc-flt-key}
                                       :sort {:type rsc-sort-key}
                                       :limit {:type 'Int}
@@ -210,8 +214,8 @@
                                :resolve (partial resolve-has-many blg-to-rsc-id
                                                  db table-name)})
                     ;; has one
-                    (assoc-in [:objects rsc-key :fields blg-to-rsc-key]
-                              {:type blg-to-rsc-key
+                    (assoc-in [:objects rsc-name-key :fields blg-to-rsc-key]
+                              {:type blg-to-rsc-name-key
                                :resolve (partial resolve-has-one blg-to-rsc-id
                                                  db blg-to-table-name)}))))
             schema (:belongs-to table))))
@@ -220,26 +224,26 @@
   (let [tbl-name (tbl/to-table-name (:name table) config)
         rsc-a-tbl-name (first (:belongs-to table))
         rsc-b-tbl-name (second (:belongs-to table))
-        rsc-a-name (inf/singular rsc-a-tbl-name)
-        rsc-b-name (inf/singular rsc-b-tbl-name)
-        rsc-a-key (keyword rsc-a-name)
-        rsc-b-key (keyword rsc-b-name)
-        rsc-a-col (str rsc-a-name "_id")
-        rsc-b-col (str rsc-b-name "_id")
-        rscs-a-name (inf/plural rsc-a-tbl-name)
-        rscs-b-name (inf/plural rsc-b-tbl-name)
-        rscs-a-key (keyword rscs-a-name)
-        rscs-b-key (keyword rscs-b-name)
+        rsc-a (inf/singular rsc-a-tbl-name)
+        rsc-b (inf/singular rsc-b-tbl-name)
+        rsc-a-name-key (csk/->PascalCaseKeyword rsc-a)
+        rsc-b-name-key (csk/->PascalCaseKeyword rsc-b)
+        rsc-a-col (str rsc-a "_id")
+        rsc-b-col (str rsc-b "_id")
+        rscs-a (inf/plural rsc-a-tbl-name)
+        rscs-b (inf/plural rsc-b-tbl-name)
+        rscs-a-key (keyword rscs-a)
+        rscs-b-key (keyword rscs-b)
         db (:db config)]
     (-> schema
-        (assoc-in [:objects rsc-a-key :fields rscs-b-key]
-                  {:type `(~'list ~rsc-b-key)
+        (assoc-in [:objects rsc-a-name-key :fields rscs-b-key]
+                  {:type `(~'list ~rsc-b-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial resolve-nn rsc-b-col rsc-a-col db
                                      tbl-name rsc-b-tbl-name)})
-        (assoc-in [:objects rsc-b-key :fields rscs-a-key]
-                  {:type `(~'list ~rsc-a-key)
+        (assoc-in [:objects rsc-b-name-key :fields rscs-a-key]
+                  {:type `(~'list ~rsc-a-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial resolve-nn rsc-a-col rsc-b-col

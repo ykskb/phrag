@@ -24,6 +24,7 @@
                                    [hawk "0.2.11"]
                                    [eftest "0.5.9"]
                                    [kerodon "0.9.1"]
+                                   [camel-snake-kebab "0.4.2"]
                                    [com.github.seancorfield/next.jdbc "1.2.674"]
                                    [com.walmartlabs/lacinia "0.39-alpha-9"]
                                    [duct/core "0.8.0"]

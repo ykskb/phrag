@@ -28,21 +28,9 @@
 (defn param-type [col-type]
   (get col-checks col-type))
 
-(defn- table->param-spec [table]
-  (reduce (fn [m col]
-               (assoc m (keyword (:name col)) (param-type (:type col))))
-             {} (:columns table)))
-
-(defn- table->query-spec [table]
-  (reduce (fn [m col]
-               (assoc m (keyword (:name col)) string?))
-             {} (:columns table)))
-
 (defmethod root-routes :reitit [config table]
   (let [db (:db config)
         table-name (:name table)
-        query-spec (table->query-spec table)
-        param-spec (table->param-spec table)
         cols (col-names table)
         rsc-path-end (str "/" (tbl/to-path-rsc table-name config))
         rsc-path-id (str "/" (tbl/to-path-rsc table-name config) "/:id")]
