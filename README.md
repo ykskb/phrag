@@ -2,23 +2,25 @@
 
 GraphQL / REST APIs from DB Schema Data
 
-Sapid constructs GraphQL and/or REST API endpoints from DB schema data.
+Sapid creates instantly-operational GraphQL / REST routes from DB schema data.
 
 #### Features:
 
-* Auto-configures GraphQL/REST routes, [ring](https://github.com/ring-clojure/ring) handlers, and database layer from a single line for [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) and [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
+* Creates [ring](https://github.com/ring-clojure/ring) routes powered for different routers including [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) or [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
 
-* Supports APIs for `one-to-one`, `one-to-many` and `many-to-many` relationships as well as `root` entities.
+* Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
-* DB schema data can be retrieved from a running DB or specified with a config map.
+* DB schema data can be retrieved from a running DB or specified with a config map selectively.
 
-* GraphiQL, Swagger UI, query [filters](#rest-api-filters), [sorting](#rest-api-sorting) and [pagination](#rest-api-pagination) for REST APIs come out of the box.
+* [Filters](#resource-filters), [sorting](#resource-sorting) and [pagination](#resource-pagination) come out of the box for both GraphQL and REST APIs.
+
+* [Swagger UI](https://swagger.io/tools/swagger-ui/) / GraphQL IDE (like GraphiQL) connectable.
 
 #### Notes:
 
 * This project is currently in POC state and hasn't been published to Clojars yet.
 
-### Schema to REST endpoints
+### Schema Data to Nested Resource Structures
 
 Here's an example schema showing how Sapid creates endpoints according to four types of relationships: `Root`, `1-to-1`, `1-to-N` and `N-to-N`. (Please refer to [Routes per relationship types](#routes-per-relationship-types) for geneic rules.)
 
@@ -27,64 +29,49 @@ Here's an example schema showing how Sapid creates endpoints according to four t
 
 ### Usage
 
-#### Schema from DB
-
-* bidi
+##### reitit
 
 ```clojure
-; Example with Integrant in Clojure codes
-{:sapid.core/bidi-routes {:db (ig/ref :my-db/connection)} ; bidi routes created from DB
- ::app {:routes (ig/ref :sapid.core)} ; ::app key to call bidi.ring/make-handler with middleware
- ::server {:app (ig/ref ::app)}} ; ::server key to run jetty or equivalent server process
+;; Read schema data from DB (as data for Integrant)
+{:sapid.core/reitit-routes {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :sapid.core/reitit-routes)}}
 
-; Direct function call returns bidi routes created from DB
-(sapid.core/make-bidi-routes (jdbc/get-connection my-db-spec)) 
+;; Provide schema data (direct function call)
+(def routes (sapid.core/make-reitit-routes {:tables [{:name "..."}]}))
 ```
+
+##### bidi
 
 ```clojure
+;; Read schema data from DB (as data for Integrant)
+{:sapid.core/bidi-routes {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :sapid.core/reitit-routes)}}
+
+;; Provide schema data (direct function call)
+(def routes (sapid.core/make-bidi-routes {:tables [{:name "..."}]}))
 ```
 
-* Duct Ataraxy
+
+##### Duct Ataraxy
 
 ```edn
-; at root/module level of duct config edn
+;; at root/module level of duct config edn
 :sapid.core/duct-routes {} 
 ```
 
 ##### Notes:
 
-Auto-configuration from a running DB leverages naming patterns of tables/columns to identify relationships:
+When reading schema data from DB connection, Sapid leverages naming patterns of tables/columns to identify relationships:
+
+> Table names can be specified in the [config map](#sapid-config) for other naming patterns. (In this case, Sapid will not attempt retrieving schema data from DB.)
 
 1. `Root` or `N-to-N` relationship?
 
-	A table name without `_` would be classified as `Root`, and a table name pattern of `resourcea_resourceb` such as `members_groups` is assumed for `N-to-N` tables. 
+	A table name without `_` would be classified as `Root`, and a table name pattern of `resourcea_resourceb` (like `members_groups`) is assumed for `N-to-N` tables. 
 
 2. `1-to-1`/`1-to-N` relationship?
 
 	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-1`/`1-to-N` relationship is identified per column.
-
-> For other naming patterns, table names can be specified in the [config map](#sapid-config).
-
-#### Schema from config
-
-* bidi
-
-```edn
-:sapid.core/bidi-routes {:tables [{:name "..."}]}
-```
-
-* Duct Ataraxy
-
-```edn
-; at root/module level of duct config
-:sapid.core/merge-on-duct {:tables [{:name "..."}]}
-```
-
-##### Notes:
-
-When `tables` data is provided, Sapid uses it for table schema instead of retrieving from a DB.
-
-> Please refer to [config section](#sapid-config-map) for the format of schema data.
 
 ### Sapid config map
 
@@ -143,43 +130,71 @@ Schema data is used to specify custom table schema to construct REST APIs withou
 | `:db-ref`               | Integrant reference to a database connection for REST handler configs.       | Created from `:db-config-key` |
 | `:db-keys`              | Keys to get a connection from a database map.                                    | [:spec]                       |
 
-### REST API filters
+### Resource Filters
 
-Sapid uses format of `?column=[operator]:[value]` for filtering query params.
+##### GraphQL
 
-* Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
+Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in query arguments for filtering.
 
-* Operators default to `eq` when omitted.
+###### Example:
 
-* Multiple queries are applied with `AND` operator.
+`{users (filter: {id: {operator: lt, value: 100} id: {operator: ne, value: 1}})}` (`users` where `id` is less than `100` `AND` `id` is not equal to `1`)
 
-##### Example:
+##### REST API
 
-`?id=lt:100&id=ne:1` (where `id` is less than `100` `AND` `id` is not equal to `1`.)
+Format of `?column=[operator]:[value]` is used in a query string for filtering.
 
-### REST API sorting
 
-Sapid uses format of `?order-by=[column]:[direction]` for sorting query params.
+###### Example:
 
-* Supported directions are `asc` and `desc`.
+`?id=lt:100&id=ne:1` (where `id` is less than `100` `AND` `id` is not equal to `1`)
 
-* Direction defaults to `desc` when omitted.
+> * Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
+> * Operators default to `eq` when omitted.
+> * Multiple queries are applied with `AND` operator.
 
-##### Example:
+### Resource Sorting
 
-`?order-by=id:desc` (order by `id` column in descending order.)
+##### GraphQL
 
-### REST API pagination
+Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting.
 
-Sapid supports `limit` and `offset` params for paginating query params.
+###### Example:
 
-* They can be used independently.
+`sort: {id: asc}` (sort by `id` column in ascending order)
 
-* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
+##### REST API
 
-##### Example:
+Format of `?order-by=[column]:[asc or desc]` is used in a query string for sorting.
 
-`?limit=20&id=gt:20` (retrieve 20 items after/greater than `id`:`20`.)
+###### Example:
+
+`?order-by=id:desc` (sort by `id` column in descending order)
+
+> * Direction defaults to `desc` when omitted.
+
+### Resource Pagination
+
+##### GraphQL
+
+Format of `limit: [count]` and `offset: [count]` is used in query arguments for pagination. 
+
+###### Example
+
+`(filter: {id: {operator: gt value: 20}} limit: 25)` (20 items after/greater than `id`:`20`).
+
+##### REST API
+
+Formats of `limit=[count]` and `offset=[count]` are used in a query string for pagination.
+
+###### Example:
+
+`?limit=20&id=gt:20` (20 items after/greater than `id`:`20`.)
+
+>* `limit` and `offset` can be used independently.
+>
+>* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
+
 
 
 ### Routes per relationship types
