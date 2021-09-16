@@ -132,20 +132,19 @@ Schema data is used to specify custom table schema to construct REST APIs withou
 
 ### Resource Filters
 
-##### GraphQL
+#### GraphQL
 
 Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in query arguments for filtering.
 
-###### Example:
+##### Example:
 
 `{users (filter: {id: {operator: lt, value: 100} id: {operator: ne, value: 1}})}` (`users` where `id` is less than `100` `AND` `id` is not equal to `1`)
 
-##### REST API
+#### REST API
 
 Format of `?column=[operator]:[value]` is used in a query string for filtering.
 
-
-###### Example:
+##### Example:
 
 `?id=lt:100&id=ne:1` (where `id` is less than `100` `AND` `id` is not equal to `1`)
 
@@ -155,19 +154,19 @@ Format of `?column=[operator]:[value]` is used in a query string for filtering.
 
 ### Resource Sorting
 
-##### GraphQL
+#### GraphQL
 
 Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting.
 
-###### Example:
+##### Example:
 
 `sort: {id: asc}` (sort by `id` column in ascending order)
 
-##### REST API
+#### REST API
 
 Format of `?order-by=[column]:[asc or desc]` is used in a query string for sorting.
 
-###### Example:
+##### Example:
 
 `?order-by=id:desc` (sort by `id` column in descending order)
 
@@ -175,24 +174,23 @@ Format of `?order-by=[column]:[asc or desc]` is used in a query string for sorti
 
 ### Resource Pagination
 
-##### GraphQL
+#### GraphQL
 
-Format of `limit: [count]` and `offset: [count]` is used in query arguments for pagination. 
+Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination. 
 
-###### Example
+##### Example
 
 `(filter: {id: {operator: gt value: 20}} limit: 25)` (20 items after/greater than `id`:`20`).
 
-##### REST API
+#### REST API
 
 Formats of `limit=[count]` and `offset=[count]` are used in a query string for pagination.
 
-###### Example:
+##### Example:
 
 `?limit=20&id=gt:20` (20 items after/greater than `id`:`20`.)
 
 >* `limit` and `offset` can be used independently.
->
 >* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
 
 
