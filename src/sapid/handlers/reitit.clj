@@ -137,7 +137,7 @@
   (fn [req]
     (let [params (param-data req)
           query (get params "query")
-          vars (get params "variables")
+          vars (w/keywordize-keys (get params "variables"))
           result (lcn/execute schema query vars nil)]
       {:status 200
        :body result})))

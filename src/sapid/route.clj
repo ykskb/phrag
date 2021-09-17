@@ -4,9 +4,6 @@
             [sapid.table :as tbl]
             [sapid.graphql :as gql]))
 
-(defn- col-names [table]
-  (set (map :name (:columns table))))
-
 (defmulti root-routes (fn [config & _] (:router config)))
 (defmulti one-n-link-routes (fn [config & _] (:router config)))
 (defmulti n-n-create-routes (fn [config & _] (:router config)))
@@ -31,7 +28,7 @@
 (defmethod root-routes :reitit [config table]
   (let [db (:db config)
         table-name (:name table)
-        cols (col-names table)
+        cols (tbl/col-names table)
         rsc-path-end (str "/" (tbl/to-path-rsc table-name config))
         rsc-path-id (str "/" (tbl/to-path-rsc table-name config) "/:id")]
     {:routes [[rsc-path-end {:get {:handler (rtt/list-root db table-name cols)}
@@ -49,7 +46,7 @@
   (let [db (:db config)
         table-name (:name table)
         p-col (tbl/to-col-name p-rsc)
-        cols (col-names table)
+        cols (tbl/col-names table)
         p-rsc-path (tbl/to-path-rsc p-rsc config)
         c-rsc-path (tbl/to-path-rsc table-name config)
         rsc-path (str "/" p-rsc-path "/:p-id/" c-rsc-path)
@@ -69,7 +66,7 @@
         rsc-b (second (:belongs-to table))
         col-a (tbl/to-col-name rsc-a)
         col-b (tbl/to-col-name rsc-b)
-        cols (col-names table)
+        cols (tbl/col-names table)
         rsc-a-path (tbl/to-path-rsc rsc-a config)
         rsc-b-path (tbl/to-path-rsc rsc-b config)
         a-add-path (str "/" rsc-a-path "/:id-a/" rsc-b-path "/:id-b/add")
@@ -90,10 +87,10 @@
         nn-p-col (tbl/to-col-name p-rsc)
         rsc-path (str "/" (tbl/to-path-rsc p-rsc config) "/:p-id/" (tbl/to-path-rsc c-rsc config))]
     {:routes [[rsc-path {:get {:handler (rtt/list-n-n db table nn-table nn-join-col nn-p-col
-                                                      (col-names table))}}]]
+                                                      (tbl/col-names table))}}]]
      :handlers []}))
 
-(defmethod add-swag-route :reitit [config swag]
+(defmethod add-swag-route :reitit [_config swag]
   (let [{:keys [routes swag-paths swag-defs]} swag]
     (conj routes ["/swagger.json"
                   {:get {:handler (rtt/swagger swag-paths swag-defs)}}])))
@@ -107,7 +104,7 @@
 (defmethod root-routes :bidi [config table]
   (let [db (:db config)
         table-name (:name table)
-        cols (col-names table)
+        cols (tbl/col-names table)
         rsc-path (str "/" (tbl/to-path-rsc table-name config) "/")
         rsc-path-end (str "/" (tbl/to-path-rsc table-name config))]
     {:routes [{rsc-path-end {:get (bd/list-root db table-name cols)
@@ -122,7 +119,7 @@
   (let [db (:db config)
         table-name (:name table)
         p-col (tbl/to-col-name p-rsc)
-        cols (col-names table)
+        cols (tbl/col-names table)
         p-rsc-path (str "/" (tbl/to-path-rsc p-rsc config) "/")
         c-rsc-path (str "/" (tbl/to-path-rsc table-name config) "/")
         c-rsc-path-end (str "/" (tbl/to-path-rsc table-name config))]
@@ -143,7 +140,7 @@
         rsc-b (second (:belongs-to table))
         col-a (tbl/to-col-name rsc-a)
         col-b (tbl/to-col-name rsc-b)
-        cols (col-names table)
+        cols (tbl/col-names table)
         rsc-a-path (str "/" (tbl/to-path-rsc rsc-a config) "/")
         rsc-b-path (str "/" (tbl/to-path-rsc rsc-b config) "/")]
     {:routes [{[rsc-a-path :id-a rsc-b-path :id-b "/add"]
@@ -166,12 +163,12 @@
         c-rsc-path (str "/" (tbl/to-path-rsc c-rsc config))]
     {:routes [{[p-rsc-path :p-id c-rsc-path]
                {:get (bd/list-n-n db table nn-table nn-join-col nn-p-col
-                                  (col-names table))}}]
+                                  (tbl/col-names table))}}]
      :handlers []}))
 
 ;;; Duct Ataraxy
 
-(defn handler-key [project-ns action]
+(defn handler-key [_project-ns action]
   (keyword "sapid.handlers.duct-ataraxy" action))
 
 (defn route-key [project-ns resource action]
@@ -190,7 +187,7 @@
   (let [ns (:project-ns config)
         table-name (:name table)
         opts {:db (:db-ref config) :db-keys (:db-keys config)
-              :table table-name :cols (col-names table)}
+              :table table-name :cols (tbl/col-names table)}
         rsc-path (str "/" (tbl/to-path-rsc table-name config) "/")
         rsc-path-end (str "/" (tbl/to-path-rsc table-name config))]
     (reduce (fn [m [action path param-names]]
@@ -216,7 +213,7 @@
         c-rsc-path-end (str "/" (tbl/to-path-rsc c-rsc config))
         opts {:db (:db-ref config) :db-keys (:db-keys config)
               :table c-rsc :p-col (tbl/to-col-name p-rsc)
-              :cols (col-names table)}
+              :cols (tbl/col-names table)}
         rscs (str p-rsc "." c-rsc)]
     (reduce (fn [m [action path param-names]]
               (let [route-key (route-key ns rscs action)
@@ -248,7 +245,7 @@
         rsc-b-path (str "/" (tbl/to-path-rsc rsc-b config) "/")
         opts {:db (:db-ref config) :db-keys (:db-keys config)
               :table table-name :col-a (tbl/to-col-name rsc-a)
-              :col-b (tbl/to-col-name rsc-b) :cols (col-names table)}]
+              :col-b (tbl/to-col-name rsc-b) :cols (tbl/col-names table)}]
     (reduce (fn [m [action rscs path param-names]]
               (let [route-key (route-key ns rscs action)
                     handler-key (handler-key ns action)]
@@ -277,7 +274,7 @@
         opts {:db (:db-ref config) :db-keys (:db-keys config)
               :table (tbl/to-table-name c-rsc config) :nn-table (:name table)
               :nn-join-col (tbl/to-col-name c-rsc) :nn-p-col (tbl/to-col-name p-rsc)
-              :cols (col-names table)}]
+              :cols (tbl/col-names table)}]
     (reduce (fn [m [action path param-names]]
               (let [rscs (str p-rsc "." c-rsc)
                     route-key (route-key ns rscs action)

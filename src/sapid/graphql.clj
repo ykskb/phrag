@@ -1,5 +1,6 @@
 (ns sapid.graphql
-  (:require [sapid.table :as tbl]
+  (:require [clojure.walk :as w]
+            [sapid.table :as tbl]
             [sapid.handlers.core :as c]
             [camel-snake-kebab.core :as csk]
             [com.walmartlabs.lacinia.schema :as schema]
@@ -57,12 +58,41 @@
         filters (update arg-fltrs :filters conj [:= id-key (:id val)])]
     (c/list-root db table filters)))
 
-(defn resolve-has-one [id-key db table _ctx _args val]
+(defn- resolve-has-one [id-key db table _ctx _args val]
   (c/fetch-root (id-key val) db table nil))
 
-(defn resolve-nn [join-col p-col db nn-table table _ctx args val]
+(defn- resolve-nn [join-col p-col db nn-table table _ctx args val]
   (let [filters (args->filters args)]
     (c/list-n-n join-col p-col (:id val) db nn-table table filters)))
+
+(def ^:private res-true
+  {:result true})
+
+(defn- create-root [db table cols _ctx args _val]
+  (c/create-root (w/stringify-keys args) db table cols)
+  res-true)
+
+(defn- update-root [db table cols _ctx args _val]
+  (c/patch-root (:id args) (w/stringify-keys args) db table cols)
+  res-true)
+
+(defn- delete-root [db table _ctx args _val]
+  (c/delete-root (:id args) db table)
+  res-true)
+
+(defn- create-n-n [col-a col-b db table cols _ctx args _val]
+  (let [col-a-key (keyword col-a)
+        col-b-key (keyword col-b)]
+    (c/create-n-n col-a (col-a-key args) col-b (col-b-key args) args
+                  db table cols)
+    res-true))
+
+(defn- delete-n-n [col-a col-b db table _ctx args _val]
+  (let [col-a-key (keyword col-a)
+        col-b-key (keyword col-b)]
+    (c/delete-n-n col-a (col-a-key args) col-b (col-b-key args)
+                  db table)
+    res-true))
 
 ;; Object / input object fields
 
@@ -154,12 +184,17 @@
                   rsc-name-key (keyword rsc-name)
                   id-q-key (keyword rsc)
                   list-q-key (keyword rscs)
-                  db (:db config)]
+                  create-key (keyword (str "create" rsc-name))
+                  update-key (keyword (str "update" rsc-name))
+                  delete-key (keyword (str "delete" rsc-name))
+                  obj-fields (root-fields table)
+                  db (:db config)
+                  cols (tbl/col-names table)]
               (if (has-rel-type? :root table)
                 (-> m
                     (assoc-in [:objects rsc-name-key]
                               {:description rsc-name
-                               :fields (root-fields table)})
+                               :fields obj-fields})
                     (assoc-in [:input-objects rsc-flt-key]
                               {:description filter-desc
                                :fields (filter-fields table)})
@@ -180,11 +215,26 @@
                                :description (str "Query " rsc-name " by id.")
                                :args {:id {:type '(non-null ID)}}
                                :resolve (partial resolve-id-query
-                                                 db table-name)}))
+                                                 db table-name)})
+                    (assoc-in [:mutations create-key]
+                              {:type :Result
+                               :args (dissoc obj-fields :id)
+                               :resolve (partial create-root db table-name
+                                                 cols)})
+                    (assoc-in [:mutations update-key]
+                              {:type :Result
+                               :args obj-fields
+                               :resolve (partial update-root db table-name
+                                                 cols)})
+                    (assoc-in [:mutations delete-key]
+                              {:type :Result
+                               :args {:id {:type '(non-null ID)}}
+                               :resolve (partial delete-root db table-name)}))
                 m)))
           {:enums (merge filter-op sort-op)
            :input-objects filter-inputs
-           :objects {} :queries {}} (:tables config)))
+           :objects {:Result {:fields {:result {:type 'Boolean}}}}
+           :queries {}} (:tables config)))
 
 (defn- add-one-n-schema [schema config table]
   (let [table-name (tbl/to-table-name (:name table) config)
@@ -226,14 +276,20 @@
         rsc-b-tbl-name (second (:belongs-to table))
         rsc-a (inf/singular rsc-a-tbl-name)
         rsc-b (inf/singular rsc-b-tbl-name)
-        rsc-a-name-key (csk/->PascalCaseKeyword rsc-a)
-        rsc-b-name-key (csk/->PascalCaseKeyword rsc-b)
+        rsc-a-name (csk/->PascalCase rsc-a)
+        rsc-b-name (csk/->PascalCase rsc-b)
+        rsc-a-name-key (keyword rsc-a-name)
+        rsc-b-name-key (keyword rsc-b-name)
         rsc-a-col (str rsc-a "_id")
         rsc-b-col (str rsc-b "_id")
         rscs-a (inf/plural rsc-a-tbl-name)
         rscs-b (inf/plural rsc-b-tbl-name)
         rscs-a-key (keyword rscs-a)
         rscs-b-key (keyword rscs-b)
+        create-key (keyword (str "create" rsc-a-name rsc-b-name))
+        delete-key (keyword (str "delete" rsc-a-name rsc-b-name))
+        obj-fields (root-fields table)
+        cols (tbl/col-names table)
         db (:db config)]
     (-> schema
         (assoc-in [:objects rsc-a-name-key :fields rscs-b-key]
@@ -247,7 +303,17 @@
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial resolve-nn rsc-a-col rsc-b-col
-                                     db tbl-name rsc-a-tbl-name)}))))
+                                     db tbl-name rsc-a-tbl-name)})
+        (assoc-in [:mutations create-key]
+                  {:type :Result
+                   :args (dissoc obj-fields :id)
+                   :resolve (partial create-n-n rsc-a-col rsc-b-col
+                                     db tbl-name cols)})
+        (assoc-in [:mutations delete-key]
+                  {:type :Result
+                   :args (dissoc obj-fields :id)
+                   :resolve (partial delete-n-n rsc-a-col rsc-b-col
+                                     db tbl-name)}))))
 
 (defn- add-relationships [config schema]
   (reduce (fn [m table]

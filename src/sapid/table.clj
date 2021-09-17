@@ -14,6 +14,9 @@
 (defn to-col-name [rsc]
   (str (inf/singular rsc) "_id"))
 
+(defn col-names [table]
+  (set (map :name (:columns table))))
+
 ;;; table schema from database
 
 (defn- is-relation-column? [name]
