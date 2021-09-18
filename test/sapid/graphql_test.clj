@@ -39,25 +39,65 @@
   (let [db (create-database)
         conf (assoc test-config :db db)
         schema (gql/schema conf)]
-    (doto db
-      (jdbc/execute! (str "insert into members (email, first_name, last_name)"
-                          "values ('jim@test.com', 'jim', 'smith');"))
-      (jdbc/execute! (str "insert into members (email, first_name, last_name)"
-                          "values ('yoshi@test.com', 'yoshi', 'tanabe');"))
-      (jdbc/execute! (str "insert into venues (name, postal_code) "
-                          "values ('office one', '123456');"))
-      (jdbc/execute! (str "insert into venues (name, postal_code) "
-                          "values ('city hall', '234567');"))
-      (jdbc/execute! (str "insert into meetups (title, start_at, venue_id)"
-                          "values ('rust meetup', '2021-01-01 18:00:00', 2);"))
-      (jdbc/execute! (str "insert into meetups (title, start_at, venue_id)"
-                          "values ('cpp meetup', '2021-01-12 18:00:00', 1);"))
-      (jdbc/execute! (str "insert into meetups_members (meetup_id, member_id)"
-                          "values (2,1);"))
-      (jdbc/execute! (str "insert into meetups_members (meetup_id, member_id)"
-                          "values (1,1);"))
-      (jdbc/execute! (str "insert into meetups_members (meetup_id, member_id)"
-                          "values (1,2);")))
+    ;; Create mutations
+    (testing "create 1st user"
+      (let [q (str "mutation {createMember (email: \"jim@test.com\" "
+                   "first_name: \"jim\" last_name: \"smith\") {result}}")
+            res (lcn/execute schema q nil nil)]
+        (println res)
+        (is (= true (-> res :data :createMember :result)))))
+
+    (testing "create 2nd user"
+      (let [q (str "mutation {createMember (email: \"yoshi@test.com\" "
+                   "first_name: \"yoshi\" last_name: \"tanabe\") {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :createMember :result)))))
+
+    (testing "create 1st venue"
+      (let [q (str "mutation {createVenue (name: \"office one\" "
+                   "postal_code: \"123456\") {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :createVenue :result)))))
+
+    (testing "create 2nd venue"
+      (let [q (str "mutation {createVenue (name: \"city hall\" "
+                   "postal_code: \"234567\") {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :createVenue :result)))))
+
+    (testing "create 1st meetup"
+      (let [q (str "mutation {createMeetup (title: \"rust meetup\" "
+                   "start_at: \"2021-01-01 18:00:00\" venue_id: 2) {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :createMeetup :result)))))
+
+    (testing "create 2nd meetup"
+      (let [q (str "mutation {createMeetup (title: \"cpp meetup\" "
+                   "start_at: \"2021-01-12 18:00:00\" venue_id: 1) {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :createMeetup :result)))))
+
+    (testing "add member 1 to meetup 1"
+      (let [q (str "mutation {createMeetupMember (meetup_id: 1"
+                   "member_id: 1) {result}}")
+            res (lcn/execute schema q nil nil)]
+        ()
+        (is (= true (-> res :data :createMeetupMember :result)))))
+
+    (testing "add member 1 to meetup 2"
+      (let [q (str "mutation {createMeetupMember (meetup_id: 2"
+                   "member_id: 1) {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :createMeetupMember :result)))))
+
+    (testing "add member 2 to meetup 1"
+      (let [q (str "mutation {createMeetupMember (meetup_id: 1"
+                   "member_id: 2) {result}}")
+            res (lcn/execute schema q nil nil)]
+        (println res)
+        (is (= true (-> res :data :createMeetupMember :result)))))
+
+    ;; List query
     (testing "list root type entity"
       (let [q "{ members { id email first_name }}"
             result (lcn/execute schema q nil nil)]
@@ -99,8 +139,8 @@
       (let [q "{ member(id: 1) { email meetups { id title }}}"
             result (lcn/execute schema q nil nil)]
         (is (= {:email "jim@test.com"
-                :meetups [{:id 2 :title "cpp meetup"}
-                          {:id 1 :title "rust meetup"}]}
+                :meetups [{:id 1 :title "rust meetup"}
+                          {:id 2 :title "cpp meetup"}]}
                (-> result :data :member))))
       (let [q "{ member(id: 2) { email meetups { id title }}}"
             result (lcn/execute schema q nil nil)]
