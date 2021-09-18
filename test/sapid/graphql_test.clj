@@ -80,7 +80,6 @@
       (let [q (str "mutation {createMeetupMember (meetup_id: 1"
                    "member_id: 1) {result}}")
             res (lcn/execute schema q nil nil)]
-        ()
         (is (= true (-> res :data :createMeetupMember :result)))))
 
     (testing "add member 1 to meetup 2"
@@ -93,7 +92,6 @@
       (let [q (str "mutation {createMeetupMember (meetup_id: 1"
                    "member_id: 2) {result}}")
             res (lcn/execute schema q nil nil)]
-        (println res)
         (is (= true (-> res :data :createMeetupMember :result)))))
 
     ;; Queries
@@ -181,4 +179,26 @@
             result (lcn/execute schema q nil nil)]
         (is (= [{:id 1 :first_name "jim"}
                 {:id 2 :first_name "yoshi"}]
+               (-> result :data :members)))))
+
+    ;; Update mutation
+    (testing "update entity"
+      (let [q (str "mutation {updateMember (id: 1 email: \"ken@test.com\" "
+                   "first_name: \"Ken\" last_name: \"Spencer\") {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :updateMember :result))))
+      (let [q (str "{ member (id: 1) { id first_name last_name email}}")
+            result (lcn/execute schema q nil nil)]
+        (is (= {:id 1 :first_name "Ken" :last_name "Spencer"
+                :email "ken@test.com"}
+               (-> result :data :member)))))
+
+    ;; Delete mutation
+    (testing "delete entity"
+      (let [q (str "mutation {deleteMember (id: 1) {result}}")
+            res (lcn/execute schema q nil nil)]
+        (is (= true (-> res :data :deleteMember :result))))
+      (let [q (str "{ members { id first_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 2 :first_name "yoshi"}]
                (-> result :data :members)))))))
