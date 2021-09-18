@@ -1,6 +1,5 @@
 (ns sapid.graphql-test
-  (:require [clojure.java.jdbc :as jdbc]
-            [clojure.test :refer :all]
+  (:require [clojure.test :refer :all]
             [com.walmartlabs.lacinia :as lcn]
             [sapid.core-test :refer [create-database]]
             [sapid.graphql :as gql]))
@@ -97,7 +96,7 @@
         (println res)
         (is (= true (-> res :data :createMeetupMember :result)))))
 
-    ;; List query
+    ;; Queries
     (testing "list root type entity"
       (let [q "{ members { id email first_name }}"
             result (lcn/execute schema q nil nil)]
@@ -146,4 +145,40 @@
             result (lcn/execute schema q nil nil)]
         (is (= {:email "yoshi@test.com"
                 :meetups [{:id 1 :title "rust meetup"}]}
-               (-> result :data :member)))))))
+               (-> result :data :member)))))
+
+    ;; Filters
+    (testing "list entity with eq filter"
+      (let [q (str "{ members (filter: {first_name: {operator:eq "
+                   "value: \"yoshi\"}}) { id last_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 2 :last_name "tanabe"}]
+               (-> result :data :members))))
+      (let [q (str "{ members (filter: {first_name: {operator: eq "
+                   "value: \"yoshi\"} last_name: {operator: eq "
+                   "value: \"smith\"}}) { id last_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [] (-> result :data :members)))))
+
+    ;; Pagination
+    (testing "list entity with pagination"
+      (let [q (str "{ members (limit: 1) { id first_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 1 :first_name "jim"}]
+               (-> result :data :members))))
+      (let [q (str "{ members (offset: 1) { id first_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 2 :first_name "yoshi"}] (-> result :data :members)))))
+
+    ;; Sorting
+    (testing "list entity sorted"
+      (let [q (str "{ members (sort: {first_name: desc}) { id first_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 2 :first_name "yoshi"}
+                {:id 1 :first_name "jim"}]
+               (-> result :data :members))))
+      (let [q (str "{ members (sort: {first_name: asc}) { id first_name }}")
+            result (lcn/execute schema q nil nil)]
+        (is (= [{:id 1 :first_name "jim"}
+                {:id 2 :first_name "yoshi"}]
+               (-> result :data :members)))))))
