@@ -73,11 +73,20 @@ When reading schema data from DB connection, Sapid leverages naming patterns of 
 
 	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-1`/`1-to-N` relationship is identified per column.
 
-### Sapid config map
+### Sapid Config
 
 Though configurable parameters vary by router types, Sapid doesn't require many config values in general. Some key concepts & list of parameters are as below:
 
-#### Schema data
+#### Config Parameters
+
+| Key                     | Description                                                                                       | Default Value      |
+|-------------------------|---------------------------------------------------------------------------------------------------|--------------------|
+| `:db`                   | Database connection object.                                                                       |                    |
+| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.                               | `true`             |
+| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.                       | `true`             |
+| `:tables`               | DB schema including list of table definitions. Plz check [Schema Data](#schema-data) for details. | Created from `:db` |
+
+#### Schema Data
 
 Schema data is used to specify custom table schema to construct REST APIs without querying a DB. It is specified with a list of tables under `:tables` key in the config map.
 
@@ -86,39 +95,32 @@ Schema data is used to specify custom table schema to construct REST APIs withou
    {:relation-types [:root :one-n]
     :name "users"
     :columns [{:name "id"
-       	       :type "text"}
+       	      :type "text"
+               :notnull 0
+               :dflt_value nil}
               {:name "image_id"
-               :type "int"}
-	       ; ... more columns
-	      ]
+               :type "int"
+               :notnull 1
+               :dflt_value 1}
+	           ;; ... more columns
+	           ]
     :belongs-to ["image"]
     :pre-save-signal #ig/ref :my-project/user-pre-save-fn
     :post-save-signal #ig/ref :my-project/user-post-save-fn}
-    ; ... more tables
-   ]
-   ; ... more parameters
-}
+    ;; ... more tables
+    ]}
 ```
 
-##### Table details:
+##### Table Data Details:
 
 | Key              	 | Description                                                                                                       |
 |------------------------|-------------------------------------------------------------------------------------------------------------------|
 | `:name`              	 | Table name.                                                                                                       |
-| `:columns`             | List of columns. A column can contain `:name` and `:type` parameters.                                             |
-| `:relation-types`      | List of relation types. `:root`, `:one-n` and `:n-n` are supported.                                               |
+| `:columns`             | List of columns. A column can contain `:name`, `:type`, `:notnull` and `:dflt_value` parameters.                  |
+| `:relation-types`      | List of table relation types. `:root`, `:one-n` and `:n-n` are supported.                                         |
 | `:belongs-to`          | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
 | `:pre-save-signal`     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
 | `:post-save-signal`    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
-
-#### Config parameter details:
-
-| Key                     | Description                                                                  | Default Value                 |
-|-------------------------|------------------------------------------------------------------------------|-------------------------------|
-| `:db`                   | Database connection object.                                                  |                               |
-| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.          | `true`                        |
-| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.  | `true`                        |
-| `:tables`               | DB schema including list of table definitions.                               | Created from `:db`            |
 
 * Parameters specific to Duct Ataraxy
 
@@ -192,8 +194,6 @@ Formats of `limit=[count]` and `offset=[count]` are used in a query string for p
 
 >* `limit` and `offset` can be used independently.
 >* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
-
-
 
 ### Routes per relationship types
 
