@@ -1,8 +1,8 @@
-(ns sapid.graphql-test
+(ns phrag.graphql-test
   (:require [clojure.test :refer :all]
             [com.walmartlabs.lacinia :as lcn]
-            [sapid.core-test :refer [create-database]]
-            [sapid.graphql :as gql]))
+            [phrag.core-test :refer [create-database]]
+            [phrag.graphql :as gql]))
 
 (def ^:private test-config
   {:table-name-plural true,

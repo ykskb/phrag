@@ -1,5 +1,5 @@
-(ns sapid.handlers.core
-  (:require [sapid.db :as db]))
+(ns phrag.handlers.core
+  (:require [phrag.db :as db]))
 
 ;;; root
 

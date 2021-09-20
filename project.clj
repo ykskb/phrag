@@ -1,13 +1,13 @@
-(defproject sapid "0.1.0-SNAPSHOT"
+(defproject phrag "0.1.0-SNAPSHOT"
   :description "Automatic GraphQL / REST API with RDBMS"
-  :url "https://github.com/ykskb/sapid"
+  :url "https://github.com/ykskb/phrag"
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.10.3"]
                  [com.github.seancorfield/honeysql "2.0.0-rc3"]
                  [org.xerial/sqlite-jdbc "3.34.0"]
                  [inflections "0.13.2"]]
   :plugins [[duct/lein-duct "0.12.3"]]
-  :main ^:skip-aot sapid.main
+  :main ^:skip-aot phrag.main
   :resource-paths ["resources" "target/resources"]
   :prep-tasks     ["javac" "compile" ["run" ":duct/compiler"]]
   :middleware     [lein-duct.plugin/middleware]

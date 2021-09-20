@@ -7,7 +7,7 @@
             [fipp.edn :refer [pprint]]
             [clojure.tools.namespace.repl :refer [refresh]]
             [clojure.java.io :as io]
-            [sapid.core :as sapid]
+            [phrag.core :as phrag]
             [eftest.runner :as eftest]
             [integrant.core :as ig]
             [integrant.repl :refer [clear halt go init prep reset]]
@@ -48,8 +48,8 @@
  (constantly {:database.sql/connection
               {:connection-uri "jdbc:sqlite:db/dev.sqlite"}
               ;{:dbtype "sqlite" :dbname "dev.sqlite"}
-              :sapid.core/bidi-routes {:db (ig/ref :database.sql/connection)}
-              ::app {:routes (ig/ref :sapid.core/bidi-routes)}
+              :phrag.core/bidi-routes {:db (ig/ref :database.sql/connection)}
+              ::app {:routes (ig/ref :phrag.core/bidi-routes)}
               ::server {:app (ig/ref ::app)
                         :options {:port 3000
                                   :join? false}}}))

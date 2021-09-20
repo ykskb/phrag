@@ -1,7 +1,7 @@
-(ns sapid.graphql
+(ns phrag.graphql
   (:require [clojure.walk :as w]
-            [sapid.table :as tbl]
-            [sapid.handlers.core :as c]
+            [phrag.table :as tbl]
+            [phrag.handlers.core :as c]
             [camel-snake-kebab.core :as csk]
             [com.walmartlabs.lacinia.schema :as schema]
             ;; [clojure.pprint :as pp]

@@ -1,4 +1,4 @@
-(ns sapid.db
+(ns phrag.db
   (:refer-clojure :exclude [group-by update])
   (:require [clojure.core :as c]
             [clojure.java.jdbc :as jdbc]

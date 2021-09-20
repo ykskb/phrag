@@ -1,12 +1,12 @@
-# Sapid
+# Phrag
 
-GraphQL / REST APIs from DB Schema Data
+DB Schema Data to GraphQL
 
-Sapid creates instantly-operational GraphQL / REST routes from DB schema data.
+Phrag creates instantly-operational REST routes from DB schema data.
 
 #### Features:
 
-* Creates [ring](https://github.com/ring-clojure/ring) routes powered for different routers including [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) or [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
+* Creates graphql-powered [ring](https://github.com/ring-clojure/ring) routes for different routers including [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) or [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
 
 * Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
@@ -14,7 +14,7 @@ Sapid creates instantly-operational GraphQL / REST routes from DB schema data.
 
 * [Filters](#resource-filters), [sorting](#resource-sorting) and [pagination](#resource-pagination) come out of the box for both GraphQL and REST APIs.
 
-* [Swagger UI](https://swagger.io/tools/swagger-ui/) / GraphQL IDE (like GraphiQL) connectable.
+* GraphQL IDE (like GraphiQL) connectable.
 
 #### Notes:
 
@@ -22,48 +22,42 @@ Sapid creates instantly-operational GraphQL / REST routes from DB schema data.
 
 ### Schema Data to Nested Resource Structures
 
-Here's an example schema showing how Sapid creates endpoints according to four types of relationships: `Root`, `1-to-1`, `1-to-N` and `N-to-N`. (Please refer to [Routes per relationship types](#routes-per-relationship-types) for geneic rules.)
-
-![Image of Schema to APIs](./docs/images/sapid-diagram.png)
-
-
 ### Usage
 
 ##### reitit
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
-{:sapid.core/reitit-routes {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :sapid.core/reitit-routes)}}
+{:phrag.core/reitit-routes {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit-routes)}}
 
 ;; Provide schema data (direct function call)
-(def routes (sapid.core/make-reitit-routes {:tables [{:name "..."}]}))
+(def routes (phrag.core/make-reitit-routes {:tables [{:name "..."}]}))
 ```
 
 ##### bidi
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
-{:sapid.core/bidi-routes {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :sapid.core/reitit-routes)}}
+{:phrag.core/bidi-routes {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit-routes)}}
 
 ;; Provide schema data (direct function call)
-(def routes (sapid.core/make-bidi-routes {:tables [{:name "..."}]}))
+(def routes (phrag.core/make-bidi-routes {:tables [{:name "..."}]}))
 ```
-
 
 ##### Duct Ataraxy
 
 ```edn
 ;; at root/module level of duct config edn
-:sapid.core/duct-routes {} 
+:phrag.core/duct-routes {} 
 ```
 
 ##### Notes:
 
-When reading schema data from DB connection, Sapid leverages naming patterns of tables/columns to identify relationships:
+When reading schema data from DB connection, Phrag leverages naming patterns of tables/columns to identify relationships:
 
-> Table names can be specified in the [config map](#sapid-config) for other naming patterns. (In this case, Sapid will not attempt retrieving schema data from DB.)
+> Table names can be specified in the [config map](#phrag-config) for other naming patterns. (In this case, Phrag will not attempt retrieving schema data from DB.)
 
 1. `Root` or `N-to-N` relationship?
 
@@ -73,9 +67,9 @@ When reading schema data from DB connection, Sapid leverages naming patterns of 
 
 	If a table is not `N-to-N` and contains a column ending with `_id`, `1-to-1`/`1-to-N` relationship is identified per column.
 
-### Sapid Config
+### Phrag Config
 
-Though configurable parameters vary by router types, Sapid doesn't require many config values in general. Some key concepts & list of parameters are as below:
+Though configurable parameters vary by router types, Phrag doesn't require many config values in general. Some key concepts & list of parameters are as below:
 
 #### Config Parameters
 
@@ -128,13 +122,11 @@ Schema data is used to specify custom table schema to construct REST APIs withou
 |-------------------------|------------------------------------------------------------------------------|-------------------------------|
 | `:project-ns`           | Project namespace. It'll be used for route keys.                             | Loaded from `:duct.core`      |
 | `:db-config-key`        | Integrant key for a database connection.                                     | `:duct.database/sql`          |
-| `:db`                   | Database connection object. If provided Sapid won't init the :db-config-key. | Created from `:db-config-key` |
+| `:db`                   | Database connection object. If provided Phrag won't init the :db-config-key. | Created from `:db-config-key` |
 | `:db-ref`               | Integrant reference to a database connection for REST handler configs.       | Created from `:db-config-key` |
 | `:db-keys`              | Keys to get a connection from a database map.                                    | [:spec]                       |
 
 ### Resource Filters
-
-#### GraphQL
 
 Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in query arguments for filtering.
 
@@ -142,21 +134,11 @@ Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in
 
 `{users (filter: {id: {operator: lt, value: 100} id: {operator: ne, value: 1}})}` (`users` where `id` is less than `100` `AND` `id` is not equal to `1`)
 
-#### REST API
-
-Format of `?column=[operator]:[value]` is used in a query string for filtering.
-
-##### Example:
-
-`?id=lt:100&id=ne:1` (where `id` is less than `100` `AND` `id` is not equal to `1`)
-
 > * Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
 > * Operators default to `eq` when omitted.
-> * Multiple queries are applied with `AND` operator.
+> * Multiple filters are applied with `AND` operator.
 
 ### Resource Sorting
-
-#### GraphQL
 
 Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting.
 
@@ -164,19 +146,7 @@ Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorti
 
 `sort: {id: asc}` (sort by `id` column in ascending order)
 
-#### REST API
-
-Format of `?order-by=[column]:[asc or desc]` is used in a query string for sorting.
-
-##### Example:
-
-`?order-by=id:desc` (sort by `id` column in descending order)
-
-> * Direction defaults to `desc` when omitted.
-
 ### Resource Pagination
-
-#### GraphQL
 
 Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination. 
 
@@ -184,46 +154,8 @@ Formats of `limit: [count]` and `offset: [count]` are used in query arguments fo
 
 `(filter: {id: {operator: gt value: 20}} limit: 25)` (20 items after/greater than `id`:`20`).
 
-#### REST API
-
-Formats of `limit=[count]` and `offset=[count]` are used in a query string for pagination.
-
-##### Example:
-
-`?limit=20&id=gt:20` (20 items after/greater than `id`:`20`.)
-
 >* `limit` and `offset` can be used independently.
 >* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
-
-### Routes per relationship types
-
-Generic rules of route creation per relatioship types are as below:
-
-* `Root`
-
-| HTTP methods                               | Routes           |
-|--------------------------------------------|------------------|
-| `GET`, `POST`                              | `/resource`      |
-| `GET`, `DELETE`, `PUT` and `PATCH`         | `/resource/{id}` |
-
-* `1-to-1`/`1-to-N`
-
-| HTTP methods                       | Routes                                                   |
-|------------------------------------|----------------------------------------------------------|
-| `GET` and `POST`                   | `/parent-resource/{parent-id}/child-resource`            |
-| `GET`, `DELETE`, `PUT` and `PATCH` | `/parent-resource/{parent-id}/child-resource/{child-id}` |
-
-* `N-to-N`
-
-| HTTP methods | Routes                                              |
-|--------------|-----------------------------------------------------|
-| `GET`        | `/resource-a/{id-of-a}/resource-b`                  |
-| `GET`        | `/resource-b/{id-of-b}/resource-a`                  |
-| `POST`       | `/resource-a/{id-of-a}/resource-b/{id-of-b}/add`    |
-| `POST`       | `/resource-b/{id-of-b}/resource-a/{id-of-a}/add`    |
-| `POST`       | `/resource-a/{id-of-a}/resource-b/{id-of-b}/delete` |
-| `POST`       | `/resource-b/{id-of-b}/resource-a/{id-of-a}/delete` |
-
 
 ### Environment
 

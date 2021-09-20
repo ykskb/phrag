@@ -12,5 +12,5 @@
  :duct.module/logging {}
  :duct.module.web/api {}
  :duct.module/sql {}
- :sapid.core/duct-routes {}}
+ :phrag.core/duct-routes {}}
 

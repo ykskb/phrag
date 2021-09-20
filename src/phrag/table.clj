@@ -1,6 +1,6 @@
-(ns sapid.table
+(ns phrag.table
   (:require [clojure.string :as s]
-            [sapid.db :as db]
+            [phrag.db :as db]
             [inflections.core :as inf]))
 
 ;; table-related utils
