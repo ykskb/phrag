@@ -2,17 +2,17 @@
 
 DB Schema Data to GraphQL
 
-Phrag creates instantly-operational REST routes from DB schema data.
+Phrag creates instantly-operational GraphQL routes from DB schema data.
 
 #### Features:
 
-* Creates graphql-powered [ring](https://github.com/ring-clojure/ring) routes for different routers including [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) or [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
+* Creates a GraphQL-powered [ring](https://github.com/ring-clojure/ring) route for different routers including [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) or [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
 
 * Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
 * DB schema data can be retrieved from a running DB or specified with a config map selectively.
 
-* [Filters](#resource-filters), [sorting](#resource-sorting) and [pagination](#resource-pagination) come out of the box for both GraphQL and REST APIs.
+* [Filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) come out of the box.
 
 * GraphQL IDE (like GraphiQL) connectable.
 
@@ -28,29 +28,29 @@ Phrag creates instantly-operational REST routes from DB schema data.
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
-{:phrag.core/reitit-routes {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit-routes)}}
+{:phrag.core/reitit-graphql {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit-graphql)}}
 
 ;; Provide schema data (direct function call)
-(def routes (phrag.core/make-reitit-routes {:tables [{:name "..."}]}))
+(def routes (phrag.core/make-reitit-graphql {:tables [{:name "..."}]}))
 ```
 
 ##### bidi
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
-{:phrag.core/bidi-routes {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit-routes)}}
+{:phrag.core/bidi-graphql {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit-graphql)}}
 
 ;; Provide schema data (direct function call)
-(def routes (phrag.core/make-bidi-routes {:tables [{:name "..."}]}))
+(def routes (phrag.core/make-bidi-graphql {:tables [{:name "..."}]}))
 ```
 
 ##### Duct Ataraxy
 
 ```edn
 ;; at root/module level of duct config edn
-:phrag.core/duct-routes {} 
+:phrag.core/duct-graphql {} 
 ```
 
 ##### Notes:
@@ -82,7 +82,7 @@ Though configurable parameters vary by router types, Phrag doesn't require many 
 
 #### Schema Data
 
-Schema data is used to specify custom table schema to construct REST APIs without querying a DB. It is specified with a list of tables under `:tables` key in the config map.
+Schema data is used to specify custom table schema to construct GraphQL without querying a DB. It is specified with a list of tables under `:tables` key in the config map.
 
 ```edn
 {:tables [
@@ -123,10 +123,10 @@ Schema data is used to specify custom table schema to construct REST APIs withou
 | `:project-ns`           | Project namespace. It'll be used for route keys.                             | Loaded from `:duct.core`      |
 | `:db-config-key`        | Integrant key for a database connection.                                     | `:duct.database/sql`          |
 | `:db`                   | Database connection object. If provided Phrag won't init the :db-config-key. | Created from `:db-config-key` |
-| `:db-ref`               | Integrant reference to a database connection for REST handler configs.       | Created from `:db-config-key` |
-| `:db-keys`              | Keys to get a connection from a database map.                                    | [:spec]                       |
+| `:db-ref`               | Integrant reference to a database connection for GraphQL handler configs.    | Created from `:db-config-key` |
+| `:db-keys`              | Keys to get a connection from a database map.                                | [:spec]                       |
 
-### Resource Filters
+### Resource Filtering
 
 Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in query arguments for filtering.
 
@@ -135,7 +135,6 @@ Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in
 `{users (filter: {id: {operator: lt, value: 100} id: {operator: ne, value: 1}})}` (`users` where `id` is less than `100` `AND` `id` is not equal to `1`)
 
 > * Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
-> * Operators default to `eq` when omitted.
 > * Multiple filters are applied with `AND` operator.
 
 ### Resource Sorting
