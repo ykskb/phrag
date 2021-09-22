@@ -15,7 +15,8 @@
             [ring.adapter.jetty :as jetty]
             [ring.middleware.params :as prm]
             [ring.middleware.json :refer [wrap-json-params wrap-json-response]]
-            [ring.util.response :as res]))
+            [ring.util.response :as res]
+            [ring-graphql-ui.core :as gql]))
 
 (defn test []
   (eftest/run-tests (eftest/find-tests "test")))
@@ -26,7 +27,10 @@
 ;;; handlers
 
 (defmethod ig/init-key ::app [_ {:keys [routes]}]
+  (println routes)
   (-> (make-handler routes)
+      (gql/wrap-graphiql {:path "/graphiql"
+                          :endpoint "/graphql"})
       wrap-json-params
       wrap-json-response))
 
@@ -48,8 +52,8 @@
  (constantly {:database.sql/connection
               {:connection-uri "jdbc:sqlite:db/dev.sqlite"}
               ;{:dbtype "sqlite" :dbname "dev.sqlite"}
-              :phrag.core/bidi-routes {:db (ig/ref :database.sql/connection)}
-              ::app {:routes (ig/ref :phrag.core/bidi-routes)}
+              :phrag.core/bidi-graphql-route {:db (ig/ref :database.sql/connection)}
+              ::app {:routes (ig/ref :phrag.core/bidi-graphql-route)}
               ::server {:app (ig/ref ::app)
                         :options {:port 3000
                                   :join? false}}}))

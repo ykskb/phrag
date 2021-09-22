@@ -73,9 +73,8 @@
  (constantly {:database.sql/connection
               {:connection-uri "jdbc:sqlite:db/dev.sqlite"}
               ; {:dbtype "sqlite" :dbname "dev.sqlite"}
-              :phrag.core/reitit-graphql {:db (ig/ref :database.sql/connection)}
-              ::app {:routes (ig/ref :phrag.core/reitit-graphql)}
-              ; ::app {}
+              :phrag.core/reitit-graphql-route {:db (ig/ref :database.sql/connection)}
+              ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}
               ::server {:app (ig/ref ::app)
                         :options {:port 3000
                                   :join? false}}}))

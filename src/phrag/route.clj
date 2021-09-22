@@ -1,32 +1,39 @@
 (ns phrag.route
-  (:require [phrag.handlers.bidi :as bd]
-            [phrag.handlers.reitit :as rtt]
-            [phrag.table :as tbl]
+  (:require [clojure.walk :as w]
+            [com.walmartlabs.lacinia :as lcn]
+            [ring.util.response :as ring-res]
             [phrag.graphql :as gql]))
 
 (defmulti graphql-route (fn [config & _] (:router config)))
 
+(defn- rtt-param-data [req]
+  (w/stringify-keys (or (:body-params req) (:form-params req))))
+
 ;;; reitit
+
+(defn- rtt-gql-handler [schema]
+  (fn [req]
+    (let [params (rtt-param-data req)
+          query (get params "query")
+          vars (w/keywordize-keys (get params "variables"))
+          result (lcn/execute schema query vars nil)]
+      {:status 200
+       :body result})))
 
 (defmethod graphql-route :reitit [config]
   (let [schema (gql/schema config)]
-    ["/graphql" {:post {:handler (rtt/graphql schema)}}]))
+    ["/graphql" {:post {:handler (rtt-gql-handler schema)}}]))
 
 ;;; Bidi
 
-;;; Duct Ataraxy
+(defn- bd-gql-handler [schema]
+  (fn [req]
+    (let [params (:params req)
+          query (get params "query")
+          vars (w/keywordize-keys (get params "variables"))
+          result (lcn/execute schema query vars nil)]
+      (ring-res/response result))))
 
-(defn- handler-key [_project-ns action]
-  (keyword "phrag.handlers.duct-ataraxy" action))
-
-(defn- route-key [project-ns resource action]
-  (let [ns (str project-ns ".handler." resource)] (keyword ns action)))
-
-(defn- handler-map [handler-key route-key opts]
-  (derive route-key handler-key)
-  {[handler-key route-key] opts})
-
-(defn- route-map [path route-key param-names]
-  (if (coll? param-names)
-    {path (into [] (concat [route-key] param-names))}
-    {path [route-key]}))
+(defmethod graphql-route :bidi [config]
+  (let [schema (gql/schema config)]
+    ["/" {"graphql" {:post (bd-gql-handler schema)}}]))

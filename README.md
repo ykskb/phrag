@@ -6,7 +6,7 @@ Phrag creates instantly-operational GraphQL routes from DB schema data.
 
 #### Features:
 
-* Creates a GraphQL-powered [ring](https://github.com/ring-clojure/ring) route for different routers including [reitit](https://github.com/metosin/reitit), [bidi](https://github.com/juxt/bidi) or [Duct](https://github.com/duct-framework/duct)-[Ataraxy](https://github.com/weavejester/ataraxy).
+* Creates a GraphQL-powered [ring](https://github.com/ring-clojure/ring) route for different routers including [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
 * Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
@@ -28,29 +28,22 @@ Phrag creates instantly-operational GraphQL routes from DB schema data.
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
-{:phrag.core/reitit-graphql {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit-graphql)}}
+{:phrag.core/reitit-graphql-route {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
 
 ;; Provide schema data (direct function call)
-(def routes (phrag.core/make-reitit-graphql {:tables [{:name "..."}]}))
+(def routes (phrag.core/make-reitit-graphql-route {:tables [{:name "..."}]}))
 ```
 
 ##### bidi
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
-{:phrag.core/bidi-graphql {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit-graphql)}}
+{:phrag.core/bidi-graphql-route {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
 
 ;; Provide schema data (direct function call)
-(def routes (phrag.core/make-bidi-graphql {:tables [{:name "..."}]}))
-```
-
-##### Duct Ataraxy
-
-```edn
-;; at root/module level of duct config edn
-:phrag.core/duct-graphql {} 
+(def routes (phrag.core/make-bidi-graphql-route {:tables [{:name "..."}]}))
 ```
 
 ##### Notes:
@@ -115,16 +108,6 @@ Schema data is used to specify custom table schema to construct GraphQL without 
 | `:belongs-to`          | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
 | `:pre-save-signal`     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
 | `:post-save-signal`    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
-
-* Parameters specific to Duct Ataraxy
-
-| Key                     | Description                                                                  | Default Value                 |
-|-------------------------|------------------------------------------------------------------------------|-------------------------------|
-| `:project-ns`           | Project namespace. It'll be used for route keys.                             | Loaded from `:duct.core`      |
-| `:db-config-key`        | Integrant key for a database connection.                                     | `:duct.database/sql`          |
-| `:db`                   | Database connection object. If provided Phrag won't init the :db-config-key. | Created from `:db-config-key` |
-| `:db-ref`               | Integrant reference to a database connection for GraphQL handler configs.    | Created from `:db-config-key` |
-| `:db-keys`              | Keys to get a connection from a database map.                                | [:spec]                       |
 
 ### Resource Filtering
 
