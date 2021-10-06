@@ -36,4 +36,5 @@
                                    [threatgrid/ring-graphql-ui "0.1.3"]
                                    [ring/ring-core "1.9.3"]
                                    [ring/ring-json "0.5.1"]
-                                   [ring/ring-jetty-adapter "1.9.3"]]}})
+                                   [ring/ring-jetty-adapter "1.9.3"]
+                                   [superlifter "0.1.3"]]}})

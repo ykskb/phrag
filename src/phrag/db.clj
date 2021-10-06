@@ -38,9 +38,10 @@
   (let [fltrs (:filters filters)
         o-col (:order-col filters)
         q (-> (select :*) (from (keyword rsc))
-              (limit (:limit filters)) (offset (:offset filters)))
+              (limit (:limit filters 100)) (offset (:offset filters 0)))
         q (if (not-empty fltrs) (apply where q fltrs) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
+    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
@@ -48,11 +49,12 @@
   (let [nn-col-key (keyword (str "nn." nn-join-col))
         fltrs (:filters filters)
         o-col (:order-col filters)
-        q (-> (select :t.*) (from [(keyword nn-table) :nn])
+        q (-> (select :t.* :nn.*) (from [(keyword nn-table) :nn])
               (join [(keyword rsc) :t] [:= nn-col-key :t.id])
-              (limit (:limit filters)) (offset (:offset filters)))
+              (limit (:limit filters 100)) (offset (:offset filters 0)))
         q (if (not-empty fltrs) (apply where q fltrs) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
+    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
@@ -61,6 +63,7 @@
         q (-> (select :*) (from (keyword rsc)))
         q (if (empty? fltrs) (where q [[:= :id id]])
               (apply where q (conj fltrs [:= :id id])))]
+    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db)
          first)))

@@ -1,6 +1,5 @@
 (ns phrag.route
   (:require [clojure.walk :as w]
-            [com.walmartlabs.lacinia :as lcn]
             [ring.util.response :as ring-res]
             [phrag.graphql :as gql]))
 
@@ -11,29 +10,31 @@
 
 ;;; reitit
 
-(defn- rtt-gql-handler [schema]
-  (fn [req]
-    (let [params (rtt-param-data req)
-          query (get params "query")
-          vars (w/keywordize-keys (get params "variables"))
-          result (lcn/execute schema query vars nil)]
-      {:status 200
-       :body result})))
+(defn- rtt-gql-handler [config]
+  (let []
+    (fn [req]
+      (let [sl-ctx (gql/sl-ctx config)
+            scm (gql/schema config sl-ctx)
+            params (rtt-param-data req)
+            query (get params "query")
+            vars (w/keywordize-keys (get params "variables"))
+            result {:status 200
+                    :body (gql/exec scm query vars)}]
+        (gql/sl-stop! sl-ctx)
+        result))))
 
 (defmethod graphql-route :reitit [config]
-  (let [schema (gql/schema config)]
-    ["/graphql" {:post {:handler (rtt-gql-handler schema)}}]))
+  ["/graphql" {:post {:handler (rtt-gql-handler config)}}])
 
 ;;; Bidi
 
-(defn- bd-gql-handler [schema]
+(defn- bd-gql-handler [config]
   (fn [req]
     (let [params (:params req)
           query (get params "query")
           vars (w/keywordize-keys (get params "variables"))
-          result (lcn/execute schema query vars nil)]
+          result (gql/exec query vars config)]
       (ring-res/response result))))
 
 (defmethod graphql-route :bidi [config]
-  (let [schema (gql/schema config)]
-    ["/" {"graphql" {:post (bd-gql-handler schema)}}]))
+  ["/" {"graphql" {:post (bd-gql-handler config)}}])

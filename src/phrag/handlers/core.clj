@@ -55,9 +55,9 @@
 
 ;;; n-n
 
-(defn list-n-n [nn-join-col nn-p-col p-id db-con nn-table table filters]
+(defn list-n-n [nn-join-col nn-p-col p-ids db-con nn-table table filters]
   (let [nn-link-col (str "nn." nn-p-col)
-        filters (update filters :filters conj [:= (keyword nn-link-col) p-id])]
+        filters (update filters :filters conj [:in (keyword nn-link-col) p-ids])]
     (db/list-through db-con table nn-table nn-join-col filters)))
 
 (defn create-n-n [col-a id-a col-b id-b params db-con table cols]
