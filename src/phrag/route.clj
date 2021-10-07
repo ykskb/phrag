@@ -13,15 +13,12 @@
 (defn- rtt-gql-handler [config]
   (let []
     (fn [req]
-      (let [sl-ctx (gql/sl-ctx config)
-            scm (gql/schema config sl-ctx)
+      (let [schema (gql/schema config)
             params (rtt-param-data req)
             query (get params "query")
-            vars (w/keywordize-keys (get params "variables"))
-            result {:status 200
-                    :body (gql/exec scm query vars)}]
-        (gql/sl-stop! sl-ctx)
-        result))))
+            vars (w/keywordize-keys (get params "variables"))]
+        {:status 200
+         :body (gql/exec config schema query vars)}))))
 
 (defmethod graphql-route :reitit [config]
   ["/graphql" {:post {:handler (rtt-gql-handler config)}}])

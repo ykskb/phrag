@@ -3,7 +3,7 @@
             [phrag.db :as db]
             [inflections.core :as inf]))
 
-;; table-related utils
+;; Table utils
 
 (defn to-table-name [rsc config]
   (if (:table-name-plural config) (inf/plural rsc) (inf/singular rsc)))
@@ -17,7 +17,24 @@
 (defn col-names [table]
   (set (map :name (:columns table))))
 
-;;; table schema from database
+;;; Table full relationship map
+
+(defn- rels [table config]
+  (let [table-name (:name table)
+        rel-map {table-name (map (fn [b-to]
+                                   (to-table-name b-to config))
+                                 (:belongs-to table))}]
+    (reduce (fn [m b-to]
+              (assoc m (to-table-name b-to config) [table-name]))
+            rel-map (:belongs-to table))))
+
+(defn full-rel-map [config]
+  (reduce (fn [m table]
+            (let [rels (rels table config)]
+              (merge-with into m rels)))
+          {} (:tables config)))
+
+;;; Table schema from database
 
 (defn- is-relation-column? [name]
   (s/ends-with? (s/lower-case name) "_id"))

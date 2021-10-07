@@ -84,24 +84,8 @@
 
 ;; Schema
 
-(defn- rels [table config]
-  (let [table-name (:name table)
-        rel-map {table-name (map (fn [b-to]
-                                   (tbl/to-table-name b-to config))
-                                 (:belongs-to table))}]
-    (reduce (fn [m b-to]
-              (assoc m (tbl/to-table-name b-to config) [table-name]))
-            rel-map (:belongs-to table))))
-
-(defn- rel-map [config]
+(defn- root-schema [config rel-map]
   (reduce (fn [m table]
-            (let [rels (rels table config)]
-              (merge-with into m rels)))
-          {} (:tables config)))
-
-(defn- root-schema [config sl-ctx]
-  (let [rel-map (rel-map config)]
-    (reduce (fn [m table]
             (let [table-name (tbl/to-table-name (:name table) config)
                   rsc (inf/singular table-name)
                   rscs (inf/plural table-name)
@@ -138,34 +122,35 @@
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/list-query
-                                                 sl-ctx db table-name rels)})
+                                                 db table-name rels)})
                     (assoc-in [:queries id-q-key]
                               {:type rsc-name-key
                                :description (str "Query " rsc-name " by id.")
                                :args {:id {:type '(non-null ID)}}
                                :resolve (partial rslv/id-query
-                                                 sl-ctx db table-name rels)})
+                                                 db table-name rels)})
                     (assoc-in [:mutations create-key]
                               {:type :Result
                                :args (dissoc obj-fields :id)
-                               :resolve (partial rslv/create-root db table-name
-                                                 cols)})
+                               :resolve (partial rslv/create-root
+                                                 db table-name cols)})
                     (assoc-in [:mutations update-key]
                               {:type :Result
                                :args obj-fields
-                               :resolve (partial rslv/update-root db table-name
-                                                 cols)})
+                               :resolve (partial rslv/update-root
+                                                 db table-name cols)})
                     (assoc-in [:mutations delete-key]
                               {:type :Result
                                :args {:id {:type '(non-null ID)}}
-                               :resolve (partial rslv/delete-root db table-name)}))
+                               :resolve (partial rslv/delete-root
+                                                 db table-name)}))
                 m)))
           {:enums (merge filter-op sort-op)
            :input-objects filter-inputs
            :objects {:Result {:fields {:result {:type 'Boolean}}}}
-           :queries {}} (:tables config))))
+           :queries {}} (:tables config)))
 
-(defn- add-one-n-schema [schema config table sl-ctx]
+(defn- add-one-n-schema [schema config table rels]
   (let [table-name (tbl/to-table-name (:name table) config)
         rsc (inf/singular table-name)
         rscs (inf/plural table-name)
@@ -190,17 +175,16 @@
                                       :sort {:type rsc-sort-key}
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
-                               :resolve (partial rslv/has-many sl-ctx
-                                                 blg-to-rsc-id db table-name)})
+                               :resolve (partial rslv/has-many blg-to-rsc-id
+                                                 db table-name rels)})
                     ;; has one
                     (assoc-in [:objects rsc-name-key :fields blg-to-rsc-key]
                               {:type blg-to-rsc-name-key
-                               :resolve (partial rslv/has-one sl-ctx
-                                                 blg-to-rsc-id db
-                                                 blg-to-table-name)}))))
+                               :resolve (partial rslv/has-one blg-to-rsc-id db
+                                                 blg-to-table-name rels)}))))
             schema (:belongs-to table))))
 
-(defn- add-n-n-schema [schema config table sl-ctx]
+(defn- add-n-n-schema [schema config table rels]
   (let [tbl-name (tbl/to-table-name (:name table) config)
         rsc-a-tbl-name (first (:belongs-to table))
         rsc-b-tbl-name (second (:belongs-to table))
@@ -226,14 +210,14 @@
                   {:type `(~'list ~rsc-b-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
-                   :resolve (partial rslv/n-to-n sl-ctx rsc-b-col rsc-a-col
-                                     db tbl-name rsc-b-tbl-name)})
+                   :resolve (partial rslv/n-to-n rsc-b-col rsc-a-col
+                                     db tbl-name rsc-b-tbl-name rels)})
         (assoc-in [:objects rsc-b-name-key :fields rscs-a-key]
                   {:type `(~'list ~rsc-a-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
-                   :resolve (partial rslv/n-to-n sl-ctx rsc-a-col rsc-b-col
-                                     db tbl-name rsc-a-tbl-name)})
+                   :resolve (partial rslv/n-to-n rsc-a-col rsc-b-col
+                                     db tbl-name rsc-a-tbl-name rels)})
         (assoc-in [:mutations create-key]
                   {:type :Result
                    :args (dissoc obj-fields :id)
@@ -245,18 +229,16 @@
                    :resolve (partial rslv/delete-n-n rsc-a-col rsc-b-col
                                      db tbl-name)}))))
 
-(defn- add-relationships [config sl-ctx schema]
+(defn- add-relationships [schema config rel-map]
   (reduce (fn [m table]
-            (cond
-              (has-rel-type? :one-n table) (add-one-n-schema m config table sl-ctx)
-              (has-rel-type? :n-n table) (add-n-n-schema m config table sl-ctx)
-              :else m))
+            (let [rels (get rel-map (:name table))]
+              (cond
+                (has-rel-type? :one-n table)
+                (add-one-n-schema m config table rels)
+                (has-rel-type? :n-n table)
+                (add-n-n-schema m config table rels)
+                :else m)))
           schema (:tables config)))
-
-(defn schema [config sl-ctx]
-  (->> (root-schema config sl-ctx)
-       (add-relationships config sl-ctx)
-       schema/compile))
 
 (defn- sl-config [config]
   (let [buckets (reduce (fn [m tbl]
@@ -267,14 +249,22 @@
     {:buckets buckets
      :urania-opts {:env {:db (:db config)}}}))
 
-(defn sl-ctx [config]
-  (pp/pprint (sl-config config))
+(defn- sl-ctx [config]
   (sl-core/start! (sl-config config)))
 
-(defn sl-stop! [sl-ctx]
+(defn- sl-stop! [sl-ctx]
   (sl-core/stop! sl-ctx))
 
-(defn exec [schema query vars]
-  (pp/pprint query)
-  (lcn/execute schema query vars nil))
+(defn schema [config]
+  (let [rel-map (tbl/full-rel-map config)]
+    (pp/pprint rel-map)
+    (-> (root-schema config rel-map)
+        (add-relationships config rel-map)
+         schema/compile)))
+
+(defn exec [config schema query vars]
+  (let [ctx (sl-ctx config)
+        res (lcn/execute schema query vars ctx)]
+    (let [_ctx (sl-stop! ctx)]
+      res)))
 

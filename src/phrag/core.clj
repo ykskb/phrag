@@ -1,7 +1,5 @@
 (ns phrag.core
-  (:require [clojure.string :as s]
-            [duct.core :as core]
-            [phrag.route :as rt]
+  (:require [phrag.route :as rt]
             [phrag.table :as tbl]
             [integrant.core :as ig]
             [clojure.pprint :as pp]))

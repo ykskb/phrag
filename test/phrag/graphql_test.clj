@@ -37,11 +37,9 @@
 (deftest graphql-queries
   (let [db (create-database)
         conf (assoc test-config :db db)
-                test-gql (fn [q res-keys expected]
-                           (let [sl-ctx (gql/sl-ctx conf)
-                                 schema (gql/schema conf sl-ctx)
-                                 res (gql/exec schema q nil)]
-                     (gql/sl-stop! sl-ctx)
+        test-gql (fn [q res-keys expected]
+                   (let [schema (gql/schema conf)
+                         res (gql/exec conf schema q nil)]
                      (is (= expected (get-in res res-keys)))))]
 
     ;; Create mutations

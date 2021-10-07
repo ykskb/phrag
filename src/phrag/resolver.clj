@@ -47,7 +47,6 @@
   u/DataSource
   (-identity [this] (:id this))
   (-fetch [this env]
-    (println "fetch triggg")
     (sl-api/unwrap ((:fetch-fn this) this env))))
 
 (defrecord HasOneDataSource [id batch-fn]
@@ -93,54 +92,62 @@
   `(sl-api/with-superlifter ~ctx
      (->lacinia-promise ~body)))
 
-(defn list-query [sl-ctx db table rels _ctx args _val]
+(defn- update-count-threshold [rel trigger-opts ctx]
+  (println "Updating " rel " by " (count ctx))
+  (update trigger-opts :threshold + (count ctx)))
+
+(defn- update-1-threshold [rel trigger-opts _ctx]
+  (println "Updating " rel " by 1")
+  (update trigger-opts :threshold + 1))
+
+(defn- update-triggers-by-count [res-p rels]
+  (reduce (fn [p rel]
+            (sl-api/update-trigger! p (keyword rel) :elastic
+                                    (partial update-count-threshold rel)))
+          res-p rels))
+
+(defn- update-triggers-by-1 [res-p rels]
+  (reduce (fn [p rel]
+            (sl-api/update-trigger! p (keyword rel) :elastic
+                                    (partial update-1-threshold rel)))
+          res-p rels))
+
+(defn list-query [db table rels ctx args _val]
   (let [filters (args->filters args)
         fetch-fn (fn [_this _env] (c/list-root db table filters))]
-    (with-superlifter sl-ctx
-      (let [res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))
-            trgr-update-fn (fn [trgr-opts ctx]
-                            (println "updated from" trgr-opts)
-                            (println (count ctx))
-                            (update trgr-opts :threshold + (count ctx)))]
-        (doseq [rel rels]
-          (println "queueing " rel)
-          (sl-api/update-trigger! res-p (keyword rel) :elastic trgr-update-fn))
-        res-p))))
-
-(defn id-query [sl-ctx db table rels _ctx args _val]
-  (let [filters (args->filters args)
-        fetch-fn (fn [_this _env] (c/fetch-root (:id args) db table filters))
-        trgr-update-fn (fn [trgr-opts _ctx]
-                         (update trgr-opts :threshold + 1))]
-    (with-superlifter sl-ctx
+    (with-superlifter ctx
       (let [res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
-        (doseq [rel rels]
-          (sl-api/update-trigger! res-p (keyword rel) :elastic trgr-update-fn))
-        res-p))))
+        (update-triggers-by-count res-p rels)))))
 
-(defn has-many [sl-ctx id-key db table _ctx args val]
+(defn id-query [db table rels ctx args _val]
+  (let [filters (args->filters args)
+        fetch-fn (fn [_this _env] (c/fetch-root (:id args) db table filters))]
+    (with-superlifter ctx
+      (let [res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
+        (update-triggers-by-1 res-p rels)))))
+
+(defn has-one [id-key db table rels ctx _args val]
+  (let [batch-fn (fn [many _env]
+                   (let [ids (map :id many)]
+                     (c/list-root db table {:filters [[:in :id ids]]})))]
+    (with-superlifter ctx
+      (let [res-p (sl-api/enqueue! (keyword table)
+                                   (->HasOneDataSource (id-key val) batch-fn))]
+        (update-triggers-by-1 res-p rels)))))
+
+(defn has-many [id-key db table rels ctx args val]
   (let [arg-fltrs (args->filters args)
         batch-fn (fn [many _env]
                    (let [ids (map :id many)
                          filters (update arg-fltrs :filters conj [:in id-key ids])
                          res (c/list-root db table filters)]
                      {:ids ids :res res}))]
-    (with-superlifter sl-ctx
-      (let [p (sl-api/enqueue! (keyword table)
+    (with-superlifter ctx
+      (let [res-p (sl-api/enqueue! (keyword table)
                                (->HasManyDataSource (:id val) batch-fn id-key))]
-        p))))
+        (update-triggers-by-count res-p rels)))))
 
-(defn has-one [sl-ctx id-key db table _ctx _args val]
-  (let [batch-fn (fn [many _env]
-                   (let [ids (map :id many)
-                         res (c/list-root db table {:filters [[:in :id ids]]})]
-                     (println res)
-                     res))]
-    (with-superlifter sl-ctx
-      (sl-api/enqueue! (keyword table)
-                       (->HasOneDataSource (id-key val) batch-fn)))))
-
-(defn n-to-n [sl-ctx join-col p-col db nn-table table _ctx args val]
+(defn n-to-n [join-col p-col db nn-table table rels ctx args val]
   (let [filters (args->filters args)
         p-col-key (keyword p-col)
         batch-fn (fn [many _env]
@@ -148,10 +155,11 @@
                          res (c/list-n-n join-col p-col ids db
                                          nn-table table filters)]
                     {:ids ids :res res}))]
-    (println "nn" nn-table "tbl" table)
-    (with-superlifter sl-ctx
-      (sl-api/enqueue! (keyword nn-table)
-                       (->HasManyDataSource (:id val) batch-fn p-col-key)))))
+    (with-superlifter ctx
+      (let [res-p (sl-api/enqueue! (keyword nn-table)
+                                   (->HasManyDataSource (:id val) batch-fn
+                                                        p-col-key))]
+        (update-triggers-by-count res-p rels)))))
 
 (def ^:private res-true
   {:result true})
