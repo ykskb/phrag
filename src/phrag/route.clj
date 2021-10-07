@@ -11,10 +11,9 @@
 ;;; reitit
 
 (defn- rtt-gql-handler [config]
-  (let []
+  (let [schema (gql/schema config)]
     (fn [req]
-      (let [schema (gql/schema config)
-            params (rtt-param-data req)
+      (let [params (rtt-param-data req)
             query (get params "query")
             vars (w/keywordize-keys (get params "variables"))]
         {:status 200
@@ -26,12 +25,12 @@
 ;;; Bidi
 
 (defn- bd-gql-handler [config]
-  (fn [req]
-    (let [params (:params req)
-          query (get params "query")
-          vars (w/keywordize-keys (get params "variables"))
-          result (gql/exec query vars config)]
-      (ring-res/response result))))
+  (let [schema (gql/schema config)]
+    (fn [req]
+      (let [params (:params req)
+            query (get params "query")
+            vars (w/keywordize-keys (get params "variables"))]
+        (ring-res/response (gql/exec config schema query vars))))))
 
 (defmethod graphql-route :bidi [config]
   ["/" {"graphql" {:post (bd-gql-handler config)}}])
