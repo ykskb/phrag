@@ -150,7 +150,7 @@
            :objects {:Result {:fields {:result {:type 'Boolean}}}}
            :queries {}} (:tables config)))
 
-(defn- add-one-n-schema [schema config table rels]
+(defn- add-one-n-schema [schema config table rel-map]
   (let [table-name (tbl/to-table-name (:name table) config)
         rsc (inf/singular table-name)
         rscs (inf/plural table-name)
@@ -159,6 +159,7 @@
         rsc-name-key (keyword rsc-name)
         rsc-flt-key (keyword (str rsc-name "Filter"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
+        rsc-rels (get rel-map table-name)
         db (:db config)]
     (reduce (fn [m blg-to]
               (let [blg-to-rsc (inf/singular blg-to)
@@ -166,7 +167,8 @@
                     blg-to-rsc-name-key (keyword blg-to-rsc-name)
                     blg-to-rsc-key (keyword blg-to-rsc)
                     blg-to-rsc-id (keyword (str blg-to-rsc "_id"))
-                    blg-to-table-name (tbl/to-table-name blg-to-rsc config)]
+                    blg-to-table-name (tbl/to-table-name blg-to-rsc config)
+                    blg-to-rels (get rel-map blg-to-table-name)]
                 (-> m
                     ;; has many
                     (assoc-in [:objects blg-to-rsc-name-key :fields rscs-key]
@@ -176,15 +178,15 @@
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/has-many blg-to-rsc-id
-                                                 db table-name rels)})
+                                                 db table-name rsc-rels)})
                     ;; has one
                     (assoc-in [:objects rsc-name-key :fields blg-to-rsc-key]
                               {:type blg-to-rsc-name-key
                                :resolve (partial rslv/has-one blg-to-rsc-id db
-                                                 blg-to-table-name rels)}))))
+                                                 blg-to-table-name blg-to-rels)}))))
             schema (:belongs-to table))))
 
-(defn- add-n-n-schema [schema config table rels]
+(defn- add-n-n-schema [schema config table rel-map]
   (let [tbl-name (tbl/to-table-name (:name table) config)
         rsc-a-tbl-name (first (:belongs-to table))
         rsc-b-tbl-name (second (:belongs-to table))
@@ -200,6 +202,8 @@
         rscs-b (inf/plural rsc-b-tbl-name)
         rscs-a-key (keyword rscs-a)
         rscs-b-key (keyword rscs-b)
+        rsc-a-rels (get rel-map rsc-a-tbl-name)
+        rsc-b-rels (get rel-map rsc-b-tbl-name)
         create-key (keyword (str "create" rsc-a-name rsc-b-name))
         delete-key (keyword (str "delete" rsc-a-name rsc-b-name))
         obj-fields (root-fields table)
@@ -211,13 +215,13 @@
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial rslv/n-to-n rsc-b-col rsc-a-col
-                                     db tbl-name rsc-b-tbl-name rels)})
+                                     db tbl-name rsc-b-tbl-name rsc-b-rels)})
         (assoc-in [:objects rsc-b-name-key :fields rscs-a-key]
                   {:type `(~'list ~rsc-a-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial rslv/n-to-n rsc-a-col rsc-b-col
-                                     db tbl-name rsc-a-tbl-name rels)})
+                                     db tbl-name rsc-a-tbl-name rsc-a-rels)})
         (assoc-in [:mutations create-key]
                   {:type :Result
                    :args (dissoc obj-fields :id)
@@ -231,13 +235,12 @@
 
 (defn- add-relationships [schema config rel-map]
   (reduce (fn [m table]
-            (let [rels (get rel-map (:name table))]
-              (cond
-                (has-rel-type? :one-n table)
-                (add-one-n-schema m config table rels)
-                (has-rel-type? :n-n table)
-                (add-n-n-schema m config table rels)
-                :else m)))
+            (cond
+              (has-rel-type? :one-n table)
+              (add-one-n-schema m config table rel-map)
+              (has-rel-type? :n-n table)
+              (add-n-n-schema m config table rel-map)
+              :else m))
           schema (:tables config)))
 
 (defn- sl-config [config]
