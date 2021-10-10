@@ -6,11 +6,13 @@ Phrag creates instantly-operational GraphQL routes from DB schema data.
 
 #### Features:
 
-* Creates a GraphQL-powered [ring](https://github.com/ring-clojure/ring) route for different routers including [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
+* Creates a GraphQL-powered [ring](https://github.com/ring-clojure/ring) route for different routers such as [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
 * Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
 * DB schema data can be retrieved from a running DB or specified with a config map selectively.
+
+* Data loader (query batching) wired up to avoid N+1 problem even for nested queries.
 
 * [Filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) come out of the box.
 
@@ -18,7 +20,7 @@ Phrag creates instantly-operational GraphQL routes from DB schema data.
 
 #### Notes:
 
-* This project is currently in POC state and hasn't been published to Clojars yet.
+* This project is currently in POC/brush-up stage in a real project usage. It hasn't been published to Clojars yet.
 
 ### Schema Data to Nested Resource Structures
 
