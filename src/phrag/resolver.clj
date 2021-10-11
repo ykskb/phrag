@@ -117,60 +117,62 @@
                                     (partial update-1-threshold rel)))
           res-p rels))
 
-(defn list-query [db table rels ctx args _val]
-  (with-superlifter ctx
+(defn list-query [table rels ctx args _val]
+  (with-superlifter (:sl-ctx ctx)
     (let [filters (args->filters args)
-          fetch-fn (fn [_this _env] (c/list-root db table filters))
+          fetch-fn (fn [_this _env] (c/list-root (:db ctx) table filters))
           res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
       (update-triggers-by-count res-p rels))))
 
-(defn id-query [db table rels ctx args _val]
-  (with-superlifter ctx
+(defn id-query [table rels ctx args _val]
+  (with-superlifter (:sl-ctx ctx)
     (let [filters (args->filters args)
-          fetch-fn (fn [_this _env] (c/fetch-root (:id args) db table filters))
+          fetch-fn (fn [_this _env] (c/fetch-root (:id args) (:db ctx)
+                                                  table filters))
           res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
       (update-triggers-by-1 res-p rels))))
 
-(defn has-one [id-key db table rels ctx _args val]
-  (with-superlifter ctx
+(defn has-one [id-key table rels ctx _args val]
+  (with-superlifter (:sl-ctx ctx)
     (let [batch-fn (fn [many _env]
                      (let [ids (map :id many)
-                           res (c/list-root db table {:filters [[:in :id ids]]})]
+                           res (c/list-root (:db ctx) table
+                                            {:filters [[:in :id ids]]})]
                        (doseq [rel rels]
                          (sl-core/update-trigger!
-                          ctx (keyword rel) :elastic
+                          (:sl-ctx ctx) (keyword rel) :elastic
                           (partial update-num-threshold rel (count res))))
                        res))]
       (sl-api/enqueue! (keyword table)
                        (->HasOneDataSource (id-key val) batch-fn)))))
 
-(defn has-many [id-key db table rels ctx args val]
-  (with-superlifter ctx
+(defn has-many [id-key table rels ctx args val]
+  (with-superlifter (:sl-ctx ctx)
     (let [arg-fltrs (args->filters args)
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
                            filters (update arg-fltrs :filters
                                            conj [:in id-key ids])
-                           res (c/list-root db table filters)]
+                           res (c/list-root (:db ctx) table filters)]
                        (doseq [rel rels]
                          (sl-core/update-trigger!
-                          ctx (keyword rel) :elastic
+                          (:sl-ctx ctx) (keyword rel) :elastic
                           (partial update-num-threshold rel (count res))))
                        {:ids ids :res res}))]
       (sl-api/enqueue! (keyword table)
                        (->HasManyDataSource (:id val) batch-fn id-key)))))
 
-(defn n-to-n [join-col p-col db nn-table table rels ctx args val]
-  (with-superlifter ctx
+(defn n-to-n [join-col p-col nn-table table rels ctx args val]
+  (with-superlifter (:sl-ctx ctx)
     (let [filters (args->filters args)
           p-col-key (keyword p-col)
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
-                           res (c/list-n-n join-col p-col ids db
+                           res (c/list-n-n join-col p-col ids (:db ctx)
                                            nn-table table filters)]
                        (doseq [rel rels]
                          (sl-core/update-trigger!
-                          ctx (keyword rel) :elastic
+                          (:sl-ctx ctx) (keyword rel) :elastic
                           (partial update-num-threshold rel (count res))))
                        {:ids ids :res res}))]
       (sl-api/enqueue! (keyword nn-table)
@@ -179,30 +181,31 @@
 (def ^:private res-true
   {:result true})
 
-(defn create-root [db table cols _ctx args _val]
-  (c/create-root (w/stringify-keys args) db table cols)
+(defn create-root [table cols ctx args _val]
+  (c/create-root (w/stringify-keys args) (:db ctx) table cols)
   res-true)
 
-(defn update-root [db table cols _ctx args _val]
-  (c/patch-root (:id args) (w/stringify-keys args) db table cols)
+(defn update-root [table cols ctx args _val]
+  (c/patch-root (:id args) (w/stringify-keys args)
+                (:db ctx) table cols)
   res-true)
 
-(defn delete-root [db table _ctx args _val]
-  (c/delete-root (:id args) db table)
+(defn delete-root [table ctx args _val]
+  (c/delete-root (:id args) (:db ctx) table)
   res-true)
 
-(defn create-n-n [col-a col-b db table cols _ctx args _val]
+(defn create-n-n [col-a col-b table cols ctx args _val]
   (let [col-a-key (keyword col-a)
         col-b-key (keyword col-b)]
     (c/create-n-n col-a (col-a-key args) col-b (col-b-key args) args
-                  db table cols)
+                  (:db ctx) table cols)
     res-true))
 
-(defn delete-n-n [col-a col-b db table _ctx args _val]
+(defn delete-n-n [col-a col-b table ctx args _val]
   (let [col-a-key (keyword col-a)
         col-b-key (keyword col-b)]
     (c/delete-n-n col-a (col-a-key args) col-b (col-b-key args)
-                  db table)
+                  (:db ctx) table)
     res-true))
 
 

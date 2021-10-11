@@ -100,7 +100,6 @@
                   update-key (keyword (str "update" rsc-name))
                   delete-key (keyword (str "delete" rsc-name))
                   obj-fields (root-fields table)
-                  db (:db config)
                   cols (tbl/col-names table)
                   rels (get rel-map table-name)]
               (if (has-rel-type? :root table)
@@ -122,28 +121,27 @@
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/list-query
-                                                 db table-name rels)})
+                                                 table-name rels)})
                     (assoc-in [:queries id-q-key]
                               {:type rsc-name-key
                                :description (str "Query " rsc-name " by id.")
                                :args {:id {:type '(non-null ID)}}
                                :resolve (partial rslv/id-query
-                                                 db table-name rels)})
+                                                 table-name rels)})
                     (assoc-in [:mutations create-key]
                               {:type :Result
                                :args (dissoc obj-fields :id)
                                :resolve (partial rslv/create-root
-                                                 db table-name cols)})
+                                                 table-name cols)})
                     (assoc-in [:mutations update-key]
                               {:type :Result
                                :args obj-fields
                                :resolve (partial rslv/update-root
-                                                 db table-name cols)})
+                                                 table-name cols)})
                     (assoc-in [:mutations delete-key]
                               {:type :Result
                                :args {:id {:type '(non-null ID)}}
-                               :resolve (partial rslv/delete-root
-                                                 db table-name)}))
+                               :resolve (partial rslv/delete-root table-name)}))
                 m)))
           {:enums (merge filter-op sort-op)
            :input-objects filter-inputs
@@ -159,8 +157,7 @@
         rsc-name-key (keyword rsc-name)
         rsc-flt-key (keyword (str rsc-name "Filter"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
-        rsc-rels (get rel-map table-name)
-        db (:db config)]
+        rsc-rels (get rel-map table-name)]
     (reduce (fn [m blg-to]
               (let [blg-to-rsc (inf/singular blg-to)
                     blg-to-rsc-name (csk/->PascalCase blg-to-rsc)
@@ -178,11 +175,11 @@
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/has-many blg-to-rsc-id
-                                                 db table-name rsc-rels)})
+                                                 table-name rsc-rels)})
                     ;; has one
                     (assoc-in [:objects rsc-name-key :fields blg-to-rsc-key]
                               {:type blg-to-rsc-name-key
-                               :resolve (partial rslv/has-one blg-to-rsc-id db
+                               :resolve (partial rslv/has-one blg-to-rsc-id
                                                  blg-to-table-name blg-to-rels)}))))
             schema (:belongs-to table))))
 
@@ -207,31 +204,30 @@
         create-key (keyword (str "create" rsc-a-name rsc-b-name))
         delete-key (keyword (str "delete" rsc-a-name rsc-b-name))
         obj-fields (root-fields table)
-        cols (tbl/col-names table)
-        db (:db config)]
+        cols (tbl/col-names table)]
     (-> schema
         (assoc-in [:objects rsc-a-name-key :fields rscs-b-key]
                   {:type `(~'list ~rsc-b-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial rslv/n-to-n rsc-b-col rsc-a-col
-                                     db tbl-name rsc-b-tbl-name rsc-b-rels)})
+                                     tbl-name rsc-b-tbl-name rsc-b-rels)})
         (assoc-in [:objects rsc-b-name-key :fields rscs-a-key]
                   {:type `(~'list ~rsc-a-name-key)
                    :args {:limit {:type 'Int}
                           :offset {:type 'Int}}
                    :resolve (partial rslv/n-to-n rsc-a-col rsc-b-col
-                                     db tbl-name rsc-a-tbl-name rsc-a-rels)})
+                                     tbl-name rsc-a-tbl-name rsc-a-rels)})
         (assoc-in [:mutations create-key]
                   {:type :Result
                    :args (dissoc obj-fields :id)
                    :resolve (partial rslv/create-n-n rsc-a-col rsc-b-col
-                                     db tbl-name cols)})
+                                     tbl-name cols)})
         (assoc-in [:mutations delete-key]
                   {:type :Result
                    :args (dissoc obj-fields :id)
                    :resolve (partial rslv/delete-n-n rsc-a-col rsc-b-col
-                                     db tbl-name)}))))
+                                     tbl-name)}))))
 
 (defn- add-relationships [schema config rel-map]
   (reduce (fn [m table]
@@ -266,8 +262,10 @@
          schema/compile)))
 
 (defn exec [config schema query vars]
-  (let [ctx (sl-ctx config)
+  (let [sl-ctx (sl-ctx config)
+        ctx {:sl-ctx sl-ctx
+             :db (:db config)}
         res (lcn/execute schema query vars ctx)]
-    (let [_ctx (sl-stop! ctx)]
+    (let [_ctx (sl-stop! sl-ctx)]
       res)))
 
