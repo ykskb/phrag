@@ -66,8 +66,8 @@
     nil))
 
 (defn delete-n-n [col-a id-a col-b id-b db-con table]
-  (let [where-a [:= (keyword col-a) id-a]
-        where-b [:= (keyword col-b) id-b]
+  (let [where-a [:= col-a id-a]
+        where-b [:= col-b id-b]
         filters {:filters [where-a where-b]}]
     (db/delete-where! db-con table filters)
     nil))

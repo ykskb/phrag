@@ -8,6 +8,32 @@
             [inflections.core :as inf]
             [superlifter.core :as sl-core]))
 
+;; Enums
+
+(def ^:private filter-op
+  {:FilterOp {:values [:eq :ne :lt :le :lte :gt :ge :gte]}})
+
+(def ^:private sort-op
+  {:SortOp {:values [:asc :desc]}})
+
+;; Input objects
+
+(def ^:private filter-desc
+  (str "Filter format is {[column]: {operator: [op] value: [val]}}. "
+       "Supported operators are eq, ne, lt, le/lte, gt, and ge/gte. "
+       "Multiple filters are applied with `AND` operators."))
+
+(def ^:private sort-desc
+  (str "Sort format is {[column]: [\"asc\" or \"desc\"]}."))
+
+(def ^:private filter-inputs
+  {:StringFilter {:fields {:operator {:type :FilterOp}
+                           :value {:type 'String}}}
+   :FloatFilter {:fields {:operator {:type :FilterOp}
+                          :value {:type 'Float}}}
+   :IntFilter {:fields {:operator {:type :FilterOp}
+                        :value {:type 'Int}}}})
+
 ;; Object / input object fields
 
 (def ^:private field-types
@@ -55,32 +81,6 @@
                   field {:type :SortOp}]
               (assoc m col-key field)))
           {} (:columns table)))
-
-;; Input objects
-
-(def ^:private filter-desc
-  (str "Filter format is {[column]: {operator: [op] value: [val]}}. "
-       "Supported operators are eq, ne, lt, le/lte, gt, and ge/gte. "
-       "Multiple filters are applied with `AND` operators."))
-
-(def ^:private sort-desc
-  (str "Sort format is {[column]: [\"asc\" or \"desc\"]}."))
-
-(def ^:private filter-inputs
-  {:StringFilter {:fields {:operator {:type :FilterOp}
-                           :value {:type 'String}}}
-   :FloatFilter {:fields {:operator {:type :FilterOp}
-                          :value {:type 'Float}}}
-   :IntFilter {:fields {:operator {:type :FilterOp}
-                        :value {:type 'Int}}}})
-
-;; Enums
-
-(def ^:private filter-op
-  {:FilterOp {:values [:eq :ne :lt :le :lte :gt :ge :gte]}})
-
-(def ^:private sort-op
-  {:SortOp {:values [:asc :desc]}})
 
 ;; Schema
 
@@ -263,8 +263,9 @@
 
 (defn exec [config schema query vars]
   (let [sl-ctx (sl-ctx config)
-        ctx {:sl-ctx sl-ctx
-             :db (:db config)}
+        ctx (-> (:signal-ctx config {})
+                (assoc :sl-ctx sl-ctx)
+                (assoc :db (:db config)))
         res (lcn/execute schema query vars ctx)]
     (let [_ctx (sl-stop! sl-ctx)]
       res)))

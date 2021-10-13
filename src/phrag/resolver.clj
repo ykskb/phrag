@@ -97,7 +97,7 @@
   (println "Incrementing" rel "queue by" (count ctx))
   (update trigger-opts :threshold + (count ctx)))
 
-(defn- update-num-threshold [rel num trigger-opts]
+(defn- update-n-threshold [rel num trigger-opts]
   (println "Updating" rel "queue with" num)
   (update trigger-opts :threshold + num))
 
@@ -105,24 +105,29 @@
   (println "Incrementing" rel "queue by 1")
   (update trigger-opts :threshold + 1))
 
-(defn- update-triggers-by-count [res-p rels]
+(defn- update-triggers-by-count! [res-p rels]
   (reduce (fn [p rel]
             (sl-api/update-trigger! p (keyword rel) :elastic
                                     (partial update-count-threshold rel)))
           res-p rels))
 
-(defn- update-triggers-by-1 [res-p rels]
+(defn- update-triggers-by-1! [res-p rels]
   (reduce (fn [p rel]
             (sl-api/update-trigger! p (keyword rel) :elastic
                                     (partial update-1-threshold rel)))
           res-p rels))
+
+(defn- do-update-triggers! [ctx rels c]
+  (doseq [rel rels]
+    (sl-core/update-trigger! ctx (keyword rel) :elastic
+                             (partial update-n-threshold rel c))))
 
 (defn list-query [table rels ctx args _val]
   (with-superlifter (:sl-ctx ctx)
     (let [filters (args->filters args)
           fetch-fn (fn [_this _env] (c/list-root (:db ctx) table filters))
           res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
-      (update-triggers-by-count res-p rels))))
+      (update-triggers-by-count! res-p rels))))
 
 (defn id-query [table rels ctx args _val]
   (with-superlifter (:sl-ctx ctx)
@@ -130,7 +135,7 @@
           fetch-fn (fn [_this _env] (c/fetch-root (:id args) (:db ctx)
                                                   table filters))
           res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
-      (update-triggers-by-1 res-p rels))))
+      (update-triggers-by-1! res-p rels))))
 
 (defn has-one [id-key table rels ctx _args val]
   (with-superlifter (:sl-ctx ctx)
@@ -138,10 +143,7 @@
                      (let [ids (map :id many)
                            res (c/list-root (:db ctx) table
                                             {:filters [[:in :id ids]]})]
-                       (doseq [rel rels]
-                         (sl-core/update-trigger!
-                          (:sl-ctx ctx) (keyword rel) :elastic
-                          (partial update-num-threshold rel (count res))))
+                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        res))]
       (sl-api/enqueue! (keyword table)
                        (->HasOneDataSource (id-key val) batch-fn)))))
@@ -154,10 +156,7 @@
                            filters (update arg-fltrs :filters
                                            conj [:in id-key ids])
                            res (c/list-root (:db ctx) table filters)]
-                       (doseq [rel rels]
-                         (sl-core/update-trigger!
-                          (:sl-ctx ctx) (keyword rel) :elastic
-                          (partial update-num-threshold rel (count res))))
+                      (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        {:ids ids :res res}))]
       (sl-api/enqueue! (keyword table)
                        (->HasManyDataSource (:id val) batch-fn id-key)))))
@@ -170,10 +169,7 @@
                      (let [ids (map :id many)
                            res (c/list-n-n join-col p-col ids (:db ctx)
                                            nn-table table filters)]
-                       (doseq [rel rels]
-                         (sl-core/update-trigger!
-                          (:sl-ctx ctx) (keyword rel) :elastic
-                          (partial update-num-threshold rel (count res))))
+                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        {:ids ids :res res}))]
       (sl-api/enqueue! (keyword nn-table)
                        (->HasManyDataSource (:id val) batch-fn p-col-key)))))
