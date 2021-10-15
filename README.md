@@ -113,13 +113,13 @@ Schema data is used to specify custom table schema to construct GraphQL without 
 
 ### Resource Filtering
 
-Format of `filter: {[column]: {operator: [operator], value: [value]}` is used in query arguments for filtering.
+Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is used in arguments for filtering. `AND` / `OR` group can be created as clause lists in `and` / `or` parameter under `where`.
 
 ##### Example:
 
-`{users (filter: {id: {operator: lt, value: 100} id: {operator: ne, value: 1}})}` (`users` where `id` is less than `100` `AND` `id` is not equal to `1`)
+`{users (where: {name: {like: "%ken%"} and: [{id: {gt: 100}}, {id: {lte: 200}}]})}` (`users` where `name` is `like` `ken` `AND` `id` is greater than `100` `AND` less than or equal to `200`)
 
-> * Supported operators are `eq`, `ne`, `lt`, `le`/`lte`, `gt`, and `ge`/`gte`.
+> * Supported operators are `eq`, `ne`, `gt`, `lt`, `gte`, `lte`, `in` and `like`.
 > * Multiple filters are applied with `AND` operator.
 
 ### Resource Sorting

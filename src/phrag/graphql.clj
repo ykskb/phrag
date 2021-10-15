@@ -8,45 +8,13 @@
             [inflections.core :as inf]
             [superlifter.core :as sl-core]))
 
-;; Enums
-
-(def ^:private filter-op
-  {:FilterOp {:values [:eq :ne :lt :le :lte :gt :ge :gte]}})
-
-(def ^:private sort-op
-  {:SortOp {:values [:asc :desc]}})
-
-;; Input objects
-
-(def ^:private filter-desc
-  (str "Filter format is {[column]: {operator: [op] value: [val]}}. "
-       "Supported operators are eq, ne, lt, le/lte, gt, and ge/gte. "
-       "Multiple filters are applied with `AND` operators."))
-
-(def ^:private sort-desc
-  (str "Sort format is {[column]: [\"asc\" or \"desc\"]}."))
-
-(def ^:private filter-inputs
-  {:StringFilter {:fields {:operator {:type :FilterOp}
-                           :value {:type 'String}}}
-   :FloatFilter {:fields {:operator {:type :FilterOp}
-                          :value {:type 'Float}}}
-   :IntFilter {:fields {:operator {:type :FilterOp}
-                        :value {:type 'Int}}}})
-
-;; Object / input object fields
+;;; Objects
 
 (def ^:private field-types
   {"int" 'Int
    "integer" 'Int
    "text" 'String
    "timestamp" 'String})
-
-(def ^:private flt-input-types
-  {"int" :IntFilter
-   "integer" :IntFilter
-   "text" :StringFilter
-   "timestamp" :StringFilter})
 
 (defn- has-rel-type? [t table]
   (some #(= t %) (:relation-types table)))
@@ -65,7 +33,43 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
-(defn- filter-fields [table]
+;;; Input objects
+
+;; Where filter
+
+(def ^:private clauses-desc
+  (str "Format for where clauses is {column: {operator: value}}. "
+       "Multiple parameters are applied with `AND` operators."))
+
+(def ^:private where-desc
+  (str "AND / OR group can be created as clause lists in "
+       "\"and\" / \"or\" parameter. "
+       "Multiple parameters are applied with `AND` operators."))
+
+(def ^:private filter-inputs
+  {:StrWhere {:fields {:in {:type '(list String)}
+                       :eq {:type 'String}
+                       :like {:type 'String}}}
+   :FloatWhere {:fields {:in {:type '(list Float)}
+                         :eq {:type 'Float}
+                         :gt {:type 'Float}
+                         :lt {:type 'Float}
+                         :gte {:type 'Float}
+                         :lte {:type 'Float}}}
+   :IntWhere {:fields {:in {:type '(list Int)}
+                       :eq {:type 'Int}
+                       :gt {:type 'Int}
+                       :lt {:type 'Int}
+                       :gte {:type 'Int}
+                       :lte {:type 'Int}}}})
+
+(def ^:private flt-input-types
+  {"int" :IntWhere
+   "integer" :IntWhere
+   "text" :StrWhere
+   "timestamp" :StrWhere})
+
+(defn- rsc-clauses [table]
   (reduce (fn [m col]
             (let [col-name (:name col)
                   col-key (keyword col-name)
@@ -73,6 +77,19 @@
                   field {:type input-type}]
               (assoc m col-key field)))
           {} (:columns table)))
+
+(defn- rsc-where [table rsc-cls-key]
+  (-> (rsc-clauses table)
+      (assoc :and {:type `(~'list ~rsc-cls-key)})
+      (assoc :or {:type `(~'list ~rsc-cls-key)})))
+
+;; Sort field
+
+(def ^:private sort-desc
+  (str "Sort format is {column: \"asc\" or \"desc\"}."))
+
+(def ^:private sort-op
+  {:SortOp {:values [:asc :desc]}})
 
 (defn- sort-fields [table]
   (reduce (fn [m col]
@@ -82,7 +99,7 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
-;; Schema
+;;; Schema
 
 (defn- root-schema [config rel-map]
   (reduce (fn [m table]
@@ -91,7 +108,8 @@
                   rscs (inf/plural table-name)
                   rsc-name (csk/->PascalCase rsc)
                   rscs-name (csk/->PascalCase rscs)
-                  rsc-flt-key (csk/->PascalCaseKeyword (str rsc-name "Filter"))
+                  rsc-cls-key (csk/->PascalCaseKeyword (str rsc-name "Clauses"))
+                  rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
                   rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
                   rsc-name-key (keyword rsc-name)
                   id-q-key (keyword rsc)
@@ -107,16 +125,19 @@
                     (assoc-in [:objects rsc-name-key]
                               {:description rsc-name
                                :fields obj-fields})
-                    (assoc-in [:input-objects rsc-flt-key]
-                              {:description filter-desc
-                               :fields (filter-fields table)})
+                    (assoc-in [:input-objects rsc-cls-key]
+                              {:description clauses-desc
+                               :fields (rsc-clauses table)})
+                    (assoc-in [:input-objects rsc-whr-key]
+                              {:description where-desc
+                               :fields (rsc-where table rsc-cls-key)})
                     (assoc-in [:input-objects rsc-sort-key]
                               {:description sort-desc
                                :fields (sort-fields table)})
                     (assoc-in [:queries list-q-key]
                               {:type `(~'list ~rsc-name-key)
                                :description (str "List " rscs-name ".")
-                               :args {:filter {:type rsc-flt-key}
+                               :args {:where {:type rsc-whr-key}
                                       :sort {:type rsc-sort-key}
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
@@ -143,7 +164,7 @@
                                :args {:id {:type '(non-null ID)}}
                                :resolve (partial rslv/delete-root table-name)}))
                 m)))
-          {:enums (merge filter-op sort-op)
+          {:enums (merge sort-op)
            :input-objects filter-inputs
            :objects {:Result {:fields {:result {:type 'Boolean}}}}
            :queries {}} (:tables config)))
@@ -155,7 +176,7 @@
         rsc-name (csk/->PascalCase rsc)
         rscs-key (keyword rscs)
         rsc-name-key (keyword rsc-name)
-        rsc-flt-key (keyword (str rsc-name "Filter"))
+        rsc-whr-key (keyword (str rsc-name "Where"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
         rsc-rels (get rel-map table-name)]
     (reduce (fn [m blg-to]
@@ -170,8 +191,8 @@
                     ;; has many
                     (assoc-in [:objects blg-to-rsc-name-key :fields rscs-key]
                               {:type `(~'list ~rsc-name-key)
-                               :args {:filter {:type rsc-flt-key}
-                                      :sort {:type rsc-sort-key}
+                               :args {:where {:type rsc-whr-key}
+                                      :sort {:type rsc-sort-key} ;
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/has-many blg-to-rsc-id

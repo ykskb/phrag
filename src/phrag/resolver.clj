@@ -8,21 +8,34 @@
             [superlifter.api :as sl-api]
             [superlifter.core :as sl-core]))
 
-(def ^:private sort-ops
+(def ^:private where-ops
   {:eq  :=
-   :lt  :<
-   :le  :<=
-   :lte :<=
    :gt  :>
-   :ge  :>=
+   :lt  :<
    :gte :>=
-   :ne  :!=})
+   :lte :<=
+   :ne  :!=
+   :in :in
+   :like :like})
 
-(defn- parse-filter [fltr]
+(defn- parse-rsc-where [rsc-where]
   (map (fn [[k v]]
-         (let [op ((:operator v) sort-ops)]
-           [op k (:value v)]))
-       fltr))
+         (let [entry (first v)
+               op ((key entry) where-ops)]
+           [op k (val entry)]))
+       rsc-where))
+
+(defn- parse-and-or [op rsc-where-list]
+  (let [whr-list (reduce (fn [v rsc-where]
+                           (concat v (parse-rsc-where rsc-where)))
+                         [] rsc-where-list)]
+    (concat [op] whr-list)))
+
+(defn- parse-where [args]
+  (let [whr (:where args)]
+    (cond-> (parse-rsc-where (dissoc whr :and :or))
+      (some? (:or whr)) (conj (parse-and-or :or (:or whr)))
+      (some? (:and whr)) (conj (parse-and-or :and (:and whr))))))
 
 (defn- parse-sort [m v]
   (let [col (first (keys v))
@@ -36,12 +49,11 @@
 (defn- args->filters [args]
   (reduce (fn [m [k v]]
             (cond
-              (= k :filter) (assoc m :filters (parse-filter v))
               (= k :sort) (parse-sort m v)
               (= k :limit) (assoc m :limit v)
               (= k :offset) (assoc m :offset v)
               :else m))
-          {:limit 100 :offset 0}
+          {:where (parse-where args):limit 100 :offset 0}
           args))
 
 (defrecord FetchDataSource [fetch-fn]
@@ -123,6 +135,7 @@
                              (partial update-n-threshold rel c))))
 
 (defn list-query [table rels ctx args _val]
+  (println (args->filters args))
   (with-superlifter (:sl-ctx ctx)
     (let [filters (args->filters args)
           fetch-fn (fn [_this _env] (c/list-root (:db ctx) table filters))
@@ -142,7 +155,7 @@
     (let [batch-fn (fn [many _env]
                      (let [ids (map :id many)
                            res (c/list-root (:db ctx) table
-                                            {:filters [[:in :id ids]]})]
+                                            {:where [[:in :id ids]]})]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        res))]
       (sl-api/enqueue! (keyword table)
@@ -153,7 +166,7 @@
     (let [arg-fltrs (args->filters args)
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
-                           filters (update arg-fltrs :filters
+                           filters (update arg-fltrs :where
                                            conj [:in id-key ids])
                            res (c/list-root (:db ctx) table filters)]
                       (do-update-triggers! (:sl-ctx ctx) rels (count res))

@@ -141,16 +141,51 @@
                   :meetups [{:id 1 :title "rust meetup"}]}))
 
     ;; Filters
-    (testing "list entity with eq filter"
-      (test-gql (str "{ members (filter: {first_name: {operator:eq "
-                     "value: \"yoshi\"}}) { id last_name }}")
+    (testing "list entity with where arg"
+      (test-gql (str "{ members (where: {first_name: {eq:  \"yoshi\"}}) "
+                     "{ id last_name }}")
                 [:data :members]
                 [{:id 2 :last_name "tanabe"}])
-      (test-gql (str "{ members (filter: {first_name: {operator: eq "
-                     "value: \"yoshi\"} last_name: {operator: eq "
-                     "value: \"smith\"}}) { id last_name }}")
+      (test-gql (str "{ members (where: {first_name: {eq: \"yoshi\"} "
+                     "last_name: {eq: \"unknown\"}}) { id last_name }}")
                 [:data :members]
                 []))
+
+    (testing "list entity with AND group"
+      (test-gql (str "{ members (where: "
+                     "{ and: [{id: {gt: 1}}, {first_name: {eq: \"yoshi\"}}]}) "
+                     "{ id last_name }}")
+                [:data :members]
+                [{:id 2 :last_name "tanabe"}])
+      (test-gql (str "{ members (where: "
+                     "{ and: [{id: {gt: 0}}, {first_name: {eq: \"jim\"}}]}) "
+                     "{ id last_name }}")
+                [:data :members]
+                [{:id 1 :last_name "smith"}]))
+
+    (testing "list entity with OR group"
+      (test-gql (str "{ members (where: "
+                     "{ or: [{id: {eq: 1}}, {first_name: {eq: \"yoshi\"}}]}) "
+                     "{ id last_name }}")
+                [:data :members]
+                [{:id 1 :last_name "smith"}
+                 {:id 2 :last_name "tanabe"}])
+      (test-gql (str "{ members (where: "
+                     "{ or: [{id: {gt: 1}}, {first_name: {eq: \"yoshi\"}}]}) "
+                     "{ id last_name }}")
+                [:data :members]
+                [{:id 2 :last_name "tanabe"}]))
+
+    (testing "fetch entity with has-many param filtered with where"
+      (test-gql   "{ venue(id: 1) { name postal_code meetups { id title }}}"
+                 [:data :venue]
+                 {:name "office one" :postal_code "123456"
+                  :meetups [{:id 2 :title "cpp meetup"}]})
+      (test-gql  (str "{ venue(id: 1) { name postal_code meetups "
+                      "(where: {title: {like: \"%rust%\"}}) { id title }}}")
+                 [:data :venue]
+                 {:name "office one" :postal_code "123456"
+                  :meetups []}))
 
     ;; Pagination
     (testing "list entity with pagination"
@@ -185,7 +220,7 @@
 
     ;; Delete mutation
     (testing "delete entity"
-      (test-gql  "mutation {deleteMember (id: 1) {result}}"
+      (test-gql  "mutation {deleteMember (id: 1) { result }}"
                  [:data :deleteMember :result]
                  true)
       (test-gql  "{ members { id first_name }}"

@@ -35,11 +35,11 @@
 ;; Resource queries
 
 (defn list-up [db rsc & [filters]]
-  (let [fltrs (:filters filters)
+  (let [whr (:where filters)
         o-col (:order-col filters)
         q (-> (select :*) (from (keyword rsc))
               (limit (:limit filters 100)) (offset (:offset filters 0)))
-        q (if (not-empty fltrs) (apply where q fltrs) q)
+        q (if (not-empty whr) (apply where q whr) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
     (println (sql/format q))
     (->> (sql/format q)
@@ -47,37 +47,37 @@
 
 (defn list-through [db rsc nn-table nn-join-col & [filters]]
   (let [nn-col-key (keyword (str "nn." nn-join-col))
-        fltrs (:filters filters)
+        whr (:where filters)
         o-col (:order-col filters)
         q (-> (select :t.* :nn.*) (from [(keyword nn-table) :nn])
               (join [(keyword rsc) :t] [:= nn-col-key :t.id])
               (limit (:limit filters 100)) (offset (:offset filters 0)))
-        q (if (not-empty fltrs) (apply where q fltrs) q)
+        q (if (not-empty whr) (apply where q whr) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
     (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
 (defn fetch [db rsc id & [filters]]
-  (let [fltrs (:filters filters)
+  (let [whr (:where filters)
         q (-> (select :*) (from (keyword rsc)))
-        q (if (empty? fltrs) (where q [[:= :id id]])
-              (apply where q (conj fltrs [:= :id id])))]
+        q (if (empty? whr) (where q [[:= :id id]])
+              (apply where q (conj whr [:= :id id])))]
     (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db)
          first)))
 
 (defn delete! [db rsc id & [p-col p-id]]
-  (let [filters (if (nil? p-id) [[:= :id id]]
+  (let [whr (if (nil? p-id) [[:= :id id]]
                     [[:= :id id] [:= (keyword p-col) p-id]])
-        q (apply where (delete-from (keyword rsc)) filters)]
+        q (apply where (delete-from (keyword rsc)) whr)]
     (->> (sql/format q)
          (jdbc/execute! db))))
 
 (defn delete-where! [db rsc filters]
-  (let [fltrs (:filters filters)
-        q (apply where (delete-from (keyword rsc)) fltrs)]
+  (let [whr (:where filters)
+        q (apply where (delete-from (keyword rsc)) whr)]
     (->> (sql/format q)
          (jdbc/execute! db))))
 
@@ -85,10 +85,10 @@
   (jdbc/insert! db rsc raw-map))
 
 (defn update! [db rsc id raw-map & [p-col p-id]]
-  (let [filters (if (nil? p-id) [[:= :id id]]
+  (let [whr (if (nil? p-id) [[:= :id id]]
                     [[:= :id id] [:= (keyword p-col) p-id]])
         q (-> (h/update (keyword rsc)) (h/set raw-map))]
-    (->> (apply where q filters)
+    (->> (apply where q whr)
          sql/format
          (jdbc/execute! db))))
 
