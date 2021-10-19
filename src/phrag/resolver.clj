@@ -46,7 +46,7 @@
           (assoc :direc direc))
       m)))
 
-(defn- args->filters [args]
+(defn- args->sql-args [args]
   (reduce (fn [m [k v]]
             (cond
               (= k :sort) (parse-sort m v)
@@ -134,87 +134,117 @@
     (sl-core/update-trigger! ctx (keyword rel) :elastic
                              (partial update-n-threshold rel c))))
 
+(defn- signal [args ctx tbl-name op type]
+  (if-let [sgnl-fn (get-in ctx [:signals (keyword tbl-name) op type])]
+    (sgnl-fn args ctx)
+    args))
+
+;;; Resolvers
+
+;; Queries
+
 (defn list-query [table rels ctx args _val]
-  (println (args->filters args))
   (with-superlifter (:sl-ctx ctx)
-    (let [filters (args->filters args)
-          fetch-fn (fn [_this _env] (c/list-root (:db ctx) table filters))
-          res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
-      (update-triggers-by-count! res-p rels))))
+    (let [sql-args (-> (args->sql-args args)
+                       (signal ctx table :query :pre))
+          fetch-fn (fn [_this _env]
+                     (c/list-root (:db ctx) table sql-args))
+          res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
+                    (update-triggers-by-count! rels))]
+      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 (defn id-query [table rels ctx args _val]
   (with-superlifter (:sl-ctx ctx)
-    (let [filters (args->filters args)
+    (let [sql-args (-> (args->sql-args args)
+                       (signal ctx table :query :pre))
           fetch-fn (fn [_this _env] (c/fetch-root (:id args) (:db ctx)
-                                                  table filters))
-          res-p (sl-api/enqueue! (->FetchDataSource fetch-fn))]
-      (update-triggers-by-1! res-p rels))))
+                                                  table sql-args))
+          res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
+                    (update-triggers-by-1! rels))]
+      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 (defn has-one [id-key table rels ctx _args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [batch-fn (fn [many _env]
+    (let [sql-args (signal nil ctx table :query :pre)
+          batch-fn (fn [many _env]
                      (let [ids (map :id many)
-                           res (c/list-root (:db ctx) table
-                                            {:where [[:in :id ids]]})]
+                           whr (-> {:where [[:in :id ids]]}
+                                   (update :where conj sql-args))
+                           res (c/list-root (:db ctx) table whr)]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
-                       res))]
-      (sl-api/enqueue! (keyword table)
-                       (->HasOneDataSource (id-key val) batch-fn)))))
+                       res))
+          res-p (sl-api/enqueue! (keyword table)
+                                 (->HasOneDataSource (id-key val) batch-fn))]
+      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 (defn has-many [id-key table rels ctx args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [arg-fltrs (args->filters args)
+    (let [sql-args (-> (args->sql-args args)
+                       (signal ctx table :query :pre))
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
-                           filters (update arg-fltrs :where
+                           sql-args (update sql-args :where
                                            conj [:in id-key ids])
-                           res (c/list-root (:db ctx) table filters)]
+                           res (c/list-root (:db ctx) table sql-args)]
                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
-                       {:ids ids :res res}))]
-      (sl-api/enqueue! (keyword table)
-                       (->HasManyDataSource (:id val) batch-fn id-key)))))
+                      {:ids ids :res res}))
+          res-p (sl-api/enqueue! (keyword table)
+                                 (->HasManyDataSource (:id val) batch-fn id-key))]
+      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 (defn n-to-n [join-col p-col nn-table table rels ctx args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [filters (args->filters args)
+    (let [sql-args (-> (args->sql-args args)
+                       (signal ctx table :query :pre))
           p-col-key (keyword p-col)
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
                            res (c/list-n-n join-col p-col ids (:db ctx)
-                                           nn-table table filters)]
+                                           nn-table table sql-args)]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
-                       {:ids ids :res res}))]
-      (sl-api/enqueue! (keyword nn-table)
-                       (->HasManyDataSource (:id val) batch-fn p-col-key)))))
+                       {:ids ids :res res}))
+          res-p (sl-api/enqueue! (keyword nn-table)
+                                 (->HasManyDataSource (:id val) batch-fn
+                                                      p-col-key))]
+      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
+
+;; Mutations
 
 (def ^:private res-true
   {:result true})
 
 (defn create-root [table cols ctx args _val]
-  (c/create-root (w/stringify-keys args) (:db ctx) table cols)
-  res-true)
+  (let [sql-args (-> (signal args ctx table :create :pre)
+                     (w/stringify-keys))]
+    (c/create-root sql-args (:db ctx) table cols)
+    (signal res-true ctx table :create :post)))
 
 (defn update-root [table cols ctx args _val]
-  (c/patch-root (:id args) (w/stringify-keys args)
-                (:db ctx) table cols)
-  res-true)
+  (let [sql-args (-> (signal args ctx table :update :pre)
+                     (w/stringify-keys))]
+    (c/patch-root (:id args) sql-args (:db ctx) table cols)
+    (signal res-true ctx table :update :post)))
 
 (defn delete-root [table ctx args _val]
-  (c/delete-root (:id args) (:db ctx) table)
-  res-true)
+  (let [sql-args (-> (signal args ctx table :delete :pre)
+                     (w/stringify-keys))]
+    (c/delete-root (:id args) (:db ctx) table)
+    (signal res-true ctx table :delete :post)))
 
 (defn create-n-n [col-a col-b table cols ctx args _val]
-  (let [col-a-key (keyword col-a)
-        col-b-key (keyword col-b)]
-    (c/create-n-n col-a (col-a-key args) col-b (col-b-key args) args
-                  (:db ctx) table cols)
-    res-true))
+  (let [sql-args (-> (signal args ctx table :create :pre)
+                     (w/stringify-keys))
+        col-a-val (get sql-args col-a)
+        col-b-val (get sql-args col-b)]
+    (c/create-n-n col-a col-a-val col-b col-b-val sql-args (:db ctx) table cols)
+    (signal res-true ctx table :create :post)))
 
 (defn delete-n-n [col-a col-b table ctx args _val]
-  (let [col-a-key (keyword col-a)
-        col-b-key (keyword col-b)]
-    (c/delete-n-n col-a (col-a-key args) col-b (col-b-key args)
-                  (:db ctx) table)
-    res-true))
+  (let [sql-args (-> (signal args ctx table :delete :pre)
+                     (w/stringify-keys))
+        col-a-val (get sql-args col-a)
+        col-b-val (get sql-args col-b)]
+    (c/delete-n-n col-a col-a-val col-b col-b-val (:db ctx) table)
+    (signal res-true ctx table :delete :post)))
 
 

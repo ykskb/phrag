@@ -2,19 +2,23 @@
 
 DB Schema Data to GraphQL
 
-Phrag creates instantly-operational GraphQL routes from DB schema data.
+Phrag creates an instantly-operational GraphQL route from DB schema data.
 
 #### Features:
 
-* Creates a GraphQL-powered [ring](https://github.com/ring-clojure/ring) route for different routers such as [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
+* Creates a [ring](https://github.com/ring-clojure/ring) route powered with GraphQL query and mutation capabilities as per schema data.
 
 * Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
-* DB schema data can be retrieved from a running DB or specified with a config map selectively.
+* Data loader (query batching) wired up to avoid N+1 problem for nested queries.
 
-* Data loader (query batching) wired up to avoid N+1 problem even for nested queries.
+* [Signal dispatcher](#signals) to add custom logics before & after DB accesses per resource operations.
 
 * [Filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) come out of the box.
+
+* DB schema data can be retrieved from a running DB or specified with a config map selectively.
+
+* Automatic router wiring supported for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
 * GraphQL IDE (like GraphiQL) connectable.
 
@@ -68,12 +72,14 @@ Though configurable parameters vary by router types, Phrag doesn't require many 
 
 #### Config Parameters
 
-| Key                     | Description                                                                                       | Default Value      |
-|-------------------------|---------------------------------------------------------------------------------------------------|--------------------|
-| `:db`                   | Database connection object.                                                                       |                    |
-| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.                               | `true`             |
-| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.                       | `true`             |
-| `:tables`               | DB schema including list of table definitions. Plz check [Schema Data](#schema-data) for details. | Created from `:db` |
+| Key                     | Description                                                                                                         | Default Value      |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------|--------------------|
+| `:db`                   | Database connection object.                                                                                         |                    |
+| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.                                                 | `true`             |
+| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.                                         | `true`             |
+| `:tables`               | DB schema including list of table definitions. Plz check [Schema Data](#schema-data) for details.                   | Created from `:db` |
+| `:signals`              | Map of singal functions per resources. Plz check [Signal Functions](#signal-functions) for details.                 |                    |
+| `:signal-ctx`           | Additional context to be passed into signal functions. Plz check [Signal Functions](#signal-functions) for details. |                    |
 
 #### Schema Data
 
@@ -81,10 +87,9 @@ Schema data is used to specify custom table schema to construct GraphQL without 
 
 ```edn
 {:tables [
-   {:relation-types [:root :one-n]
-    :name "users"
+   {:name "users"
     :columns [{:name "id"
-       	      :type "text"
+       	       :type "text"
                :notnull 0
                :dflt_value nil}
               {:name "image_id"
@@ -93,23 +98,60 @@ Schema data is used to specify custom table schema to construct GraphQL without 
                :dflt_value 1}
 	           ;; ... more columns
 	           ]
+    :relation-types [:root :one-n]
     :belongs-to ["image"]
-    :pre-save-signal #ig/ref :my-project/user-pre-save-fn
-    :post-save-signal #ig/ref :my-project/user-post-save-fn}
     ;; ... more tables
     ]}
 ```
 
 ##### Table Data Details:
 
-| Key              	 | Description                                                                                                       |
+| Key              	     | Description                                                                                                       |
 |------------------------|-------------------------------------------------------------------------------------------------------------------|
 | `:name`              	 | Table name.                                                                                                       |
 | `:columns`             | List of columns. A column can contain `:name`, `:type`, `:notnull` and `:dflt_value` parameters.                  |
 | `:relation-types`      | List of table relation types. `:root`, `:one-n` and `:n-n` are supported.                                         |
 | `:belongs-to`          | List of columns related to `id` of other tables. (`:table-name-plural` will format them accordingly.)             |
-| `:pre-save-signal`     | A function to be triggered at handler before accessing DB. (It will be triggered with request as a parameter.)    |
-| `:post-save-signal`    | A function to be triggered at handler after accessing DB. (It will be triggered with result data as a parameter.) |
+
+### Signals
+
+Phrag has a signal dispatcher with receiver functions which are configurable per resource actions at pre/post-DB operation time. This is where things like access controls or custom business logics can be injected.
+
+> Notes:
+> * Resource operations types include `query`, `create`, `update` and `delete`.
+> * A pre-operation function will have SQL arguments as its first argument when called, and its returned value will be passed to subsequent DB operation.
+> * A pre-operation function for `query` will have `where` clause lists in HoneySQL format while ones for `mutations` will receive request parameters.
+> * A post-operation function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
+> * Both receiver functions will have a context map as its second argument. It'd contain a signal context specified in Phrag config as well as a DB connection and an HTTP request. 
+
+Here's an example:
+
+```clojure
+;; Restrict access to request user
+(defn- end-user-access [sql-args ctx]
+  (let [user (user-info (:request ctx))]
+    (if (if (admin-user? user))
+        sql-args
+        (update sql-args :where conj [:= :id (:user-id user)]))))
+
+;; Removes :internal-id for non-admin users
+(defn- hide-internal-id [result ctx]
+  (let [user (user-info (:request ctx))]
+    (if (if (admin-user? user))
+        result
+        (update result :internal-id ""))))
+
+;; Updates owner data with a user ID from authenticated info in a request
+(defn update-owner [sql-args ctx]
+  (let [user (user-info (:request ctx))]
+    (if (end-user? user)
+        (update sql-args :created_by (:user-id user))
+        (sql-args))))
+        
+{:users {:query {:pre end-user-access :post hide-internal-id}
+         :create {:pre update-owner}
+         :update {:pre update-owner}}}
+```
 
 ### Resource Filtering
 
@@ -149,10 +191,10 @@ To begin developing, start with a REPL.
 lein repl
 ```
 
-Then load the development environment.
+Then load the development environment with reitit example.
 
 ```clojure
-user=> (dev)
+user=> (dev-reitit)
 :loaded
 ```
 
@@ -160,7 +202,6 @@ Run `go` to prep and initiate the system.
 
 ```clojure
 dev=> (go)
-:duct.server.http.jetty/starting-server {:port 3000}
 :initiated
 ```
 

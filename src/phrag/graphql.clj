@@ -286,7 +286,8 @@
   (let [sl-ctx (sl-ctx config)
         ctx (-> (:signal-ctx config {})
                 (assoc :sl-ctx sl-ctx)
-                (assoc :db (:db config)))
+                (assoc :db (:db config))
+                (assoc :signals (:signals config)))
         res (lcn/execute schema query vars ctx)]
     (let [_ctx (sl-stop! sl-ctx)]
       res)))

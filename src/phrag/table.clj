@@ -73,7 +73,16 @@
              is-n-n (assoc :belongs-to (n-n-belongs-to table)))))
        tables))
 
-(defn schema-from-db [config db]
+(defn schema-from-db
+  "Queries database schema from a running DB and format it with relationship data
+  for internal usage.
+
+  A `table` map has: `name`, `columns`, `relationship-types` and `belongs-to`
+  parameters.
+  `relationship-types` is a list of table properties. Possible values are
+  `:root`, `:one-n`(one-to-many) and `:n-n`(many-to-many).
+  `belongs-to` is a list of tables a table links to."
+  [config db]
   (->> (db/get-db-schema db)
       identify-relations))
 

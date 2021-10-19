@@ -1,5 +1,6 @@
 (ns phrag.graphql-test
   (:require [clojure.test :refer :all]
+            [clojure.java.jdbc :as jdbc]
             [com.walmartlabs.lacinia :as lcn]
             [phrag.core-test :refer [create-database]]
             [phrag.graphql :as gql]))
@@ -227,3 +228,55 @@
                  [:data :members]
                  [{:id 2 :first_name "yoshi"}]))
     ))
+
+(defn- members-pre-query [sql-args ctx]
+  (update sql-args :where conj [:= :email (:email ctx)]))
+
+(defn- members-post-query [res ctx]
+  [(assoc (first res) :first_name (:first-name ctx))])
+
+(defn- members-pre-create [sql-args ctx]
+  (assoc sql-args :email (:email ctx)))
+
+(defn- members-post-create [res ctx]
+  res)
+
+(def ^:private signal-test-config
+  {:table-name-plural true,
+   :resource-path-plural true
+   :tables [{:name "members"
+             :columns [{:name "id" :type "integer"}
+                       {:name "first_name" :type "text"}
+                       {:name "last_name" :type "text"}
+                       {:name "email" :type "text"}]
+             :relation-types [:root]
+             :belongs-to []}]
+   :signal-ctx {:email "yoshi@test.com" :first-name "changed-first-name"}
+   :signals {:members {:query {:pre members-pre-query
+                               :post members-post-query}
+                       :create {:pre members-pre-create
+                                :post members-post-create}}}})
+
+(deftest graphql-signals
+  (let [db (doto (create-database)
+             (jdbc/insert! :members {:email "jim@test.com"
+                                     :first_name "jim"
+                                     :last_name "smith"}))
+        conf (assoc signal-test-config :db db)
+        test-gql (fn [q res-keys expected]
+                   (let [schema (gql/schema conf)
+                         res (gql/exec conf schema q nil)]
+                     (is (= expected (get-in res res-keys)))))]
+
+    (testing "create 2nd user"
+      (test-gql (str "mutation {createMember (email: \"input-email\" "
+                     "first_name: \"yoshi\" last_name: \"tanabe\") {result}}")
+                [:data :createMember :result] true))
+
+   ;; Queries
+    (testing "list root type entity"
+      (test-gql  "{ members { id email first_name }}"
+                 [:data :members]
+                 [{:id 2 :email "yoshi@test.com"
+                   :first_name "changed-first-name"}]))))
+
