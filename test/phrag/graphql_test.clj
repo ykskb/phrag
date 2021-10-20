@@ -41,52 +41,53 @@
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
                          res (gql/exec conf schema q nil)]
+                     (println res)
                      (is (= expected (get-in res res-keys)))))]
 
     ;; Create mutations
     (testing "create 1st user"
       (test-gql (str "mutation {createMember (email: \"jim@test.com\" "
-                     "first_name: \"jim\" last_name: \"smith\") {result}}")
-                [:data :createMember :result] true))
+                     "first_name: \"jim\" last_name: \"smith\") { id }}")
+                [:data :createMember :id] 1))
 
     (testing "create 2nd user"
       (test-gql (str "mutation {createMember (email: \"yoshi@test.com\" "
-                     "first_name: \"yoshi\" last_name: \"tanabe\") {result}}")
-                [:data :createMember :result] true))
+                     "first_name: \"yoshi\" last_name: \"tanabe\") { id }}")
+                [:data :createMember :id] 2))
 
     (testing "create 1st venue"
       (test-gql (str "mutation {createVenue (name: \"office one\" "
-                     "postal_code: \"123456\") {result}}")
-                [:data :createVenue :result] true))
+                     "postal_code: \"123456\") { id }}")
+                [:data :createVenue :id] 1))
 
     (testing "create 2nd venue"
       (test-gql (str "mutation {createVenue (name: \"city hall\" "
-                     "postal_code: \"234567\") {result}}")
-                [:data :createVenue :result] true))
+                     "postal_code: \"234567\") { id }}")
+                [:data :createVenue :id] 2))
 
     (testing "create 1st meetup"
       (test-gql (str "mutation {createMeetup (title: \"rust meetup\" "
-                     "start_at: \"2021-01-01 18:00:00\" venue_id: 2) {result}}")
-                [:data :createMeetup :result] true))
+                     "start_at: \"2021-01-01 18:00:00\" venue_id: 2) { id }}")
+                [:data :createMeetup :id] 1))
 
     (testing "create 2nd meetup"
       (test-gql (str "mutation {createMeetup (title: \"cpp meetup\" "
-                     "start_at: \"2021-01-12 18:00:00\" venue_id: 1) {result}}")
-                [:data :createMeetup :result] true))
+                     "start_at: \"2021-01-12 18:00:00\" venue_id: 1) { id }}")
+                [:data :createMeetup :id] 2))
 
     (testing "add member 1 to meetup 1"
       (test-gql (str "mutation {createMeetupMember (meetup_id: 1"
-                     "member_id: 1) {result}}")
+                     "member_id: 1) { result }}")
                 [:data :createMeetupMember :result] true))
 
     (testing "add member 1 to meetup 2"
       (test-gql (str "mutation {createMeetupMember (meetup_id: 2"
-                     "member_id: 1) {result}}")
+                     "member_id: 1) { result }}")
                 [:data :createMeetupMember :result] true))
 
     (testing "add member 2 to meetup 1"
       (test-gql (str "mutation {createMeetupMember (meetup_id: 1"
-                     "member_id: 2) {result}}")
+                     "member_id: 2) { result }}")
                 [:data :createMeetupMember :result] true))
                                         ;
     ;; Queries
@@ -230,16 +231,19 @@
     ))
 
 (defn- members-pre-query [sql-args ctx]
+  ;; Apply filter with email from ctx
   (update sql-args :where conj [:= :email (:email ctx)]))
 
 (defn- members-post-query [res ctx]
+  ;; Replace first_name with one from ctx
   [(assoc (first res) :first_name (:first-name ctx))])
 
 (defn- members-pre-create [sql-args ctx]
+  ;; Replace email with one from ctx
   (assoc sql-args :email (:email ctx)))
 
 (defn- members-post-create [res ctx]
-  res)
+  (assoc res :id (+ (:id res) (count (keys res)))))
 
 (def ^:private signal-test-config
   {:table-name-plural true,
@@ -270,8 +274,8 @@
 
     (testing "create 2nd user"
       (test-gql (str "mutation {createMember (email: \"input-email\" "
-                     "first_name: \"yoshi\" last_name: \"tanabe\") {result}}")
-                [:data :createMember :result] true))
+                     "first_name: \"yoshi\" last_name: \"tanabe\") { id }}")
+                [:data :createMember :id] 6))
 
    ;; Queries
     (testing "list root type entity"

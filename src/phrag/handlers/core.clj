@@ -7,8 +7,7 @@
   (db/list-up db-con table filters))
 
 (defn create-root [params db-con table cols]
-  (db/create! db-con table (select-keys params cols))
-  nil)
+  (db/create! db-con table (select-keys params cols)))
 
 (defn fetch-root [id db-con table filters]
   (db/fetch db-con table id filters))

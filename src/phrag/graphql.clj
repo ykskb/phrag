@@ -43,7 +43,7 @@
 
 (def ^:private where-desc
   (str "AND / OR group can be created as clause lists in "
-       "\"and\" / \"or\" parameter. "
+       "\"and\" / \"or\" parameter under \"where\". "
        "Multiple parameters are applied with `AND` operators."))
 
 (def ^:private filter-inputs
@@ -150,7 +150,7 @@
                                :resolve (partial rslv/id-query
                                                  table-name rels)})
                     (assoc-in [:mutations create-key]
-                              {:type :Result
+                              {:type :NewId
                                :args (dissoc obj-fields :id)
                                :resolve (partial rslv/create-root
                                                  table-name cols)})
@@ -166,7 +166,8 @@
                 m)))
           {:enums (merge sort-op)
            :input-objects filter-inputs
-           :objects {:Result {:fields {:result {:type 'Boolean}}}}
+           :objects {:Result {:fields {:result {:type 'Boolean}}}
+                     :NewId {:fields {:id {:type 'Int}}}}
            :queries {}} (:tables config)))
 
 (defn- add-one-n-schema [schema config table rel-map]
@@ -277,7 +278,6 @@
 
 (defn schema [config]
   (let [rel-map (tbl/full-rel-map config)]
-    (pp/pprint rel-map)
     (-> (root-schema config rel-map)
         (add-relationships config rel-map)
          schema/compile)))

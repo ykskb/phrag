@@ -1,6 +1,7 @@
 (ns phrag.resolver
   (:require [clojure.walk :as w]
             [clojure.pprint :as pp]
+            [phrag.logging :refer [log]]
             [phrag.handlers.core :as c]
             [urania.core :as u]
             [com.walmartlabs.lacinia.resolve :as resolve]
@@ -106,15 +107,15 @@
      (->lacinia-promise ~body)))
 
 (defn- update-count-threshold [rel trigger-opts ctx]
-  (println "Incrementing" rel "queue by" (count ctx))
+  (log :debug "Incrementing" rel "queue by" (count ctx))
   (update trigger-opts :threshold + (count ctx)))
 
 (defn- update-n-threshold [rel num trigger-opts]
-  (println "Updating" rel "queue with" num)
+  (log :debug "Updating" rel "queue with" num)
   (update trigger-opts :threshold + num))
 
 (defn- update-1-threshold [rel trigger-opts _ctx]
-  (println "Incrementing" rel "queue by 1")
+  (log :debug "Incrementing" rel "queue by 1")
   (update trigger-opts :threshold + 1))
 
 (defn- update-triggers-by-count! [res-p rels]
@@ -213,11 +214,19 @@
 (def ^:private res-true
   {:result true})
 
+(def ^:private sqlite-last-id
+  (keyword "last_insert_rowid()"))
+
+(defn- created-id [result]
+  (some #(% (first result)) [sqlite-last-id :id]))
+
 (defn create-root [table cols ctx args _val]
   (let [sql-args (-> (signal args ctx table :create :pre)
-                     (w/stringify-keys))]
-    (c/create-root sql-args (:db ctx) table cols)
-    (signal res-true ctx table :create :post)))
+                     (w/stringify-keys))
+        res (c/create-root sql-args (:db ctx) table cols)
+        created (assoc args :id (created-id res))
+        sgnl-res (signal created ctx table :create :post)]
+    {:id (:id sgnl-res)}))
 
 (defn update-root [table cols ctx args _val]
   (let [sql-args (-> (signal args ctx table :update :pre)
