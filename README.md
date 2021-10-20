@@ -10,7 +10,7 @@ Phrag creates an instantly-operational GraphQL route from DB schema data.
 
 * Supports nested resource structures for `one-to-one`, `one-to-many` and `many-to-many` relationships on top of `root` entities.
 
-* Data loader (query batching) wired up to avoid N+1 problem for nested queries.
+* Data loader (query batching) wired up to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/seancorfield/honeysql)
 
 * [Signal dispatcher](#signals) to add custom logics before & after DB accesses per resource operations.
 
@@ -30,7 +30,7 @@ Phrag creates an instantly-operational GraphQL route from DB schema data.
 
 ### Usage
 
-##### reitit
+##### reitit route
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
@@ -41,7 +41,7 @@ Phrag creates an instantly-operational GraphQL route from DB schema data.
 (def routes (phrag.core/make-reitit-graphql-route {:tables [{:name "..."}]}))
 ```
 
-##### bidi
+##### bidi route
 
 ```clojure
 ;; Read schema data from DB (as data for Integrant)
@@ -52,7 +52,7 @@ Phrag creates an instantly-operational GraphQL route from DB schema data.
 (def routes (phrag.core/make-bidi-graphql-route {:tables [{:name "..."}]}))
 ```
 
-##### Notes:
+##### Notes on Schema Data from a DB Connection:
 
 When reading schema data from DB connection, Phrag leverages naming patterns of tables/columns to identify relationships:
 
@@ -72,14 +72,14 @@ Though configurable parameters vary by router types, Phrag doesn't require many 
 
 #### Config Parameters
 
-| Key                     | Description                                                                                                         | Default Value      |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------|--------------------|
-| `:db`                   | Database connection object.                                                                                         |                    |
-| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.                                                 | `true`             |
-| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.                                         | `true`             |
-| `:tables`               | DB schema including list of table definitions. Plz check [Schema Data](#schema-data) for details.                   | Created from `:db` |
-| `:signals`              | Map of singal functions per resources. Plz check [Signal Functions](#signal-functions) for details.                 |                    |
-| `:signal-ctx`           | Additional context to be passed into signal functions. Plz check [Signal Functions](#signal-functions) for details. |                    |
+| Key                     | Description                                                                                       | Default Value      |
+|-------------------------|---------------------------------------------------------------------------------------------------|--------------------|
+| `:db`                   | Database connection object.                                                                       |                    |
+| `:table-name-plural`    | `true` if tables uses plural naming like `users` instead of `user`.                               | `true`             |
+| `:resource-path-plural` | `true` if plural is desired for URL paths like `/users` instead of `/user`.                       | `true`             |
+| `:tables`               | DB schema including list of table definitions. Plz check [Schema Data](#schema-data) for details. | Created from `:db` |
+| `:signals`              | Map of singal functions per resources. Plz check [Signals](#signals) for details.                 |                    |
+| `:signal-ctx`           | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details. |                    |
 
 #### Schema Data
 
@@ -115,16 +115,17 @@ Schema data is used to specify custom table schema to construct GraphQL without 
 
 ### Signals
 
-Phrag has a signal dispatcher with receiver functions which are configurable per resource actions at pre/post-DB operation time. This is where things like access controls or custom business logics can be injected.
+Phrag has a signal dispatcher with receiver functions which are configurable per resource queries/mutations at pre/post-DB operation time. This is where things like access controls or custom business logics can be configured.
 
 > Notes:
 > * Resource operations types include `query`, `create`, `update` and `delete`.
-> * A pre-operation function will have SQL arguments as its first argument when called, and its returned value will be passed to subsequent DB operation.
-> * A pre-operation function for `query` will have `where` clause lists in HoneySQL format while ones for `mutations` will receive request parameters.
-> * A post-operation function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
-> * Both receiver functions will have a context map as its second argument. It'd contain a signal context specified in Phrag config as well as a DB connection and an HTTP request. 
+> * Signal receiver functions are called with different parameters per types:
+>     * A pre-query function will have a list of `where` clauses in [HoneySQL](https://github.com/seancorfield/honeysql) format as its first argument, and its returned value will be passed to a subsequent DB operation.
+>     * A pre-mutation function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
+>     * A post-query/mutation function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
+>     * Both pre/post receiver functions will have a context map as its second argument. It'd contain a signal context specified in Phrag config together with a DB connection and an HTTP request. 
 
-Here's an example:
+Here's some examples:
 
 ```clojure
 ;; Restrict access to request user
@@ -142,7 +143,7 @@ Here's an example:
         (update result :internal-id ""))))
 
 ;; Updates owner data with a user ID from authenticated info in a request
-(defn update-owner [sql-args ctx]
+(defn- update-owner [sql-args ctx]
   (let [user (user-info (:request ctx))]
     (if (end-user? user)
         (update sql-args :created_by (:user-id user))
@@ -178,7 +179,7 @@ Formats of `limit: [count]` and `offset: [count]` are used in query arguments fo
 
 ##### Example
 
-`(filter: {id: {operator: gt value: 20}} limit: 25)` (20 items after/greater than `id`:`20`).
+`(where: {id: {gt: 20}} limit: 25)` (25 items after/greater than `id`:`20`).
 
 >* `limit` and `offset` can be used independently.
 >* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
