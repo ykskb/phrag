@@ -12,24 +12,41 @@
 
 ;; Schema queries
 
-(defn get-table-names [db]
-  (jdbc/query db (str "select name from sqlite_master "
-                      "where type = 'table' "
-                      "and name not like 'sqlite%' "
-                      "and name not like '%migration%';")))
+(defn- db-type [db-spec]
+  (-> (.getMetaData (:connection db-spec))
+      (.getDatabaseProductName)))
 
-(defn get-columns [db table]
+(defmulti table-names (fn [db & _] (db-type db)))
+(defmulti column-info (fn [db & _] (db-type db)))
+
+(defmethod table-names "SQLite" [db]
+  (jdbc/query db (str "SELECT name FROM sqlite_master "
+                      "WHERE type = 'table' "
+                      "AND name NOT LIKE 'sqlite%' "
+                      "AND name NOT LIKE '%migration%';")))
+
+(defmethod column-info "SQLite" [db table]
   (jdbc/query db (str "pragma table_info(" table ");")))
 
-(defn get-fks [db table]
-  (jdbc/query db (str "pragma foreign_key_list(" table ");")))
+(defmethod table-names "PostgreSQL" [db]
+  (jdbc/query db (str "SELECT table_name AS name "
+                      "FROM information_schema.tables "
+                      "WHERE table_schema='public' "
+                      "AND table_type='BASE TABLE' "
+                      "AND table_name not like '%migration%';")))
 
-(defn get-db-schema [db]
-  (let [tables (map :name (get-table-names db))]
+(defmethod column-info "PostgreSQL" [db table]
+  (jdbc/query db (str "SELECT column_name AS name, data_type AS type, "
+                      "(is_nullable = 'NO') AS notnull, column_default AS dflt_value "
+                      "FROM information_schema.columns "
+                      "WHERE table_schema = 'public' "
+                      "AND table_name = '" table "';")))
+
+(defn schema [db]
+  (let [tables (map :name (table-names db))]
     (map (fn [table-name]
            {:name table-name
-            :columns (get-columns db table-name)
-            :fks (get-fks db table-name)})
+            :columns (column-info db table-name)})
          tables)))
 
 ;; Resource queries

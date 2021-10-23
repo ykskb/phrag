@@ -13,8 +13,13 @@
 (def ^:private field-types
   {"int" 'Int
    "integer" 'Int
+   "bigint" 'Int
    "text" 'String
-   "timestamp" 'String})
+   "timestamp" 'String
+   "character varying" 'String
+   "timestamp without time zone" 'String
+   "boolean" 'Boolean
+   })
 
 (defn- has-rel-type? [t table]
   (some #(= t %) (:relation-types table)))
@@ -66,8 +71,11 @@
 (def ^:private flt-input-types
   {"int" :IntWhere
    "integer" :IntWhere
+   "bigint" :IntWhere
    "text" :StrWhere
-   "timestamp" :StrWhere})
+   "timestamp" :StrWhere
+   "character varying" :StrWhere
+   "timestamp without time zone" :StrWhere})
 
 (defn- rsc-clauses [table]
   (reduce (fn [m col]

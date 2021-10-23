@@ -83,6 +83,6 @@
   `:root`, `:one-n`(one-to-many) and `:n-n`(many-to-many).
   `belongs-to` is a list of tables a table links to."
   [config db]
-  (->> (db/get-db-schema db)
+  (->> (db/schema db)
       identify-relations))
 

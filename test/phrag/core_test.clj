@@ -44,6 +44,42 @@
 ;;            (dissoc (rest/rest-routes (rest/make-rest-config root-option))
 ;;                    :swag-paths :swag-defs)))))
 
+(defn postgres-db []
+  (doto {:connection (jdbc/get-connection {:dbtype "postgresql"
+                                           :dbname "postgres"
+                                           :host "localhost"
+                                           :port 5432
+                                           :user "postgres"
+                                           :password "example"
+                                           :stringtype "unspecified"})}
+    (jdbc/execute! (str "create table members ("
+                        "id               bigserial primary key,"
+                        "first_name       varchar(128),"
+                        "last_name        varchar(128),"
+                        "email            varchar(128));"))
+    (jdbc/execute! (str "create table groups ("
+                        "id            bigserial primary key,"
+                        "name          varchar(128),"
+                        "created_at    timestamp);"))
+    (jdbc/execute! (str "create table venues ("
+                        "id               bigserial primary key,"
+                        "name             varchar(128),"
+                        "postal_code      varchar(128);"))
+    (jdbc/execute! (str "create table meetups ("
+                        "id              bigserial primary key,"
+                        "title           varchar(128) not null, "
+                        "start_at        timestamp,"
+                        "venue_id        integer"
+                        "group_id        integer);"))
+    (jdbc/execute! (str "create table meetups_members ("
+                        "meetup_id     integer,"
+                        "member_id     integer,"
+                        "primary key (meetup_id, member_id));"))
+    (jdbc/execute! (str "create table groups_members ("
+                        "group_id    integer,"
+                        "member_id   integer,"
+                        "primary key (group_id, member_id));"))))
+
 (defn create-database []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
     (jdbc/execute! (str "create table members ("

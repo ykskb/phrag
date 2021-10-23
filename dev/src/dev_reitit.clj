@@ -59,7 +59,6 @@
 
 (defmethod ig/init-key :database.sql/connection [_ db-spec]
   {:connection (jdbc/get-connection db-spec)})
-;  (jdbc/get-datasource db-spec))
 
 ;;; API server
 
@@ -71,9 +70,16 @@
 
 (integrant.repl/set-prep!
  (constantly {:database.sql/connection
-              {:connection-uri "jdbc:sqlite:db/dev.sqlite"}
-              ; {:dbtype "sqlite" :dbname "dev.sqlite"}
-              :phrag.core/reitit-graphql-route {:db (ig/ref :database.sql/connection)}
+              ;{:connection-uri "jdbc:sqlite:db/dev.sqlite"}
+              {:dbtype "postgresql"
+               :dbname "postgres"
+               :host "localhost"
+               :port 5432
+               :user "postgres"
+               :password "example"
+               :stringtype "unspecified"}
+              :phrag.core/reitit-graphql-route
+              {:db (ig/ref :database.sql/connection)}
               ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}
               ::server {:app (ig/ref ::app)
                         :options {:port 3000

@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.java.jdbc :as jdbc]
             [com.walmartlabs.lacinia :as lcn]
-            [phrag.core-test :refer [create-database]]
+            [phrag.core-test :refer [create-database postgres-db]]
             [phrag.graphql :as gql]))
 
 (def ^:private test-config
@@ -36,7 +36,7 @@
              :belongs-to ["meetups" "members"]}]})
 
 (deftest graphql-queries
-  (let [db (create-database)
+  (let [db (create-database) ;; postgres-db for tests in real DB
         conf (assoc test-config :db db)
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
