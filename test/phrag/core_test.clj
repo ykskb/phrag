@@ -64,12 +64,12 @@
     (jdbc/execute! (str "create table venues ("
                         "id               bigserial primary key,"
                         "name             varchar(128),"
-                        "postal_code      varchar(128);"))
+                        "postal_code      varchar(128));"))
     (jdbc/execute! (str "create table meetups ("
                         "id              bigserial primary key,"
                         "title           varchar(128) not null, "
                         "start_at        timestamp,"
-                        "venue_id        integer"
+                        "venue_id        integer,"
                         "group_id        integer);"))
     (jdbc/execute! (str "create table meetups_members ("
                         "meetup_id     integer,"
@@ -80,7 +80,7 @@
                         "member_id   integer,"
                         "primary key (group_id, member_id));"))))
 
-(defn create-database []
+(defn create-db []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
     (jdbc/execute! (str "create table members ("
                         "id               integer primary key, "

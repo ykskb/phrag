@@ -98,8 +98,8 @@
     (->> (sql/format q)
          (jdbc/execute! db))))
 
-(defn create! [db rsc raw-map]
-  (jdbc/insert! db rsc raw-map {:return-keys ["id"]}))
+(defn create! [db rsc raw-map opts]
+  (jdbc/insert! db rsc raw-map opts))
 
 (defn update! [db rsc id raw-map & [p-col p-id]]
   (let [whr (if (nil? p-id) [[:= :id id]]

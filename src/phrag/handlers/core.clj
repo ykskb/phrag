@@ -7,7 +7,9 @@
   (db/list-up db-con table filters))
 
 (defn create-root [params db-con table cols]
-  (db/create! db-con table (select-keys params cols)))
+  (let [opts {:return-keys (if (contains? cols "id")
+                             ["id"] nil)}]
+    (db/create! db-con table (select-keys params cols) opts)))
 
 (defn fetch-root [id db-con table filters]
   (db/fetch db-con table id filters))
@@ -32,9 +34,10 @@
 
 (defn create-one-n [p-col p-id params db-con table cols]
   (let [params (-> (assoc params p-col p-id)
-                   (select-keys cols))]
-    (db/create! db-con table params)
-    nil))
+                   (select-keys cols))
+        opts {:return-keys (if (contains? cols "id")
+                             ["id"] nil)}]
+    (db/create! db-con table params opts)))
 
 (defn fetch-one-n [id p-col p-id db-con table filters]
   (let [filters (update filters :where conj [:= (keyword p-col) p-id])]
@@ -61,8 +64,10 @@
 
 (defn create-n-n [col-a id-a col-b id-b params db-con table cols]
   (let [params (-> params (assoc col-a id-a) (assoc col-b id-b)
-                   (select-keys cols))]
-    (db/create! db-con table params)
+                   (select-keys cols))
+        opts {:return-keys (if (contains? cols "id")
+                             ["id"] nil)}]
+    (db/create! db-con table params opts)
     nil))
 
 (defn delete-n-n [col-a id-a col-b id-b db-con table]

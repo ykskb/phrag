@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.java.jdbc :as jdbc]
             [com.walmartlabs.lacinia :as lcn]
-            [phrag.core-test :refer [create-database postgres-db]]
+            [phrag.core-test :refer [create-db postgres-db]]
             [phrag.graphql :as gql]))
 
 (def ^:private test-config
@@ -35,8 +35,11 @@
              :relation-types [:n-n]
              :belongs-to ["meetups" "members"]}]})
 
+;; create-db: in-memory SQLite
+;; postgres-db: real PostgreSQL
+
 (deftest graphql-queries
-  (let [db (create-database) ;; postgres-db for tests in real DB
+  (let [db (create-db)
         conf (assoc test-config :db db)
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
@@ -262,7 +265,7 @@
                                 :post members-post-create}}}})
 
 (deftest graphql-signals
-  (let [db (doto (create-database)
+  (let [db (doto (create-db)
              (jdbc/insert! :members {:email "jim@test.com"
                                      :first_name "jim"
                                      :last_name "smith"}))
