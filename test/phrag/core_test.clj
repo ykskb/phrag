@@ -100,14 +100,20 @@
                         "title           text not null, "
                         "start_at        timestamp, "
                         "venue_id        int, "
-                        "group_id        int);"))
+                        "group_id        int, "
+                        "foreign key(venue_id) references venues(id), "
+                        "foreign key(group_id) references groups(id));"))
     (jdbc/execute! (str "create table meetups_members ("
                         "meetup_id     int, "
                         "member_id     int, "
+                        "foreign key(meetup_id) references meetups(id), "
+                        "foreign key(member_id) references members(id), "
                         "primary key (meetup_id, member_id));"))
     (jdbc/execute! (str "create table groups_members ("
                         "group_id    int, "
                         "member_id   int, "
+                        "foreign key(group_id) references groups(id), "
+                        "foreign key(member_id) references members(id), "
                         "primary key (group_id, member_id));"))))
 
 (def ^:private expected-schema-map

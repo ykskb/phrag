@@ -5,15 +5,13 @@
             [clojure.pprint :as pp]))
 
 (defn- options->config [options]
-(let [db (:db options)
-        config {:router (:router options)
-                :db db
-                :table-name-plural (:table-name-plural options true)
-                :resource-path-plural (:resource-path-plural options true)
-                :project-ns (:project-ns options)
-                :db-keys (:db-keys options)
-                :db-ref (:db-ref options)}]
-    (assoc config :tables (or (:tables options) (tbl/schema-from-db config db)))))
+  (let [config {:router (:router options)
+                :db (:db options)
+                :tables (:tables options)
+                :scan-schema (:scan-schema options true)
+                :no-fk-on-db (:no-fk-on-db options false)
+                :table-name-plural (:table-name-plural options true)}]
+    (assoc config :tables (tbl/schema-from-db config))))
 
 ;;; reitit
 

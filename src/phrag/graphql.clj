@@ -1,5 +1,6 @@
 (ns phrag.graphql
   (:require [phrag.table :as tbl]
+            [phrag.logging :refer [log]]
             [phrag.resolver :as rslv]
             [camel-snake-kebab.core :as csk]
             [com.walmartlabs.lacinia :as lcn]
@@ -20,9 +21,6 @@
    "timestamp without time zone" 'String
    "boolean" 'Boolean
    })
-
-(defn- has-rel-type? [t table]
-  (some #(= t %) (:relation-types table)))
 
 (defn- needs-non-null? [col]
   (and (= 1 (:notnull col)) (nil? (:dflt_value col))))
@@ -111,7 +109,8 @@
 
 (defn- root-schema [config rel-map]
   (reduce (fn [m table]
-            (let [table-name (tbl/to-table-name (:name table) config)
+            (let [table-name (:name table)
+                  table-type (:table-type table)
                   rsc (inf/singular table-name)
                   rscs (inf/plural table-name)
                   rsc-name (csk/->PascalCase rsc)
@@ -120,7 +119,6 @@
                   rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
                   rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
                   rsc-name-key (keyword rsc-name)
-                  id-q-key (keyword rsc)
                   list-q-key (keyword rscs)
                   create-key (keyword (str "create" rsc-name))
                   update-key (keyword (str "update" rsc-name))
@@ -128,58 +126,55 @@
                   obj-fields (root-fields table)
                   cols (tbl/col-names table)
                   rels (get rel-map table-name)]
-              (if (has-rel-type? :root table)
-                (-> m
-                    (assoc-in [:objects rsc-name-key]
-                              {:description rsc-name
-                               :fields obj-fields})
-                    (assoc-in [:input-objects rsc-cls-key]
-                              {:description clauses-desc
-                               :fields (rsc-clauses table)})
-                    (assoc-in [:input-objects rsc-whr-key]
-                              {:description where-desc
-                               :fields (rsc-where table rsc-cls-key)})
-                    (assoc-in [:input-objects rsc-sort-key]
-                              {:description sort-desc
-                               :fields (sort-fields table)})
+              (cond-> m
+                    true (assoc-in [:objects rsc-name-key]
+                                   {:description rsc-name
+                                    :fields obj-fields})
+                    true (assoc-in [:input-objects rsc-cls-key]
+                                   {:description clauses-desc
+                                    :fields (rsc-clauses table)})
+                    true (assoc-in [:input-objects rsc-whr-key]
+                                   {:description where-desc
+                                    :fields (rsc-where table rsc-cls-key)})
+                    true (assoc-in [:input-objects rsc-sort-key]
+                                   {:description sort-desc
+                                    :fields (sort-fields table)})
+
+                    (= table-type :root)
                     (assoc-in [:queries list-q-key]
                               {:type `(~'list ~rsc-name-key)
-                               :description (str "List " rscs-name ".")
+                               :description (str "Query " rscs-name ".")
                                :args {:where {:type rsc-whr-key}
                                       :sort {:type rsc-sort-key}
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/list-query
                                                  table-name rels)})
-                    (assoc-in [:queries id-q-key]
-                              {:type rsc-name-key
-                               :description (str "Query " rsc-name " by id.")
-                               :args {:id {:type '(non-null ID)}}
-                               :resolve (partial rslv/id-query
-                                                 table-name rels)})
+                    (= table-type :root)
                     (assoc-in [:mutations create-key]
                               {:type :NewId
                                :args (dissoc obj-fields :id)
                                :resolve (partial rslv/create-root
                                                  table-name cols)})
+                    (= table-type :root)
                     (assoc-in [:mutations update-key]
                               {:type :Result
                                :args obj-fields
                                :resolve (partial rslv/update-root
                                                  table-name cols)})
+                    (= table-type :root)
                     (assoc-in [:mutations delete-key]
                               {:type :Result
                                :args {:id {:type '(non-null ID)}}
-                               :resolve (partial rslv/delete-root table-name)}))
-                m)))
+                               :resolve (partial rslv/delete-root table-name)}))))
           {:enums (merge sort-op)
            :input-objects filter-inputs
            :objects {:Result {:fields {:result {:type 'Boolean}}}
                      :NewId {:fields {:id {:type 'Int}}}}
            :queries {}} (:tables config)))
 
-(defn- add-one-n-schema [schema config table rel-map]
-  (let [table-name (tbl/to-table-name (:name table) config)
+(defn- update-fk-schema [schema config table rel-map]
+  (let [table-name (:name table)
         rsc (inf/singular table-name)
         rscs (inf/plural table-name)
         rsc-name (csk/->PascalCase rsc)
@@ -189,13 +184,13 @@
         rsc-sort-key (keyword (str rsc-name "Sort"))
         rsc-rels (get rel-map table-name)]
     (reduce (fn [m blg-to]
-              (let [blg-to-rsc (inf/singular blg-to)
+              (let [blg-to-tbl-name (:table blg-to)
+                    blg-to-rsc (inf/singular blg-to-tbl-name)
                     blg-to-rsc-name (csk/->PascalCase blg-to-rsc)
                     blg-to-rsc-name-key (keyword blg-to-rsc-name)
                     blg-to-rsc-key (keyword blg-to-rsc)
-                    blg-to-rsc-id (keyword (str blg-to-rsc "_id"))
-                    blg-to-table-name (tbl/to-table-name blg-to-rsc config)
-                    blg-to-rels (get rel-map blg-to-table-name)]
+                    blg-to-rsc-id (keyword (:from blg-to))
+                    blg-to-rels (get rel-map blg-to-tbl-name)]
                 (-> m
                     ;; has many
                     (assoc-in [:objects blg-to-rsc-name-key :fields rscs-key]
@@ -210,44 +205,26 @@
                     (assoc-in [:objects rsc-name-key :fields blg-to-rsc-key]
                               {:type blg-to-rsc-name-key
                                :resolve (partial rslv/has-one blg-to-rsc-id
-                                                 blg-to-table-name blg-to-rels)}))))
-            schema (:belongs-to table))))
+                                                 blg-to-tbl-name
+                                                 blg-to-rels)}))))
+            schema (:fks table))))
 
-(defn- add-n-n-schema [schema config table rel-map]
-  (let [tbl-name (tbl/to-table-name (:name table) config)
-        rsc-a-tbl-name (first (:belongs-to table))
-        rsc-b-tbl-name (second (:belongs-to table))
+(defn- update-pivot-schema [schema config table]
+  (let [tbl-name (:name table)
+        primary-fks (tbl/primary-fks table)
+        rsc-a-tbl-name (:table (first primary-fks))
+        rsc-b-tbl-name (:table (second primary-fks))
         rsc-a (inf/singular rsc-a-tbl-name)
         rsc-b (inf/singular rsc-b-tbl-name)
         rsc-a-name (csk/->PascalCase rsc-a)
         rsc-b-name (csk/->PascalCase rsc-b)
-        rsc-a-name-key (keyword rsc-a-name)
-        rsc-b-name-key (keyword rsc-b-name)
-        rsc-a-col (str rsc-a "_id")
-        rsc-b-col (str rsc-b "_id")
-        rscs-a (inf/plural rsc-a-tbl-name)
-        rscs-b (inf/plural rsc-b-tbl-name)
-        rscs-a-key (keyword rscs-a)
-        rscs-b-key (keyword rscs-b)
-        rsc-a-rels (get rel-map rsc-a-tbl-name)
-        rsc-b-rels (get rel-map rsc-b-tbl-name)
+        rsc-a-col (:from (first primary-fks))
+        rsc-b-col (:from (second primary-fks))
         create-key (keyword (str "create" rsc-a-name rsc-b-name))
         delete-key (keyword (str "delete" rsc-a-name rsc-b-name))
         obj-fields (root-fields table)
         cols (tbl/col-names table)]
     (-> schema
-        (assoc-in [:objects rsc-a-name-key :fields rscs-b-key]
-                  {:type `(~'list ~rsc-b-name-key)
-                   :args {:limit {:type 'Int}
-                          :offset {:type 'Int}}
-                   :resolve (partial rslv/n-to-n rsc-b-col rsc-a-col
-                                     tbl-name rsc-b-tbl-name rsc-b-rels)})
-        (assoc-in [:objects rsc-b-name-key :fields rscs-a-key]
-                  {:type `(~'list ~rsc-a-name-key)
-                   :args {:limit {:type 'Int}
-                          :offset {:type 'Int}}
-                   :resolve (partial rslv/n-to-n rsc-a-col rsc-b-col
-                                     tbl-name rsc-a-tbl-name rsc-a-rels)})
         (assoc-in [:mutations create-key]
                   {:type :Result
                    :args (dissoc obj-fields :id)
@@ -259,14 +236,11 @@
                    :resolve (partial rslv/delete-n-n rsc-a-col rsc-b-col
                                      tbl-name)}))))
 
-(defn- add-relationships [schema config rel-map]
+(defn- update-relationships [schema config rel-map]
   (reduce (fn [m table]
-            (cond
-              (has-rel-type? :one-n table)
-              (add-one-n-schema m config table rel-map)
-              (has-rel-type? :n-n table)
-              (add-n-n-schema m config table rel-map)
-              :else m))
+            (cond-> m
+              true (update-fk-schema config table rel-map)
+              (= (:table-type table) :pivot) (update-pivot-schema config table)))
           schema (:tables config)))
 
 (defn- sl-config [config]
@@ -285,10 +259,12 @@
   (sl-core/stop! sl-ctx))
 
 (defn schema [config]
-  (let [rel-map (tbl/full-rel-map config)]
-    (-> (root-schema config rel-map)
-        (add-relationships config rel-map)
-         schema/compile)))
+  (let [rel-map (tbl/full-rel-map config)
+        scm-map (-> (root-schema config rel-map)
+                    (update-relationships config rel-map))]
+    (log :info "Generated queries: " (sort (keys (:queries scm-map))))
+    (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
+    (schema/compile scm-map)))
 
 (defn exec [config schema query vars]
   (let [sl-ctx (sl-ctx config)

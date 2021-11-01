@@ -1,6 +1,8 @@
 (ns phrag.table
   (:require [clojure.string :as s]
+            [clojure.pprint :as pp]
             [phrag.db :as db]
+            [phrag.logging :refer [log]]
             [inflections.core :as inf]))
 
 ;; Table utils
@@ -8,25 +10,25 @@
 (defn to-table-name [rsc config]
   (if (:table-name-plural config) (inf/plural rsc) (inf/singular rsc)))
 
-(defn to-path-rsc [rsc config]
-  (if (:resource-path-plural config) (inf/plural rsc) (inf/singular rsc)))
-
 (defn to-col-name [rsc]
   (str (inf/singular rsc) "_id"))
 
 (defn col-names [table]
   (set (map :name (:columns table))))
 
+(defn primary-fks [table]
+  (vals (select-keys (:fk-map table) (keys (:pk-map table)))))
+
 ;;; Table full relationship map
 
 (defn- rels [table config]
   (let [table-name (:name table)
-        rel-map {table-name (map (fn [b-to]
-                                   (to-table-name b-to config))
-                                 (:belongs-to table))}]
-    (reduce (fn [m b-to]
-              (assoc m (to-table-name b-to config) [table-name]))
-            rel-map (:belongs-to table))))
+        rel-map {table-name (map (fn [blg-to]
+                                   (to-table-name (:table blg-to) config))
+                                 (:fks table))}]
+    (reduce (fn [m blg-to]
+              (assoc m (to-table-name (:table blg-to) config) [table-name]))
+            rel-map (:fks table))))
 
 (defn full-rel-map [config]
   (reduce (fn [m table]
@@ -36,53 +38,76 @@
 
 ;;; Table schema from database
 
-(defn- is-relation-column? [name]
-  (s/ends-with? (s/lower-case name) "_id"))
-
-(defn- has-relation-column? [table]
-  (some (fn [column] (is-relation-column? (:name column)))
-        (:columns table)))
-
-(defn- is-n-n-table? [table]
-  (s/includes? (:name table) "_"))
-
-(defn- n-n-belongs-to [table]
-  (let [table-name (:name table)
-        parts (s/split table-name #"_" 2)]
-    [(first parts) (second parts)]))
-
-(defn- belongs-to [table]
+(defn- fks-by-names [table config]
   (reduce (fn [v column]
-            (let [name (:name column)]
-              (if (is-relation-column? name)
-                (conj v (s/replace name "_id" ""))
+            (let [col-name (:name column)]
+              (if (s/ends-with? (s/lower-case col-name) "_id")
+                (conj v
+                      {:table (to-table-name (s/replace col-name "_id" "") config)
+                       :from col-name :to "id"})
                 v)))
           []
           (:columns table)))
 
-(defn- relation-types [table]
-  (if (is-n-n-table? table) [:n-n]
-      (if (has-relation-column? table) [:one-n :root] [:root])))
-
-(defn identify-relations [tables]
+(defn- update-fks-by-names [tables config]
   (map (fn [table]
-         (let [is-n-n (is-n-n-table? table)]
-           (cond-> table
-             true (assoc :relation-types (relation-types table))
-             (not is-n-n) (assoc :belongs-to (belongs-to table))
-             is-n-n (assoc :belongs-to (n-n-belongs-to table)))))
+         (let [fks (fks-by-names table config)]
+           (println table)
+           (-> table
+               (assoc :fks fks)
+               (assoc :fk-map (zipmap (map :from fks) fks)))))
        tables))
 
-(defn schema-from-db
-  "Queries database schema from a running DB and format it with relationship data
-  for internal usage.
+(defn- is-pivot-table? [table]
+  (and (> (count (:pks table)) 1)
+       (let [fk-names (set (keys (:fk-map table)))
+             pk-names (keys (:pk-map table))]
+         (every? #(contains? fk-names %) pk-names))))
 
-  A `table` map has: `name`, `columns`, `relationship-types` and `belongs-to`
-  parameters.
-  `relationship-types` is a list of table properties. Possible values are
-  `:root`, `:one-n`(one-to-many) and `:n-n`(many-to-many).
-  `belongs-to` is a list of tables a table links to."
-  [config db]
-  (->> (db/schema db)
-      identify-relations))
+(defn- table-type [table]
+  (if (is-pivot-table? table) :pivot :root))
+
+(defn- update-table-types [tables]
+  (map #(assoc % :table-type (table-type %)) tables))
+
+(defn- update-info-maps [tables]
+  (map (fn [table]
+         (let [cols (:columns table)
+               fks (:fks table)
+               pks (:pks table)]
+           (-> table
+               (assoc :col-map (zipmap (map :name cols) cols))
+               (assoc :fk-map (zipmap (map :from fks) fks))
+               (assoc :pk-map (zipmap (map :name pks) pks)))))
+       tables))
+
+(defn- merge-config-tables [tables config]
+  (let [cfg-tables (:tables config)
+        cfg-tbl-names (set (map :name cfg-tables))
+        tbl-names (set (map :name tables))
+        cfg-tbl-map (zipmap cfg-tbl-names cfg-tables)
+        merged (map (fn [table]
+                      (merge table (get cfg-tbl-map (:name table))))
+                    tables)
+        cfg-tbl-diff (filter (fn [table]
+                               (not (contains? tbl-names (:name table))))
+                             cfg-tables)]
+    (concat merged cfg-tbl-diff)))
+
+(defn schema-from-db
+  "By default foreign keys constraints in a database are used for relationships.
+  Alternatively, `:no-fk-on-db` can be used to detect relations by table/column names,
+  but it has limitations as tables and columns need to be matching."
+  [config]
+  (let [scm (if (:scan-schema config)
+              (cond-> (db/schema (:db config))
+                true (update-info-maps)
+                (:no-fk-on-db config) (update-fks-by-names config)
+                true (update-table-types)
+                true (merge-config-tables config))
+              (cond-> (:tables config)
+                true (update-info-maps)
+                (:no-fk-on-db config) (update-fks-by-names config)))]
+    (log :info "Origin DB schema:\n" (with-out-str (pp/pprint scm)))
+    scm))
 
