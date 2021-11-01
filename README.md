@@ -1,8 +1,6 @@
 # Phrag
 
-DB Schema Data to GraphQL
-
-Phrag creates an instantly-operational yet customizable GraphQL handler from DB schema data.
+Instantly-operational yet customizable GraphQL handler for RDBMS
 
 #### Features:
 
@@ -16,7 +14,7 @@ Phrag creates an instantly-operational yet customizable GraphQL handler from DB 
 
 * Out-of-the-box resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) for query operations.
 
-* Custom schema data to override schema data retrieved from a database.
+* Options to selectively override schema data or entirely base on provided data through [config](#phrag-config).
 
 * Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
@@ -60,28 +58,27 @@ Phrag creates an instantly-operational yet customizable GraphQL handler from DB 
 
 ### Phrag Config
 
-Though configurable parameters vary by router types, Phrag doesn't require many config values in general. Some key concepts & list of parameters are as below:
+Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
 
 #### Config Parameters
 
-| Key                  | Description                                                                                                 | Default Value |
-|----------------------|-------------------------------------------------------------------------------------------------------------|---------------|
-| `:db`                | Database connection object.                                                                                 |               |
-| `:tables`            | List of table definitions. Plz check [Schema Data](#schema-data) for details.                               |               |
-| `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                           |               |
-| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details.           |               |
-| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                               | `true`        |
-| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection from names is desired.             | `false`       |
-| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`. | `true`        |
+| Key                  | description                                                                                                 | Required | Default Value |
+|----------------------|-------------------------------------------------------------------------------------------------------------|----------|---------------|
+| `:db`                | Database connection object.                                                                                 | Yes      |               |
+| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                        | No       |               |
+| `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                           | No       |               |
+| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details.           | No       |               |
+| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                               | No       | `true`        |
+| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection from names is desired.             | No       | `false`       |
+| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`. | No       | `true`        |
 
 #### Schema Data
 
-Schema data is used to specify custom table schema to construct GraphQL. It is specified with a list of tables under `:tables` key in the config map.
+By default, Phrag retrieves DB schema data from a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain columns and/or relationships for specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
 
 > Notes:
 > * When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
 > * When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
-> * Schema data can be useful to exclude certain columns and/or relationships for specific tables.
 
 ```edn
 {:tables [
@@ -131,27 +128,27 @@ Here's some examples:
 ;; Restrict access to request user
 (defn- end-user-access [sql-args ctx]
   (let [user (user-info (:request ctx))]
-    (if (if (admin-user? user))
-        sql-args
-        (update sql-args :where conj [:= :id (:user-id user)]))))
+    (if (admin-user? user))
+      sql-args
+      (update sql-args :where conj [:= :id (:user-id user)])))
 
 ;; Removes :internal-id for non-admin users
 (defn- hide-internal-id [result ctx]
   (let [user (user-info (:request ctx))]
-    (if (if (admin-user? user))
-        result
-        (update result :internal-id ""))))
+    (if (admin-user? user))
+      result
+      (update result :internal-id "")))
 
 ;; Updates owner data with a user ID from authenticated info in a request
 (defn- update-owner [sql-args ctx]
   (let [user (user-info (:request ctx))]
     (if (end-user? user)
-        (update sql-args :created_by (:user-id user))
-        (sql-args))))
+      (update sql-args :created_by (:user-id user))
+      (sql-args))))
         
-{:users {:query {:pre end-user-access :post hide-internal-id}
-         :create {:pre update-owner}
-         :update {:pre update-owner}}}
+(def example-config {:signals {:users {:query {:pre end-user-access :post hide-internal-id}
+                                       :create {:pre update-owner}
+                                       :update {:pre update-owner}}}})
 ```
 
 ### Resource Filtering
