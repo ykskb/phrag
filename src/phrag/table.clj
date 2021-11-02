@@ -7,36 +7,30 @@
 
 ;; Table utils
 
-(defn to-table-name [rsc config]
-  (if (:table-name-plural config) (inf/plural rsc) (inf/singular rsc)))
-
-(defn to-col-name [rsc]
-  (str (inf/singular rsc) "_id"))
-
 (defn col-names [table]
   (set (map :name (:columns table))))
 
 (defn primary-fks [table]
   (vals (select-keys (:fk-map table) (keys (:pk-map table)))))
 
-;;; Table full relationship map
+;;; Full relationship map per table including reverse relations
 
-(defn- rels [table config]
+(defn- rels [table]
   (let [table-name (:name table)
-        rel-map {table-name (map (fn [blg-to]
-                                   (to-table-name (:table blg-to) config))
+        rel-map {table-name (map (fn [fk] (:table fk))
                                  (:fks table))}]
-    (reduce (fn [m blg-to]
-              (assoc m (to-table-name (:table blg-to) config) [table-name]))
+    (reduce (fn [m fk] (assoc m (:table fk) [table-name]))
             rel-map (:fks table))))
 
 (defn full-rel-map [config]
   (reduce (fn [m table]
-            (let [rels (rels table config)]
-              (merge-with into m rels)))
+            (merge-with into m (rels table)))
           {} (:tables config)))
 
-;;; Table schema from database
+;;; Optional foreign key detection from table/column names
+
+(defn- to-table-name [rsc config]
+  (if (:plural-table-name config) (inf/plural rsc) (inf/singular rsc)))
 
 (defn- fks-by-names [table config]
   (reduce (fn [v column]
@@ -52,11 +46,12 @@
 (defn- update-fks-by-names [tables config]
   (map (fn [table]
          (let [fks (fks-by-names table config)]
-           (println table)
            (-> table
                (assoc :fks fks)
                (assoc :fk-map (zipmap (map :from fks) fks)))))
        tables))
+
+;;; Table schema map from config
 
 (defn- is-pivot-table? [table]
   (and (> (count (:pks table)) 1)
@@ -83,14 +78,15 @@
 
 (defn- merge-config-tables [tables config]
   (let [cfg-tables (:tables config)
-        cfg-tbl-names (set (map :name cfg-tables))
-        tbl-names (set (map :name tables))
+        cfg-tbl-names (map :name cfg-tables)
+        tbl-names (map :name tables)
+        tbl-name-set (set tbl-names)
         cfg-tbl-map (zipmap cfg-tbl-names cfg-tables)
         merged (map (fn [table]
                       (merge table (get cfg-tbl-map (:name table))))
                     tables)
         cfg-tbl-diff (filter (fn [table]
-                               (not (contains? tbl-names (:name table))))
+                               (not (contains? tbl-name-set (:name table))))
                              cfg-tables)]
     (concat merged cfg-tbl-diff)))
 
@@ -108,6 +104,10 @@
               (cond-> (:tables config)
                 true (update-info-maps)
                 (:no-fk-on-db config) (update-fks-by-names config)))]
-    (log :info "Origin DB schema:\n" (with-out-str (pp/pprint scm)))
+    (log :info "Origin DB schema:\n"
+         (with-out-str (pp/pprint (map #(-> %
+                                            (dissoc :col-map)
+                                            (dissoc :fk-map)
+                                            (dissoc :pk-map)) scm))))
     scm))
 

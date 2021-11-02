@@ -10,7 +10,7 @@
                 :tables (:tables options)
                 :scan-schema (:scan-schema options true)
                 :no-fk-on-db (:no-fk-on-db options false)
-                :table-name-plural (:table-name-plural options true)}]
+                :plural-table-name (:plural-table-name options true)}]
     (assoc config :tables (tbl/schema-from-db config))))
 
 ;;; reitit

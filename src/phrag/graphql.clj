@@ -38,7 +38,7 @@
 
 ;;; Input objects
 
-;; Where filter
+;; Where-style filters
 
 (def ^:private clauses-desc
   (str "Format for where clauses is {column: {operator: value}}. "
@@ -89,7 +89,7 @@
       (assoc :and {:type `(~'list ~rsc-cls-key)})
       (assoc :or {:type `(~'list ~rsc-cls-key)})))
 
-;; Sort field
+;; Sort fields
 
 (def ^:private sort-desc
   (str "Sort format is {column: \"asc\" or \"desc\"}."))
@@ -105,7 +105,7 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
-;;; Schema
+;;; GraphQL schema
 
 (defn- root-schema [config rel-map]
   (reduce (fn [m table]
@@ -173,7 +173,7 @@
                      :NewId {:fields {:id {:type 'Int}}}}
            :queries {}} (:tables config)))
 
-(defn- update-fk-schema [schema config table rel-map]
+(defn- update-fk-schema [schema table rel-map]
   (let [table-name (:name table)
         rsc (inf/singular table-name)
         rscs (inf/plural table-name)
@@ -183,33 +183,33 @@
         rsc-whr-key (keyword (str rsc-name "Where"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
         rsc-rels (get rel-map table-name)]
-    (reduce (fn [m blg-to]
-              (let [blg-to-tbl-name (:table blg-to)
-                    blg-to-rsc (inf/singular blg-to-tbl-name)
-                    blg-to-rsc-name (csk/->PascalCase blg-to-rsc)
-                    blg-to-rsc-name-key (keyword blg-to-rsc-name)
-                    blg-to-rsc-key (keyword blg-to-rsc)
-                    blg-to-rsc-id (keyword (:from blg-to))
-                    blg-to-rels (get rel-map blg-to-tbl-name)]
+    (reduce (fn [m fk]
+              (let [fk-to-tbl-name (:table fk)
+                    fk-to-rsc (inf/singular fk-to-tbl-name)
+                    fk-to-rsc-name (csk/->PascalCase fk-to-rsc)
+                    fk-to-rsc-name-key (keyword fk-to-rsc-name)
+                    fk-to-rsc-key (keyword fk-to-rsc)
+                    fk-from-rsc-id (keyword (:from fk))
+                    fk-to-rels (get rel-map fk-to-tbl-name)]
                 (-> m
                     ;; has many
-                    (assoc-in [:objects blg-to-rsc-name-key :fields rscs-key]
+                    (assoc-in [:objects fk-to-rsc-name-key :fields rscs-key]
                               {:type `(~'list ~rsc-name-key)
                                :args {:where {:type rsc-whr-key}
                                       :sort {:type rsc-sort-key} ;
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
-                               :resolve (partial rslv/has-many blg-to-rsc-id
+                               :resolve (partial rslv/has-many fk-from-rsc-id
                                                  table-name rsc-rels)})
                     ;; has one
-                    (assoc-in [:objects rsc-name-key :fields blg-to-rsc-key]
-                              {:type blg-to-rsc-name-key
-                               :resolve (partial rslv/has-one blg-to-rsc-id
-                                                 blg-to-tbl-name
-                                                 blg-to-rels)}))))
+                    (assoc-in [:objects rsc-name-key :fields fk-to-rsc-key]
+                              {:type fk-to-rsc-name-key
+                               :resolve (partial rslv/has-one fk-from-rsc-id
+                                                 fk-to-tbl-name
+                                                 fk-to-rels)}))))
             schema (:fks table))))
 
-(defn- update-pivot-schema [schema config table]
+(defn- update-pivot-schema [schema table]
   (let [tbl-name (:name table)
         primary-fks (tbl/primary-fks table)
         rsc-a-tbl-name (:table (first primary-fks))
@@ -239,8 +239,8 @@
 (defn- update-relationships [schema config rel-map]
   (reduce (fn [m table]
             (cond-> m
-              true (update-fk-schema config table rel-map)
-              (= (:table-type table) :pivot) (update-pivot-schema config table)))
+              true (update-fk-schema table rel-map)
+              (= (:table-type table) :pivot) (update-pivot-schema table)))
           schema (:tables config)))
 
 (defn- sl-config [config]

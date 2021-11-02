@@ -14,7 +14,7 @@ Instantly-operational yet customizable GraphQL handler for RDBMS
 
 * Out-of-the-box resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) for query operations.
 
-* Options to selectively override schema data or entirely base on provided data through [config](#phrag-config).
+* Options to selectively override database schema data or entirely base on provided data through [config](#phrag-config).
 
 * Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
@@ -62,19 +62,19 @@ Though there are multiple options for customization, the only config parameter r
 
 #### Config Parameters
 
-| Key                  | description                                                                                                 | Required | Default Value |
-|----------------------|-------------------------------------------------------------------------------------------------------------|----------|---------------|
-| `:db`                | Database connection object.                                                                                 | Yes      |               |
-| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                        | No       |               |
-| `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                           | No       |               |
-| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details.           | No       |               |
-| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                               | No       | `true`        |
-| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection from names is desired.             | No       | `false`       |
-| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`. | No       | `true`        |
+| Key                  | description                                                                                                  | Required | Default Value |
+|----------------------|--------------------------------------------------------------------------------------------------------------|----------|---------------|
+| `:db`                | Database connection object.                                                                                  | Yes      |               |
+| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                         | No       |               |
+| `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                            | No       |               |
+| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details.            | No       |               |
+| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                | No       | `true`        |
+| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names. | No       | `false`       |
+| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.  | No       | `true`        |
 
 #### Schema Data
 
-By default, Phrag retrieves DB schema data from a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain columns and/or relationships for specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
+By default, Phrag retrieves DB schema data through a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
 
 > Notes:
 > * When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
@@ -115,7 +115,7 @@ By default, Phrag retrieves DB schema data from a DB connection and it is suffic
 Phrag can signal configurable functions per resource queries/mutations at pre/post-DB operation time. This is where things like access controls or custom business logics can be configured.
 
 > Notes:
-> * Resource operations types include `query`, `create`, `update` and `delete`.
+> * Resource operation types include `query`, `create`, `update` and `delete`.
 > * Signal receiver functions are called with different parameters per types:
 >     * A pre-query function will have a list of `where` clauses in [HoneySQL](https://github.com/seancorfield/honeysql) format as its first argument, and its returned value will be passed to a subsequent DB operation.
 >     * A pre-mutation function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
