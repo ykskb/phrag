@@ -3,11 +3,11 @@
             [clojure.java.jdbc :as jdbc]
             [com.walmartlabs.lacinia :as lcn]
             [phrag.core-test :refer [create-db postgres-db]]
+            [phrag.table :as tbl]
             [phrag.graphql :as gql]))
 
 (def ^:private test-config
   {:table-name-plural true,
-   :resource-path-plural true
    :tables [{:name "members"
              :columns [{:name "id" :type "integer"}
                        {:name "first_name" :type "text"}
@@ -40,7 +40,10 @@
 
 (deftest graphql-queries
   (let [db (create-db)
-        conf (assoc test-config :db db)
+        opt {:db db
+             :scan-schema true}
+        conf {:db db
+              :tables (tbl/schema-from-db opt)}
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
                          res (gql/exec conf schema q nil)]
@@ -101,49 +104,49 @@
                   {:id 2 :email "yoshi@test.com" :first_name "yoshi"}]))
 
     (testing "fetch root type entity"
-      (test-gql  "{ member(id: 1) { id email first_name }}"
-                 [:data :member]
-                 {:id 1 :email "jim@test.com" :first_name "jim"}))
+      (test-gql  "{ members (where: {id: {eq: 1}}) { id email first_name }}"
+                 [:data :members]
+                 [{:id 1 :email "jim@test.com" :first_name "jim"}]))
 
     (testing "fetch entity with has-one param"
-      (test-gql  "{ meetup(id: 1) { title start_at venue { id name }}}"
-                 [:data :meetup]
-                 {:title "rust meetup" :start_at "2021-01-01 18:00:00"
-                  :venue {:id 2 :name "city hall"}})
-      (test-gql  "{ meetup(id: 2) { title start_at venue { id name }}}"
-                 [:data :meetup]
-                 {:title "cpp meetup" :start_at "2021-01-12 18:00:00"
-                  :venue {:id 1 :name "office one"}}))
+      (test-gql  "{ meetups (where: {id: {eq: 1}}) { title start_at venue { id name }}}"
+                 [:data :meetups]
+                 [{:title "rust meetup" :start_at "2021-01-01 18:00:00"
+                   :venue {:id 2 :name "city hall"}}])
+      (test-gql  "{ meetups (where: {id: {eq: 2}}) { title start_at venue { id name }}}"
+                 [:data :meetups]
+                 [{:title "cpp meetup" :start_at "2021-01-12 18:00:00"
+                   :venue {:id 1 :name "office one"}}]))
 
     (testing "fetch entity with has-many param"
-      (test-gql  "{ venue(id: 1) { name postal_code meetups { id title }}}"
-                 [:data :venue]
-                 {:name "office one" :postal_code "123456"
-                  :meetups [{:id 2 :title "cpp meetup"}]})
-      (test-gql  "{ venue(id: 2) { name postal_code meetups { id title }}}"
-                 [:data :venue]
-                 {:name "city hall" :postal_code "234567"
-                  :meetups [{:id 1 :title "rust meetup"}]}))
-
-    (testing "list entities with many-to-many param"
-      (test-gql  "{ members { email meetups { id title }}}"
-                 [:data :members]
-                 [{:email "jim@test.com"
-                   :meetups [{:id 1 :title "rust meetup"}
-                             {:id 2 :title "cpp meetup"}]}
-                  {:email "yoshi@test.com"
+      (test-gql  "{ venues (where: {id: {eq: 1}}) { name postal_code meetups { id title }}}"
+                 [:data :venues]
+                 [{:name "office one" :postal_code "123456"
+                   :meetups [{:id 2 :title "cpp meetup"}]}])
+      (test-gql  "{ venues (where: {id: {eq: 2}}) { name postal_code meetups { id title }}}"
+                 [:data :venues]
+                 [{:name "city hall" :postal_code "234567"
                    :meetups [{:id 1 :title "rust meetup"}]}]))
 
+    (testing "list entities with many-to-many param"
+      (test-gql  "{ members { email meetups_members { meetup { id title }}}}"
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
+                                     {:meetup {:id 2 :title "cpp meetup"}}]}
+                  {:email "yoshi@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
+
     (testing "fetch entity with many-to-many param"
-      (test-gql  "{ member(id: 1) { email meetups { id title }}}"
-                 [:data :member]
-                 {:email "jim@test.com"
-                  :meetups [{:id 1 :title "rust meetup"}
-                            {:id 2 :title "cpp meetup"}]})
-      (test-gql  "{ member(id: 2) { email meetups { id title }}}"
-                 [:data :member]
-                 {:email "yoshi@test.com"
-                  :meetups [{:id 1 :title "rust meetup"}]}))
+      (test-gql  "{ members (where: {id: {eq: 1}}) { email meetups_members {meetup { id title }}}}"
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
+                                     {:meetup {:id 2 :title "cpp meetup"}}]}])
+      (test-gql  "{ members (where: {id: {eq: 2}}) { email meetups_members {meetup { id title }}}}"
+                 [:data :members]
+                 [{:email "yoshi@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
 
     ;; Filters
     (testing "list entity with where arg"
@@ -182,15 +185,15 @@
                 [{:id 2 :last_name "tanabe"}]))
 
     (testing "fetch entity with has-many param filtered with where"
-      (test-gql   "{ venue(id: 1) { name postal_code meetups { id title }}}"
-                 [:data :venue]
-                 {:name "office one" :postal_code "123456"
-                  :meetups [{:id 2 :title "cpp meetup"}]})
-      (test-gql  (str "{ venue(id: 1) { name postal_code meetups "
+      (test-gql   "{ venues (where: {id: {eq: 1}}) { name postal_code meetups { id title }}}"
+                 [:data :venues]
+                 [{:name "office one" :postal_code "123456"
+                   :meetups [{:id 2 :title "cpp meetup"}]}])
+      (test-gql  (str "{ venues (where: {id: {eq: 1}}) { name postal_code meetups "
                       "(where: {title: {like: \"%rust%\"}}) { id title }}}")
-                 [:data :venue]
-                 {:name "office one" :postal_code "123456"
-                  :meetups []}))
+                 [:data :venues]
+                 [{:name "office one" :postal_code "123456"
+                   :meetups []}]))
 
     ;; Pagination
     (testing "list entity with pagination"
@@ -218,10 +221,10 @@
                      "first_name: \"Ken\" last_name: \"Spencer\") {result}}")
                 [:data :updateMember :result]
                 true)
-      (test-gql  "{ member (id: 1) { id first_name last_name email}}"
-                 [:data :member]
-                 {:id 1 :first_name "Ken" :last_name "Spencer"
-                  :email "ken@test.com"}))
+      (test-gql  "{ members (where: {id: {eq: 1}}) { id first_name last_name email}}"
+                 [:data :members]
+                 [{:id 1 :first_name "Ken" :last_name "Spencer"
+                   :email "ken@test.com"}]))
 
     ;; Delete mutation
     (testing "delete entity"
@@ -250,14 +253,14 @@
 
 (def ^:private signal-test-config
   {:table-name-plural true,
-   :resource-path-plural true
+   :scan-schema false
    :tables [{:name "members"
              :columns [{:name "id" :type "integer"}
                        {:name "first_name" :type "text"}
                        {:name "last_name" :type "text"}
                        {:name "email" :type "text"}]
-             :relation-types [:root]
-             :belongs-to []}]
+             :table-type :root
+             :fks []}]
    :signal-ctx {:email "yoshi@test.com" :first-name "changed-first-name"}
    :signals {:members {:query {:pre members-pre-query
                                :post members-post-query}

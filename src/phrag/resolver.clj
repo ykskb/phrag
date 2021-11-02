@@ -57,23 +57,31 @@
           {:where (parse-where args):limit 100 :offset 0}
           args))
 
+;; Workaround as error/reject in fetch method make promises stuck in pending state without
+;; being caught in subsequent codes. Fallback is to return nil after error log output.
+(defn- exec-sql [sql-fn records env]
+  (try (sql-fn records env)
+       (catch Throwable e
+         (log :error e)
+         nil)))
+
 (defrecord FetchDataSource [fetch-fn]
   u/DataSource
   (-identity [this] (:id this))
   (-fetch [this env]
-    (sl-api/unwrap ((:fetch-fn this) this env))))
+    (sl-api/unwrap (exec-sql (:fetch-fn this) this env))))
 
 (defrecord HasOneDataSource [id batch-fn]
   u/DataSource
   (-identity [this] (:id this))
   (-fetch [this env]
-    (let [responses ((:batch-fn this) [this] env)]
+    (let [responses (exec-sql (:batch-fn this) [this] env)]
       (sl-api/unwrap first responses)))
 
   u/BatchedSource
   (-fetch-multi [muse muses env]
     (let [muses (cons muse muses)
-          responses ((:batch-fn muse) muses env)
+          responses (exec-sql (:batch-fn muse) muses env)
           map-fn (fn [responses]
                    (zipmap (map u/-identity muses)
                            responses))]
@@ -83,13 +91,13 @@
   u/DataSource
   (-identity [this] (:id this))
   (-fetch [this env]
-    (let [results ((:batch-fn this) [this] env)]
+    (let [results (exec-sql (:batch-fn this) [this] env)]
       (sl-api/unwrap :res results)))
 
   u/BatchedSource
   (-fetch-multi [muse muses env]
     (let [muses (cons muse muses)
-          responses ((:batch-fn muse) muses env)
+          responses (exec-sql (:batch-fn muse) muses env)
           map-fn (fn [result]
                    (let [m (zipmap (:ids result) (repeat []))
                          vals (group-by rel-key (:res result))]
