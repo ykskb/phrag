@@ -116,13 +116,6 @@
     (testing "scan DB with fk: config table data to override"
       (let [venues-columns [{:name "id" :type "integer"}]
             meetups-fks [{:table "venues" :from "venue_id" :to "id"}]]
-        (println (tbl/schema-from-db {:db db
-                                      :scan-schema true
-                                      :no-fk-on-db false
-                                      :tables [{:name "venues"
-                                                :columns venues-columns}
-                                               {:name "meetups"
-                                                :fks meetups-fks}]}))
         (schema-as-expected?
          [members
           groups

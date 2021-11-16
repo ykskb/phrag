@@ -5,45 +5,6 @@
             [phrag.table :as tbl]
             [integrant.core :as ig]))
 
-(def ^:private db-ref (gensym 'test-db-ref))
-(def ^:private sym-q (symbol 'q))
-(def ^:private sym-b (symbol 'b))
-(def ^:private sym-id (symbol 'id))
-(def ^:private sym-p-id (symbol 'p-id))
-(def ^:private sym-id-a (symbol 'id-a))
-(def ^:private sym-id-b (symbol 'id-b))
-
-(def ^:private root-option
-  {:project-ns "my-project"
-   :router :ataraxy
-   :db-ref db-ref
-   :db-keys nil
-   :tables [{:name "members"
-             :columns [{:name "id"}
-                       {:name "first_name"}
-                       {:name "last_name"}
-                       {:name "email"}]
-             :relation-types [:root]}]})
-
-(def ^:private root-ataraxy-routes
-  [{[:post "/graphql" {sym-b :params}]
-    [:my-project.handler.members/create-root sym-b]}])
-
-(def ^:private root-ataraxy-handlers
-  [{[:phrag.handlers.duct-ataraxy/list-root
-     :my-project.handler.members/list-root]
-    {:db db-ref
-     :db-keys nil
-     :table "members"
-     :cols #{"id" "email" "last_name" "first_name"}}}])
-
-;; (deftest ataraxy-routes-creation
-;;   (testing "root type from config"
-;;     (is (= {:routes root-ataraxy-routes
-;;             :handlers root-ataraxy-handlers}
-;;            (dissoc (rest/rest-routes (rest/make-rest-config root-option))
-;;                    :swag-paths :swag-defs)))))
-
 (defn postgres-db []
   (doto {:connection (jdbc/get-connection {:dbtype "postgresql"
                                            :dbname "postgres"
@@ -103,6 +64,12 @@
                         "group_id        int, "
                         "foreign key(venue_id) references venues(id), "
                         "foreign key(group_id) references groups(id));"))
+    (jdbc/execute! (str "create table member_follow ("
+                        "created_by    int, "
+                        "member_id     int, "
+                        "foreign key(created_by) references members(id), "
+                        "foreign key(member_id) references members(id), "
+                        "primary key (created_by, member_id));"))
     (jdbc/execute! (str "create table meetups_members ("
                         "meetup_id     int, "
                         "member_id     int, "
@@ -116,57 +83,3 @@
                         "foreign key(member_id) references members(id), "
                         "primary key (group_id, member_id));"))))
 
-(def ^:private expected-schema-map
-  [{:name "members"
-    :columns [{:name "id"}
-              {:name "first_name"}
-              {:name "last_name"}
-              {:name "email"}]
-    :relation-types [:root]
-    :belongs-to []}
-   {:name "groups"
-    :columns [{:name "id"}
-              {:name "name"}
-              {:name "created_at"}]
-    :relation-types [:root]
-    :belongs-to []}
-   {:name "venues"
-    :columns [{:name "id"}
-              {:name "name"}
-              {:name "postal_code"}]
-    :relation-types [:root]
-    :belongs-to []}
-   {:name "meetups"
-    :columns [{:name "id"}
-              {:name "title"}
-              {:name "start_at"}
-              {:name "venue_id"}
-              {:name "group_id"}]
-    :relation-types [:one-n :root]
-    :belongs-to ["venue" "group"]}
-   {:name "meetups_members"
-    :columns [{:name "meetup_id"}
-              {:name "member_id"}]
-    :relation-types [:n-n]
-    :belongs-to ["meetups" "members"]}
-   {:name "groups_members"
-    :columns [{:name "group_id"}
-              {:name "member_id"}]
-    :relation-types [:n-n]
-    :belongs-to ["groups" "members"]}])
-
-;; (deftest schema-map-from-db
-;;   (testing "all relation types"
-;;     (let [config (rest/make-rest-config one-n-option)
-;;           res-map
-;;           (reduce (fn [m table]
-;;                     (let [col-names (map #(:name %) (:columns table))]
-;;                       (assoc m (:name table)
-;;                              (assoc table :col-names col-names))))
-;;                   {}
-;;                   (tbl/schema-from-db config (create-database)))]
-;;       (doseq [exp-table expected-schema-map]
-;;         (let [res-table (get res-map (:name exp-table))]
-;;           (is (= (map #(:name %) (:columns exp-table)) (:col-names res-table)))
-;;           (is (= (:relation-types exp-table) (:relation-types res-table)))
-;;           (is (= (:belongs-to exp-table) (:belongs-to res-table))))))))

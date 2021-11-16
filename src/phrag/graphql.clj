@@ -6,6 +6,7 @@
             [com.walmartlabs.lacinia :as lcn]
             [com.walmartlabs.lacinia.schema :as schema]
             [clojure.pprint :as pp]
+            [clojure.string :as s]
             [inflections.core :as inf]
             [superlifter.core :as sl-core]))
 
@@ -173,12 +174,25 @@
                      :NewId {:fields {:id {:type 'Int}}}}
            :queries {}} (:tables config)))
 
+(defn has-many-field-key [table fk]
+  (let [tbl-name (:name table)
+        rscs (inf/plural tbl-name)
+        fk-from (:from fk)]
+    (keyword (if (and (= (:table-type table) :pivot)
+                      (tbl/is-circular-m2m-fk? table fk-from))
+               (str rscs "_on_" fk-from)
+               rscs))))
+
+(defn- has-one-field-key [fk]
+  (let [from (:from fk)]
+    (if (s/ends-with? from "_id")
+      (keyword (s/replace from #"_id" ""))
+      (keyword (str from "_" (inf/singular (:table fk)))))))
+
 (defn- update-fk-schema [schema table rel-map]
   (let [table-name (:name table)
         rsc (inf/singular table-name)
-        rscs (inf/plural table-name)
         rsc-name (csk/->PascalCase rsc)
-        rscs-key (keyword rscs)
         rsc-name-key (keyword rsc-name)
         rsc-whr-key (keyword (str rsc-name "Where"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
@@ -188,23 +202,24 @@
                     fk-to-rsc (inf/singular fk-to-tbl-name)
                     fk-to-rsc-name (csk/->PascalCase fk-to-rsc)
                     fk-to-rsc-name-key (keyword fk-to-rsc-name)
-                    fk-to-rsc-key (keyword fk-to-rsc)
-                    fk-from-rsc-id (keyword (:from fk))
+                    fk-from-rsc-col (keyword (:from fk))
                     fk-to-rels (get rel-map fk-to-tbl-name)]
                 (-> m
-                    ;; has many
-                    (assoc-in [:objects fk-to-rsc-name-key :fields rscs-key]
+                    ;; has many on linked table
+                    (assoc-in [:objects fk-to-rsc-name-key
+                               :fields (has-many-field-key table fk)]
                               {:type `(~'list ~rsc-name-key)
                                :args {:where {:type rsc-whr-key}
                                       :sort {:type rsc-sort-key} ;
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
-                               :resolve (partial rslv/has-many fk-from-rsc-id
+                               :resolve (partial rslv/has-many fk-from-rsc-col
                                                  table-name rsc-rels)})
-                    ;; has one
-                    (assoc-in [:objects rsc-name-key :fields fk-to-rsc-key]
+                    ;; has one on fk origin table
+                    (assoc-in [:objects rsc-name-key
+                               :fields (has-one-field-key fk)]
                               {:type fk-to-rsc-name-key
-                               :resolve (partial rslv/has-one fk-from-rsc-id
+                               :resolve (partial rslv/has-one fk-from-rsc-col
                                                  fk-to-tbl-name
                                                  fk-to-rels)}))))
             schema (:fks table))))
@@ -212,16 +227,11 @@
 (defn- update-pivot-schema [schema table]
   (let [tbl-name (:name table)
         primary-fks (tbl/primary-fks table)
-        rsc-a-tbl-name (:table (first primary-fks))
-        rsc-b-tbl-name (:table (second primary-fks))
-        rsc-a (inf/singular rsc-a-tbl-name)
-        rsc-b (inf/singular rsc-b-tbl-name)
-        rsc-a-name (csk/->PascalCase rsc-a)
-        rsc-b-name (csk/->PascalCase rsc-b)
         rsc-a-col (:from (first primary-fks))
         rsc-b-col (:from (second primary-fks))
-        create-key (keyword (str "create" rsc-a-name rsc-b-name))
-        delete-key (keyword (str "delete" rsc-a-name rsc-b-name))
+        rsc-name (csk/->PascalCase (inf/singular tbl-name))
+        create-key (keyword (str "create" rsc-name))
+        delete-key (keyword (str "delete" rsc-name))
         obj-fields (root-fields table)
         cols (tbl/col-names table)]
     (-> schema

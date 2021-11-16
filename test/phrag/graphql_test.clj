@@ -1,39 +1,9 @@
 (ns phrag.graphql-test
   (:require [clojure.test :refer :all]
             [clojure.java.jdbc :as jdbc]
-            [com.walmartlabs.lacinia :as lcn]
             [phrag.core-test :refer [create-db postgres-db]]
             [phrag.table :as tbl]
             [phrag.graphql :as gql]))
-
-(def ^:private test-config
-  {:table-name-plural true,
-   :tables [{:name "members"
-             :columns [{:name "id" :type "integer"}
-                       {:name "first_name" :type "text"}
-                       {:name "last_name" :type "text"}
-                       {:name "email" :type "text"}]
-             :relation-types [:root]
-             :belongs-to []}
-            {:name "venues"
-             :columns [{:name "id" :type "integer"}
-                       {:name "name" :type "text"}
-                       {:name "postal_code" :type "text"}]
-             :relation-types [:root]
-             :belongs-to []}
-            {:name "meetups"
-             :columns [{:name "id" :type "integer"}
-                       {:name "title" :type "text"}
-                       {:name "start_at" :type "timestamp"}
-                       {:name "venue_id" :type "integer"}
-                       {:name "group_id" :type "integer"}]
-             :relation-types [:one-n :root]
-             :belongs-to ["venue" "group"]}
-            {:name "meetups_members"
-             :columns [{:name "meetup_id" :type "integer"}
-                       {:name "member_id" :type "integer"}]
-             :relation-types [:n-n]
-             :belongs-to ["meetups" "members"]}]})
 
 ;; create-db: in-memory SQLite
 ;; postgres-db: real PostgreSQL
@@ -47,10 +17,10 @@
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
                          res (gql/exec conf schema q nil)]
-                     (println res)
                      (is (= expected (get-in res res-keys)))))]
 
-    ;; Create mutations
+    ;; Root entities
+
     (testing "create 1st user"
       (test-gql (str "mutation {createMember (email: \"jim@test.com\" "
                      "first_name: \"jim\" last_name: \"smith\") { id }}")
@@ -60,6 +30,19 @@
       (test-gql (str "mutation {createMember (email: \"yoshi@test.com\" "
                      "first_name: \"yoshi\" last_name: \"tanabe\") { id }}")
                 [:data :createMember :id] 2))
+
+    (testing "list root type entity"
+      (test-gql  "{ members { id email first_name }}"
+                 [:data :members]
+                 [{:id 1 :email "jim@test.com" :first_name "jim"}
+                  {:id 2 :email "yoshi@test.com" :first_name "yoshi"}]))
+
+    (testing "fetch root type entity"
+      (test-gql  "{ members (where: {id: {eq: 1}}) { id email first_name }}"
+                 [:data :members]
+                 [{:id 1 :email "jim@test.com" :first_name "jim"}]))
+
+    ;; One-to-many relationships
 
     (testing "create 1st venue"
       (test-gql (str "mutation {createVenue (name: \"office one\" "
@@ -81,33 +64,6 @@
                      "start_at: \"2021-01-12 18:00:00\" venue_id: 1) { id }}")
                 [:data :createMeetup :id] 2))
 
-    (testing "add member 1 to meetup 1"
-      (test-gql (str "mutation {createMeetupMember (meetup_id: 1"
-                     "member_id: 1) { result }}")
-                [:data :createMeetupMember :result] true))
-
-    (testing "add member 1 to meetup 2"
-      (test-gql (str "mutation {createMeetupMember (meetup_id: 2"
-                     "member_id: 1) { result }}")
-                [:data :createMeetupMember :result] true))
-
-    (testing "add member 2 to meetup 1"
-      (test-gql (str "mutation {createMeetupMember (meetup_id: 1"
-                     "member_id: 2) { result }}")
-                [:data :createMeetupMember :result] true))
-                                        ;
-    ;; Queries
-    (testing "list root type entity"
-      (test-gql  "{ members { id email first_name }}"
-                 [:data :members]
-                 [{:id 1 :email "jim@test.com" :first_name "jim"}
-                  {:id 2 :email "yoshi@test.com" :first_name "yoshi"}]))
-
-    (testing "fetch root type entity"
-      (test-gql  "{ members (where: {id: {eq: 1}}) { id email first_name }}"
-                 [:data :members]
-                 [{:id 1 :email "jim@test.com" :first_name "jim"}]))
-
     (testing "fetch entity with has-one param"
       (test-gql  "{ meetups (where: {id: {eq: 1}}) { title start_at venue { id name }}}"
                  [:data :meetups]
@@ -128,6 +84,23 @@
                  [{:name "city hall" :postal_code "234567"
                    :meetups [{:id 1 :title "rust meetup"}]}]))
 
+    ;; Many-to-many relationships
+
+    (testing "add member 1 to meetup 1"
+      (test-gql (str "mutation {createMeetupsMember (meetup_id: 1"
+                     "member_id: 1) { result }}")
+                [:data :createMeetupsMember :result] true))
+
+    (testing "add member 1 to meetup 2"
+      (test-gql (str "mutation {createMeetupsMember (meetup_id: 2"
+                     "member_id: 1) { result }}")
+                [:data :createMeetupsMember :result] true))
+
+    (testing "add member 2 to meetup 1"
+      (test-gql (str "mutation {createMeetupsMember (meetup_id: 1"
+                     "member_id: 2) { result }}")
+                [:data :createMeetupsMember :result] true))
+
     (testing "list entities with many-to-many param"
       (test-gql  "{ members { email meetups_members { meetup { id title }}}}"
                  [:data :members]
@@ -147,6 +120,27 @@
                  [:data :members]
                  [{:email "yoshi@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
+
+    ;; Cyclic many-to-many relationship
+
+    (testing "add member 2 follow to member 1"
+      (test-gql (str "mutation {createMemberFollow (member_id: 2"
+                     "created_by: 1) { result }}")
+                [:data :createMemberFollow :result] true))
+
+    (testing "list entities with cyclic many-to-many pararm"
+      (test-gql  "{ members { first_name member_follows_on_created_by {member { first_name }}}}"
+                 [:data :members]
+                 [{:first_name "jim"
+                   :member_follows_on_created_by [{:member {:first_name "yoshi"}}]}
+                  {:first_name "yoshi"
+                   :member_follows_on_created_by []}])
+      (test-gql  "{ members { first_name member_follows_on_member_id {created_by_member { first_name }}}}"
+                 [:data :members]
+                 [{:first_name "jim"
+                   :member_follows_on_member_id []}
+                  {:first_name "yoshi"
+                   :member_follows_on_member_id [{:created_by_member {:first_name "jim"}}]}]))
 
     ;; Filters
     (testing "list entity with where arg"
