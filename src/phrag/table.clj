@@ -13,13 +13,24 @@
 (defn primary-fks [table]
   (vals (select-keys (:fk-map table) (keys (:pk-map table)))))
 
+(defn is-cyclic-m2m-fk?
+  "Cyclic many-to-many links records on the same table.
+  Example: `user_follow` table where followers and the followed are both
+  linked to `users` table."
+  [table fk-from]
+  (let [p-fks (primary-fks table)
+        p-fk-tbls (map :table p-fks)
+        cycl-linked-tbls (set (for [[tbl freq] (frequencies p-fk-tbls)
+                                    :when (> freq 1)] tbl))
+        cycl-link-fks (filter #(contains? cycl-linked-tbls (:table %)) p-fks)]
+    (contains? (set (map :from cycl-link-fks)) fk-from)))
+
 ;;; Full relationship map per table including reverse relations
 
 (defn- rels [table]
   (let [table-name (:name table)
-        rel-map {table-name (map (fn [fk] (:table fk))
-                                 (:fks table))}]
-    (reduce (fn [m fk] (assoc m (:table fk) [table-name]))
+        rel-map {table-name (set (map #(:table %) (:fks table)))}]
+    (reduce (fn [m fk] (assoc m (:table fk) #{table-name}))
             rel-map (:fks table))))
 
 (defn full-rel-map [config]

@@ -91,7 +91,7 @@
               (limit (:limit filters 100)) (offset (:offset filters 0)))
         q (if (not-empty whr) (apply where q whr) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
-    ;;(println (sql/format q))
+    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 

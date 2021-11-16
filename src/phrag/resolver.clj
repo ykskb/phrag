@@ -120,6 +120,7 @@
 
 (defn- update-n-threshold [rel num trigger-opts]
   (log :debug "Updating" rel "queue with" num)
+  (pp/pprint trigger-opts)
   (update trigger-opts :threshold + num))
 
 (defn- update-1-threshold [rel trigger-opts _ctx]
@@ -160,6 +161,7 @@
                      (c/list-root (:db ctx) table sql-args))
           res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
                     (update-triggers-by-count! rels))]
+      (prn "list-query called")
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 (defn id-query [table rels ctx args _val]
