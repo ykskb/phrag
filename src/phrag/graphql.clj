@@ -179,7 +179,7 @@
         rscs (inf/plural tbl-name)
         fk-from (:from fk)]
     (keyword (if (and (= (:table-type table) :pivot)
-                      (tbl/is-cyclic-m2m-fk? table fk-from))
+                      (tbl/is-circular-m2m-fk? table fk-from))
                (str rscs "_on_" fk-from)
                rscs))))
 

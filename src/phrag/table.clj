@@ -13,8 +13,8 @@
 (defn primary-fks [table]
   (vals (select-keys (:fk-map table) (keys (:pk-map table)))))
 
-(defn is-cyclic-m2m-fk?
-  "Cyclic many-to-many links records on the same table.
+(defn is-circular-m2m-fk?
+  "Circular many-to-many links records on the same table.
   Example: `user_follow` table where followers and the followed are both
   linked to `users` table."
   [table fk-from]
