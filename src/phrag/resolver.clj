@@ -120,7 +120,6 @@
 
 (defn- update-n-threshold [rel num trigger-opts]
   (log :debug "Updating" rel "queue with" num)
-  (pp/pprint trigger-opts)
   (update trigger-opts :threshold + num))
 
 (defn- update-triggers-by-count! [res-p rels]
