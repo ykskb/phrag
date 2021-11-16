@@ -123,20 +123,10 @@
   (pp/pprint trigger-opts)
   (update trigger-opts :threshold + num))
 
-(defn- update-1-threshold [rel trigger-opts _ctx]
-  (log :debug "Incrementing" rel "queue by 1")
-  (update trigger-opts :threshold + 1))
-
 (defn- update-triggers-by-count! [res-p rels]
   (reduce (fn [p rel]
             (sl-api/update-trigger! p (keyword rel) :elastic
                                     (partial update-count-threshold rel)))
-          res-p rels))
-
-(defn- update-triggers-by-1! [res-p rels]
-  (reduce (fn [p rel]
-            (sl-api/update-trigger! p (keyword rel) :elastic
-                                    (partial update-1-threshold rel)))
           res-p rels))
 
 (defn- do-update-triggers! [ctx rels c]
@@ -161,17 +151,6 @@
                      (c/list-root (:db ctx) table sql-args))
           res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
                     (update-triggers-by-count! rels))]
-      (prn "list-query called")
-      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
-
-(defn id-query [table rels ctx args _val]
-  (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (-> (args->sql-args args)
-                       (signal ctx table :query :pre))
-          fetch-fn (fn [_this _env] (c/fetch-root (:id args) (:db ctx)
-                                                  table sql-args))
-          res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
-                    (update-triggers-by-1! rels))]
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 (defn has-one [id-key table rels ctx _args val]
@@ -188,6 +167,7 @@
                                  (->HasOneDataSource (id-key val) batch-fn))]
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
+
 (defn has-many [id-key table rels ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (args->sql-args args)
@@ -201,22 +181,6 @@
                       {:ids ids :res res}))
           res-p (sl-api/enqueue! (keyword table)
                                  (->HasManyDataSource (:id val) batch-fn id-key))]
-      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
-
-(defn n-to-n [join-col p-col nn-table table rels ctx args val]
-  (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (-> (args->sql-args args)
-                       (signal ctx table :query :pre))
-          p-col-key (keyword p-col)
-          batch-fn (fn [many _env]
-                     (let [ids (map :id many)
-                           res (c/list-n-n join-col p-col ids (:db ctx)
-                                           nn-table table sql-args)]
-                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
-                       {:ids ids :res res}))
-          res-p (sl-api/enqueue! (keyword nn-table)
-                                 (->HasManyDataSource (:id val) batch-fn
-                                                      p-col-key))]
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 ;; Mutations

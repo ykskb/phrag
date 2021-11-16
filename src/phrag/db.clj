@@ -8,8 +8,6 @@
               limit offset] :as h]
             [honey.sql :as sql]))
 
-;; todo: query handling to be improved with proper formatting
-
 ;; Schema queries
 
 (defn- db-type [db-spec]
@@ -95,32 +93,10 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn list-through [db rsc nn-table nn-join-col & [filters]]
-  (let [nn-col-key (keyword (str "nn." nn-join-col))
-        whr (:where filters)
-        o-col (:order-col filters)
-        q (-> (select :t.* :nn.*) (from [(keyword nn-table) :nn])
-              (join [(keyword rsc) :t] [:= nn-col-key :t.id])
-              (limit (:limit filters 100)) (offset (:offset filters 0)))
-        q (if (not-empty whr) (apply where q whr) q)
-        q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
-    ;;(println (sql/format q))
-    (->> (sql/format q)
-         (jdbc/query db))))
-
-(defn fetch [db rsc id & [filters]]
-  (let [whr (:where filters)
-        q (-> (select :*) (from (keyword rsc)))
-        q (if (empty? whr) (where q [[:= :id id]])
-              (apply where q (conj whr [:= :id id])))]
-    ;;(println (sql/format q))
-    (->> (sql/format q)
-         (jdbc/query db)
-         first)))
-
 (defn delete! [db rsc id & [p-col p-id]]
-  (let [whr (if (nil? p-id) [[:= :id id]]
-                    [[:= :id id] [:= (keyword p-col) p-id]])
+  (let [whr (if (nil? p-id)
+              [[:= :id id]]
+              [[:= :id id] [:= (keyword p-col) p-id]])
         q (apply where (delete-from (keyword rsc)) whr)]
     (->> (sql/format q)
          (jdbc/execute! db))))
