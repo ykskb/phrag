@@ -97,7 +97,7 @@
         q (-> (apply select aggrs) (from (keyword rsc))
               (limit (:limit filters 100)) (offset (:offset filters 0)))
         q (if (not-empty whr) (apply where q whr) q)]
-    (println (sql/format q))
+    ;;(println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
@@ -106,7 +106,7 @@
         q (-> (apply select aggrs) (select grp-by)
               (from (keyword rsc)) (group-by grp-by))
         q (if (not-empty whr) (apply where q whr) q)]
-    (println (sql/format q))
+    ;;(println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
