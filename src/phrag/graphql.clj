@@ -26,7 +26,7 @@
 (defn- needs-non-null? [col]
   (and (= 1 (:notnull col)) (nil? (:dflt_value col))))
 
-(defn- root-fields [table]
+(defn- rsc-object [table]
   (reduce (fn [m col]
             (let [col-name (:name col)
                   col-key (keyword col-name)
@@ -36,6 +36,13 @@
                           {:type col-type})]
               (assoc m col-key field)))
           {} (:columns table)))
+
+(defn- aggr-object [rsc-obj-key]
+  {:count {:type 'Int}
+   :sum {:type rsc-obj-key}
+   :avg {:type rsc-obj-key}
+   :max {:type rsc-obj-key}
+   :min {:type rsc-obj-key}})
 
 ;;; Input objects
 
@@ -108,10 +115,15 @@
 
 ;;; GraphQL schema
 
+(defn- rsc-relations [rel-map table-name]
+  (let [rels (get rel-map table-name)]
+    (into rels (map #(str % "_aggregate") rels))))
+
 (defn- root-schema [config rel-map]
   (reduce (fn [m table]
             (let [table-name (:name table)
                   table-type (:table-type table)
+                  use-aggr (:use-aggregation config)
                   rsc (inf/singular table-name)
                   rscs (inf/plural table-name)
                   rsc-name (csk/->PascalCase rsc)
@@ -120,13 +132,16 @@
                   rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
                   rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
                   rsc-name-key (keyword rsc-name)
+                  rsc-fields-key (keyword (str rsc-name "Fields"))
+                  rsc-aggr-key (keyword (str rsc-name "Aggregate"))
                   list-q-key (keyword rscs)
+                  aggr-q-key (keyword (str rscs "_aggregate"))
                   create-key (keyword (str "create" rsc-name))
                   update-key (keyword (str "update" rsc-name))
                   delete-key (keyword (str "delete" rsc-name))
-                  obj-fields (root-fields table)
+                  obj-fields (rsc-object table)
                   cols (tbl/col-names table)
-                  rels (get rel-map table-name)]
+                  rels (rsc-relations rel-map table-name)]
               (cond-> m
                     true (assoc-in [:objects rsc-name-key]
                                    {:description rsc-name
@@ -140,6 +155,12 @@
                     true (assoc-in [:input-objects rsc-sort-key]
                                    {:description sort-desc
                                     :fields (sort-fields table)})
+                    use-aggr (assoc-in [:objects rsc-fields-key]
+                                       {:description rsc-name
+                                        :fields obj-fields})
+                    use-aggr (assoc-in [:objects rsc-aggr-key]
+                                       {:description rsc-name
+                                        :fields (aggr-object rsc-fields-key)})
 
                     (= table-type :root)
                     (assoc-in [:queries list-q-key]
@@ -151,6 +172,14 @@
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/list-query
                                                  table-name rels)})
+                    use-aggr
+                    (assoc-in [:queries aggr-q-key]
+                              {:type rsc-aggr-key
+                               :description (str "Aggrecate " rscs-name ".")
+                               :args {:where {:type rsc-whr-key}}
+                               :resolve (partial rslv/aggregate-root
+                                                 table-name)})
+
                     (= table-type :root)
                     (assoc-in [:mutations create-key]
                               {:type :NewId
@@ -189,39 +218,49 @@
       (keyword (s/replace from #"_id" ""))
       (keyword (str from "_" (inf/singular (:table fk)))))))
 
-(defn- update-fk-schema [schema table rel-map]
+(defn- update-fk-schema [schema table rel-map use-aggr]
   (let [table-name (:name table)
         rsc (inf/singular table-name)
         rsc-name (csk/->PascalCase rsc)
         rsc-name-key (keyword rsc-name)
+        rsc-aggr-key (keyword (str rsc-name "Aggregate"))
         rsc-whr-key (keyword (str rsc-name "Where"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
-        rsc-rels (get rel-map table-name)]
+        rsc-rels (rsc-relations rel-map table-name)]
     (reduce (fn [m fk]
               (let [fk-to-tbl-name (:table fk)
                     fk-to-rsc (inf/singular fk-to-tbl-name)
                     fk-to-rsc-name (csk/->PascalCase fk-to-rsc)
                     fk-to-rsc-name-key (keyword fk-to-rsc-name)
                     fk-from-rsc-col (keyword (:from fk))
-                    fk-to-rels (get rel-map fk-to-tbl-name)]
-                (-> m
-                    ;; has many on linked table
-                    (assoc-in [:objects fk-to-rsc-name-key
-                               :fields (has-many-field-key table fk)]
-                              {:type `(~'list ~rsc-name-key)
-                               :args {:where {:type rsc-whr-key}
-                                      :sort {:type rsc-sort-key} ;
-                                      :limit {:type 'Int}
-                                      :offset {:type 'Int}}
-                               :resolve (partial rslv/has-many fk-from-rsc-col
-                                                 table-name rsc-rels)})
-                    ;; has one on fk origin table
-                    (assoc-in [:objects rsc-name-key
-                               :fields (has-one-field-key fk)]
-                              {:type fk-to-rsc-name-key
-                               :resolve (partial rslv/has-one fk-from-rsc-col
-                                                 fk-to-tbl-name
-                                                 fk-to-rels)}))))
+                    fk-to-rels (rsc-relations rel-map fk-to-tbl-name)
+                    has-many-fld-key (has-many-field-key table fk)]
+                (cond-> m
+                  ;; has-many on linked tables
+                  true (assoc-in
+                        [:objects fk-to-rsc-name-key :fields has-many-fld-key]
+                        {:type `(~'list ~rsc-name-key)
+                         :args {:where {:type rsc-whr-key}
+                                :sort {:type rsc-sort-key}
+                                :limit {:type 'Int}
+                                :offset {:type 'Int}}
+                         :resolve (partial rslv/has-many fk-from-rsc-col
+                                           table-name rsc-rels)})
+                  ;; has-many aggregate on linked tables
+                  use-aggr (assoc-in
+                            [:objects fk-to-rsc-name-key :fields
+                             (keyword (str (name has-many-fld-key)
+                                           "_aggregate"))]
+                            {:type rsc-aggr-key
+                             :args {:where {:type rsc-whr-key}}
+                             :resolve (partial rslv/aggregate-has-many
+                                               fk-from-rsc-col table-name)})
+                  ;; has-one on fk origin tables
+                  true (assoc-in
+                        [:objects rsc-name-key :fields (has-one-field-key fk)]
+                        {:type fk-to-rsc-name-key
+                         :resolve (partial rslv/has-one fk-from-rsc-col
+                                           fk-to-tbl-name fk-to-rels)}))))
             schema (:fks table))))
 
 (defn- update-pivot-schema [schema table]
@@ -232,7 +271,7 @@
         rsc-name (csk/->PascalCase (inf/singular tbl-name))
         create-key (keyword (str "create" rsc-name))
         delete-key (keyword (str "delete" rsc-name))
-        obj-fields (root-fields table)
+        obj-fields (rsc-object table)
         cols (tbl/col-names table)]
     (-> schema
         (assoc-in [:mutations create-key]
@@ -249,14 +288,18 @@
 (defn- update-relationships [schema config rel-map]
   (reduce (fn [m table]
             (cond-> m
-              true (update-fk-schema table rel-map)
+              true (update-fk-schema table rel-map (:use-aggregation config))
               (= (:table-type table) :pivot) (update-pivot-schema table)))
           schema (:tables config)))
 
 (defn- sl-config [config]
   (let [buckets (reduce (fn [m tbl]
-                          (assoc m (keyword (:name tbl))
-                                 {:triggers {:elastic {:threshold 0}}}))
+                          (let [tbl-name (:name tbl)]
+                            (-> m
+                                (assoc (keyword tbl-name)
+                                       {:triggers {:elastic {:threshold 0}}})
+                                (assoc (keyword (str tbl-name "_aggregate"))
+                                       {:triggers {:elastic {:threshold 0}}}))))
                         {:default {:triggers {:elastic {:threshold 0}}}}
                         (:tables config))]
     {:buckets buckets

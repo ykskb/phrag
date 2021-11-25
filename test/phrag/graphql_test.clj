@@ -13,7 +13,8 @@
         opt {:db db
              :scan-schema true}
         conf {:db db
-              :tables (tbl/schema-from-db opt)}
+              :tables (tbl/schema-from-db opt)
+              :use-aggregation true}
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
                          res (gql/exec conf schema q nil)]
@@ -42,6 +43,14 @@
                  [:data :members]
                  [{:id 1 :email "jim@test.com" :first_name "jim"}]))
 
+    (testing "aggregate root type entity"
+      (test-gql "{ members_aggregate {count max {id} min {id}}}"
+                [:data :members_aggregate]
+                {:count 2 :max {:id 2} :min {:id 1}})
+      (test-gql "{ members_aggregate {count max {id email} min {id}}}"
+                [:data :members_aggregate]
+                {:count 2 :max {:id 2 :email "yoshi@test.com"} :min {:id 1}}))
+
     ;; One-to-many relationships
 
     (testing "create 1st venue"
@@ -64,25 +73,68 @@
                      "start_at: \"2021-01-12 18:00:00\" venue_id: 1) { id }}")
                 [:data :createMeetup :id] 2))
 
+    (testing "list entities with has-one param"
+      (test-gql  (str "{ meetups { id title start_at venue_id "
+                      "venue { id name }}}")
+                 [:data :meetups]
+                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
+                   :venue_id 2 :venue {:id 2 :name "city hall"}}
+                  {:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
+                   :venue_id 1 :venue {:id 1 :name "office one"}}]))
+
     (testing "fetch entity with has-one param"
-      (test-gql  "{ meetups (where: {id: {eq: 1}}) { title start_at venue { id name }}}"
+      (test-gql  (str "{ meetups (where: {id: {eq: 1}}) "
+                      "{ id title start_at venue_id venue { id name }}}")
                  [:data :meetups]
-                 [{:title "rust meetup" :start_at "2021-01-01 18:00:00"
-                   :venue {:id 2 :name "city hall"}}])
-      (test-gql  "{ meetups (where: {id: {eq: 2}}) { title start_at venue { id name }}}"
+                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
+                   :venue_id 2 :venue {:id 2 :name "city hall"}}])
+      (test-gql (str  "{ meetups (where: {id: {eq: 2}}) "
+                      "{ id title start_at venue_id venue { id name }}}")
                  [:data :meetups]
-                 [{:title "cpp meetup" :start_at "2021-01-12 18:00:00"
-                   :venue {:id 1 :name "office one"}}]))
+                 [{:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
+                   :venue_id 1 :venue {:id 1 :name "office one"}}]))
+
+    (testing "list entities with has-many param"
+      (test-gql (str "{ venues { id name postal_code meetups { id title }}}")
+                [:data :venues]
+                [{:id 1 :name "office one" :postal_code "123456"
+                  :meetups [{:id 2 :title "cpp meetup"}]}
+                 {:id 2 :name "city hall" :postal_code "234567"
+                  :meetups [{:id 1 :title "rust meetup"}]}]))
+
+    (testing "list entities with has-many param and aggregation"
+      (test-gql (str "{ venues { id name postal_code meetups { id title } "
+                     "meetups_aggregate {count max {id title} min {id}}}}")
+                [:data :venues]
+                [{:id 1 :name "office one" :postal_code "123456"
+                  :meetups [{:id 2 :title "cpp meetup"}]
+                  :meetups_aggregate {:count 1 :min {:id 2}
+                                      :max {:id 2 :title "cpp meetup"}}}
+                 {:id 2 :name "city hall" :postal_code "234567"
+                  :meetups [{:id 1 :title "rust meetup"}]
+                  :meetups_aggregate {:count 1 :min {:id 1}
+                                      :max {:id 1 :title "rust meetup"}}}]))
 
     (testing "fetch entity with has-many param"
-      (test-gql  "{ venues (where: {id: {eq: 1}}) { name postal_code meetups { id title }}}"
+      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+                      "{ name postal_code meetups { id title }}}")
                  [:data :venues]
                  [{:name "office one" :postal_code "123456"
                    :meetups [{:id 2 :title "cpp meetup"}]}])
-      (test-gql  "{ venues (where: {id: {eq: 2}}) { name postal_code meetups { id title }}}"
+      (test-gql (str  "{ venues (where: {id: {eq: 2}}) "
+                      "{ name postal_code meetups { id title }}}")
                  [:data :venues]
                  [{:name "city hall" :postal_code "234567"
                    :meetups [{:id 1 :title "rust meetup"}]}]))
+
+    (testing "fetch entity with has-many param and aggregate"
+      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+                     "{ name postal_code meetups { id title } "
+                     "meetups_aggregate {count max {id} min {id}}}}")
+                [:data :venues]
+                [{:name "office one" :postal_code "123456"
+                  :meetups [{:id 2 :title "cpp meetup"}]
+                  :meetups_aggregate {:count 1 :min {:id 2} :max {:id 2}}}]))
 
     ;; Many-to-many relationships
 
@@ -110,37 +162,138 @@
                   {:email "yoshi@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
 
+    (testing "list entities with many-to-many param and aggregation"
+      (test-gql  (str "{ members { email meetups_members { meetup { id title }} "
+                      "meetups_members_aggregate { count "
+                      "max { meetup_id member_id } min { meetup_id member_id }}}}")
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
+                                     {:meetup {:id 2 :title "cpp meetup"}}]
+                   :meetups_members_aggregate {:count 2
+                                               :max {:meetup_id 2 :member_id 1}
+                                               :min {:meetup_id 1 :member_id 1}}}
+                  {:email "yoshi@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
+                   :meetups_members_aggregate {:count 1
+                                               :max {:meetup_id 1 :member_id 2}
+                                               :min {:meetup_id 1 :member_id 2}}}]))
+
+    (testing "list entities with many-to-many param and filtered aggregation"
+      (test-gql  (str "{ members { email meetups_members { meetup { id title }} "
+                      "meetups_members_aggregate (where: {meetup_id: {lt: 2}}) { count "
+                      "max { meetup_id member_id } min { meetup_id member_id }}}}")
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
+                                     {:meetup {:id 2 :title "cpp meetup"}}]
+                   :meetups_members_aggregate {:count 1
+                                               :max {:meetup_id 1 :member_id 1}
+                                               :min {:meetup_id 1 :member_id 1}}}
+                  {:email "yoshi@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
+                   :meetups_members_aggregate {:count 1
+                                               :max {:meetup_id 1 :member_id 2}
+                                               :min {:meetup_id 1 :member_id 2}}}]))
+
     (testing "fetch entity with many-to-many param"
-      (test-gql  "{ members (where: {id: {eq: 1}}) { email meetups_members {meetup { id title }}}}"
+      (test-gql (str  "{ members (where: {id: {eq: 1}}) "
+                      "{ email meetups_members {meetup { id title }}}}")
                  [:data :members]
                  [{:email "jim@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
                                      {:meetup {:id 2 :title "cpp meetup"}}]}])
-      (test-gql  "{ members (where: {id: {eq: 2}}) { email meetups_members {meetup { id title }}}}"
+      (test-gql (str "{ members (where: {id: {eq: 2}}) "
+                     "{ email meetups_members {meetup { id title }}}}")
                  [:data :members]
                  [{:email "yoshi@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
 
-    ;; Cyclic many-to-many relationship
+    (testing "fetch entity with many-to-many param and aggregation"
+      (test-gql (str  "{ members (where: {id: {eq: 1}}) "
+                      "{ email meetups_members {meetup { id title }} "
+                      "meetups_members_aggregate {count "
+                      "max {meetup_id member_id} min {meetup_id member_id}}}}")
+                [:data :members]
+                [{:email "jim@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
+                                    {:meetup {:id 2 :title "cpp meetup"}}]
+                  :meetups_members_aggregate {:count 2
+                                              :max {:meetup_id 2 :member_id 1}
+                                              :min {:meetup_id 1 :member_id 1}}}])
+      (test-gql (str "{ members (where: {id: {eq: 2}}) "
+                     "{ email meetups_members {meetup { id title }} "
+                     "meetups_members_aggregate {count "
+                     "max {meetup_id member_id} min {meetup_id member_id}}}}")
+                [:data :members]
+                [{:email "yoshi@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
+                  :meetups_members_aggregate {:count 1
+                                              :max {:meetup_id 1 :member_id 2}
+                                              :min {:meetup_id 1 :member_id 2}}}]))
+
+    ;; Circular many-to-many relationship
 
     (testing "add member 2 follow to member 1"
       (test-gql (str "mutation {createMemberFollow (member_id: 2"
                      "created_by: 1) { result }}")
                 [:data :createMemberFollow :result] true))
 
-    (testing "list entities with cyclic many-to-many pararm"
-      (test-gql  "{ members { first_name member_follows_on_created_by {member { first_name }}}}"
+    (testing "list entities with circular many-to-many pararm"
+      (test-gql (str  "{ members { first_name member_follows_on_created_by "
+                      "{ member { first_name }}}}")
                  [:data :members]
                  [{:first_name "jim"
-                   :member_follows_on_created_by [{:member {:first_name "yoshi"}}]}
+                   :member_follows_on_created_by
+                   [{:member {:first_name "yoshi"}}]}
                   {:first_name "yoshi"
                    :member_follows_on_created_by []}])
-      (test-gql  "{ members { first_name member_follows_on_member_id {created_by_member { first_name }}}}"
+      (test-gql (str  "{ members { first_name member_follows_on_member_id "
+                      "{ created_by_member { first_name }}}}")
                  [:data :members]
                  [{:first_name "jim"
                    :member_follows_on_member_id []}
                   {:first_name "yoshi"
-                   :member_follows_on_member_id [{:created_by_member {:first_name "jim"}}]}]))
+                   :member_follows_on_member_id
+                   [{:created_by_member {:first_name "jim"}}]}]))
+
+    (testing "list entities with circular many-to-many param and aggregation"
+      (test-gql (str  "{ members { first_name member_follows_on_created_by "
+                      "{ member { first_name }}"
+                      "member_follows_on_created_by_aggregate { count "
+                      "max { member_id created_by } min { member_id created_by }}}}")
+                [:data :members]
+                [{:first_name "jim"
+                  :member_follows_on_created_by
+                  [{:member {:first_name "yoshi"}}]
+                  :member_follows_on_created_by_aggregate
+                  {:count 1
+                   :max {:member_id 2 :created_by 1}
+                   :min {:member_id 2 :created_by 1}}}
+                 {:first_name "yoshi"
+                  :member_follows_on_created_by []
+                  :member_follows_on_created_by_aggregate
+                  {:count nil
+                   :max {:member_id nil :created_by nil}
+                   :min {:member_id nil :created_by nil}}}])
+      (test-gql (str  "{ members { first_name member_follows_on_member_id "
+                      "{ created_by_member { first_name }}"
+                      "member_follows_on_member_id_aggregate { count "
+                      "max { member_id created_by } min { member_id created_by }}}}")
+                [:data :members]
+                [{:first_name "jim"
+                  :member_follows_on_member_id []
+                  :member_follows_on_member_id_aggregate
+                  {:count nil
+                   :max {:member_id nil :created_by nil}
+                   :min {:member_id nil :created_by nil}}}
+                 {:first_name "yoshi"
+                  :member_follows_on_member_id
+                  [{:created_by_member {:first_name "jim"}}]
+                  :member_follows_on_member_id_aggregate
+                  {:count 1
+                   :max {:member_id 2 :created_by 1}
+                   :min {:member_id 2 :created_by 1}}}]))
 
     ;; Filters
     (testing "list entity with where arg"
@@ -179,12 +332,14 @@
                 [{:id 2 :last_name "tanabe"}]))
 
     (testing "fetch entity with has-many param filtered with where"
-      (test-gql   "{ venues (where: {id: {eq: 1}}) { name postal_code meetups { id title }}}"
+      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+                     "{ name postal_code meetups { id title }}}")
                  [:data :venues]
                  [{:name "office one" :postal_code "123456"
                    :meetups [{:id 2 :title "cpp meetup"}]}])
-      (test-gql  (str "{ venues (where: {id: {eq: 1}}) { name postal_code meetups "
-                      "(where: {title: {like: \"%rust%\"}}) { id title }}}")
+      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+                     "{ name postal_code meetups "
+                     "(where: {title: {like: \"%rust%\"}}) { id title }}}")
                  [:data :venues]
                  [{:name "office one" :postal_code "123456"
                    :meetups []}]))
@@ -215,7 +370,8 @@
                      "first_name: \"Ken\" last_name: \"Spencer\") {result}}")
                 [:data :updateMember :result]
                 true)
-      (test-gql  "{ members (where: {id: {eq: 1}}) { id first_name last_name email}}"
+      (test-gql (str  "{ members (where: {id: {eq: 1}}) "
+                      "{ id first_name last_name email}}")
                  [:data :members]
                  [{:id 1 :first_name "Ken" :last_name "Spencer"
                    :email "ken@test.com"}]))
@@ -229,6 +385,8 @@
                  [:data :members]
                  [{:id 2 :first_name "yoshi"}]))
     ))
+
+;;; Testing signals
 
 (defn- members-pre-query [sql-args ctx]
   ;; Apply filter with email from ctx

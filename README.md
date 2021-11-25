@@ -68,6 +68,7 @@ Though there are multiple options for customization, the only config parameter r
 | `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                         | No       |               |
 | `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                            | No       |               |
 | `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details.            | No       |               |
+| `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                          | No       | `true`        |
 | `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                | No       | `true`        |
 | `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names. | No       | `false`       |
 | `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.  | No       | `true`        |

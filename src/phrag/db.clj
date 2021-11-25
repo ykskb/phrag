@@ -2,10 +2,9 @@
   (:refer-clojure :exclude [group-by update])
   (:require [clojure.core :as c]
             [clojure.java.jdbc :as jdbc]
-            ;; [next.jdbc :as jdbc]
             [honey.sql.helpers :refer
              [select update delete-from from where join order-by
-              limit offset] :as h]
+              limit offset group-by] :as h]
             [honey.sql :as sql]))
 
 ;; Schema queries
@@ -90,6 +89,24 @@
         q (if (not-empty whr) (apply where q whr) q)
         q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
     ;;(println (sql/format q))
+    (->> (sql/format q)
+         (jdbc/query db))))
+
+(defn aggregate [db rsc aggrs & [filters]]
+  (let [whr (:where filters)
+        q (-> (apply select aggrs) (from (keyword rsc))
+              (limit (:limit filters 100)) (offset (:offset filters 0)))
+        q (if (not-empty whr) (apply where q whr) q)]
+    (println (sql/format q))
+    (->> (sql/format q)
+         (jdbc/query db))))
+
+(defn aggregate-grp-by [db rsc aggrs grp-by & [filters]]
+  (let [whr (:where filters)
+        q (-> (apply select aggrs) (select grp-by)
+              (from (keyword rsc)) (group-by grp-by))
+        q (if (not-empty whr) (apply where q whr) q)]
+    (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 

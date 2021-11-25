@@ -18,6 +18,12 @@
   (db/update! db-con table id (select-keys params cols))
   nil)
 
+(defn aggregate-root [db-con table aggrs filters]
+  (db/aggregate db-con table aggrs filters))
+
+(defn aggregate-grp-by [db-con table aggrs grp-by filters]
+  (db/aggregate-grp-by db-con table aggrs grp-by filters))
+
 ;;; n-n
 
 (defn create-n-n [col-a id-a col-b id-b params db-con table cols]

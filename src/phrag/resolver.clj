@@ -71,37 +71,18 @@
   (-fetch [this env]
     (sl-api/unwrap (exec-sql (:fetch-fn this) this env))))
 
-(defrecord HasOneDataSource [id batch-fn]
+(defrecord BatchDataSource [id batch-fn map-1-fn map-n-fn]
   u/DataSource
   (-identity [this] (:id this))
   (-fetch [this env]
     (let [responses (exec-sql (:batch-fn this) [this] env)]
-      (sl-api/unwrap first responses)))
+      (sl-api/unwrap (:map-1-fn this) responses)))
 
   u/BatchedSource
   (-fetch-multi [muse muses env]
     (let [muses (cons muse muses)
           responses (exec-sql (:batch-fn muse) muses env)
-          map-fn (fn [responses]
-                   (zipmap (map u/-identity muses)
-                           responses))]
-      (sl-api/unwrap map-fn responses))))
-
-(defrecord HasManyDataSource [id batch-fn rel-key]
-  u/DataSource
-  (-identity [this] (:id this))
-  (-fetch [this env]
-    (let [results (exec-sql (:batch-fn this) [this] env)]
-      (sl-api/unwrap :res results)))
-
-  u/BatchedSource
-  (-fetch-multi [muse muses env]
-    (let [muses (cons muse muses)
-          responses (exec-sql (:batch-fn muse) muses env)
-          map-fn (fn [result]
-                   (let [m (zipmap (:ids result) (repeat []))
-                         vals (group-by rel-key (:res result))]
-                     (merge-with concat m vals)))]
+          map-fn (partial (:map-n-fn muse) muses)]
       (sl-api/unwrap map-fn responses))))
 
 (defn- ->lacinia-promise [sl-result]
@@ -152,6 +133,7 @@
                     (update-triggers-by-count! rels))]
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
+
 (defn has-one [id-key table rels ctx _args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (signal nil ctx table :query :pre)
@@ -162,10 +144,14 @@
                            res (c/list-root (:db ctx) table whr)]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        res))
+          map-n-fn (fn [muses batch-res]
+                     (let [m (zipmap (map :id muses) (repeat nil))
+                           vals (zipmap (map :id batch-res) batch-res)]
+                       (merge m vals)))
           res-p (sl-api/enqueue! (keyword table)
-                                 (->HasOneDataSource (id-key val) batch-fn))]
+                                 (->BatchDataSource (id-key val) batch-fn
+                                                    first map-n-fn))]
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
-
 
 (defn has-many [id-key table rels ctx args val]
   (with-superlifter (:sl-ctx ctx)
@@ -177,9 +163,82 @@
                                            conj [:in id-key ids])
                            res (c/list-root (:db ctx) table sql-args)]
                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
-                      {:ids ids :res res}))
+                      res))
+          map-n-fn (fn [muses batch-res]
+                     (let [m (zipmap (map :id muses) (repeat []))
+                           vals (group-by id-key batch-res)]
+                       (merge-with concat m vals)))
           res-p (sl-api/enqueue! (keyword table)
-                                 (->HasManyDataSource (:id val) batch-fn id-key))]
+                                 (->BatchDataSource (:id val) batch-fn
+                                                    identity map-n-fn))]
+      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
+
+;; Aggregates
+
+(defn- aggr-fields [ctx]
+  (let [slctns (-> ctx
+                   (:com.walmartlabs.lacinia/selection)
+                   (:selections))]
+    (reduce (fn [m slct]
+              (let [aggr (:field-name slct)]
+                (if (= :count aggr)
+                  (assoc m :count nil)
+                  (assoc m aggr (map :field-name (:selections slct))))))
+         {} slctns)))
+
+(defn- aggr-key [aggr-type col]
+  (keyword (str (name aggr-type) "_" (name col))))
+
+(defn- aggr-selects [fields]
+  (reduce (fn [v [aggr cols]]
+         (if (= :count aggr)
+           (conj v [[:count :*] :count])
+           (concat v (map (fn [col]
+                            [[aggr col] (aggr-key aggr col)])
+                          cols))))
+       [] fields))
+
+(defn- aggr-result [fields sql-res & [id-key id]]
+  (reduce (fn [m [aggr cols]]
+            (if (= :count aggr)
+              (assoc m aggr (:count sql-res))
+              (assoc m aggr (reduce (fn [m col]
+                                      (assoc m col ((aggr-key aggr col) sql-res)))
+                                    {} cols))))
+          (or sql-res {id-key id})
+          fields))
+
+(defn- aggr-many-result [fields sql-multi-res id-key ids]
+  (let [multi-res-map (zipmap (map #(id-key %) sql-multi-res) sql-multi-res)]
+    (map #(aggr-result fields (get multi-res-map %) id-key %) ids)))
+
+(defn aggregate-root [table ctx args _val]
+  (let [sql-args (args->sql-args args)
+        fields (aggr-fields ctx)
+        selects (aggr-selects fields)
+        res (first (c/aggregate-root (:db ctx) table selects sql-args))]
+    (prn (c/aggregate-root (:db ctx) table selects sql-args))
+    (aggr-result fields res)))
+
+(defn aggregate-has-many [id-key table ctx args val]
+  (with-superlifter (:sl-ctx ctx)
+    (let [sql-args (-> (args->sql-args args)
+                       (signal ctx table :query :pre))
+          fields (aggr-fields ctx)
+          selects (aggr-selects fields )
+          batch-fn (fn [many _env]
+                     (let [ids (map :id many)
+                           sql-args (update sql-args :where
+                                            conj [:in id-key ids])
+                           sql-res (c/aggregate-grp-by (:db ctx) table selects
+                                                   id-key sql-args)]
+                       (aggr-many-result fields sql-res id-key ids)))
+          map-n-fn (fn [_muses batch-res]
+                     (prn "mmmm" batch-res)
+                     (zipmap (map id-key batch-res) batch-res))
+          res-p (sl-api/enqueue! (keyword (str table "_aggregate"))
+                                 (->BatchDataSource (:id val) batch-fn
+                                                    first map-n-fn))]
       (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
 ;; Mutations
