@@ -12,6 +12,8 @@ Instantly-operational yet customizable GraphQL handler for RDBMS
 
 * [Signals](#signals) to inject custom logics before & after DB accesses per resource operations.
 
+* Aggregations for root entity queies and has-many relationships.
+
 * Out-of-the-box resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) for query operations.
 
 * Options to selectively override database schema data or entirely base on provided data through [config](#phrag-config).

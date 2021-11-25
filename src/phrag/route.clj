@@ -5,10 +5,10 @@
 
 (defmulti graphql-route (fn [config & _] (:router config)))
 
+;;; reitit
+
 (defn- rtt-param-data [req]
   (w/stringify-keys (or (:body-params req) (:form-params req))))
-
-;;; reitit
 
 (defn- rtt-gql-handler [config]
   (let [schema (gql/schema config)]
