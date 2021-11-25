@@ -12,6 +12,10 @@
                  [inflections "0.13.2"]
                  [superlifter "0.1.3"]]
   :resource-paths ["resources" "target/resources"]
+  :plugins [[lein-eftest "0.5.9"]
+            [lein-cloverage "1.2.2"]]
+  :eftest {:report eftest.report.pretty/report
+           :report-to-file "target/junit.xml"}
   :profiles
   {:dev  [:project/dev :profiles/dev]
    :repl {:repl-options {:init-ns user}}
