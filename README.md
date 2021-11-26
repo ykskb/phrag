@@ -1,22 +1,24 @@
 # Phrag
 
-Instantly-operational yet customizable GraphQL handler for RDBMS
+**Instantly-operational yet customizable GraphQL handler for RDBMS**
+
+Phrag creates a GraphQL-powered handler from a database connection.
 
 #### Features:
 
-* `Query`, `create`, `update`, and `delete` operations created per resources from DB schema data, using [Lacinia](https://github.com/walmartlabs/lacinia).
+* Queries and mutations (`create` / `update` / `delete`) created per resources with [Lacinia](https://github.com/walmartlabs/lacinia).
 
-* `One-to-one`, `one-to-many` and `many-to-many` relationships supported as nested resource structures.
+* `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships supported as nested object queries.
 
-* Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/seancorfield/honeysql)
+* Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
+
+* Aggregation queries for root entity and has-many relationships.
+
+* Resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) for query operations.
 
 * [Signals](#signals) to inject custom logics before & after DB accesses per resource operations.
 
-* Aggregations for root entity queies and has-many relationships.
-
-* Out-of-the-box resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) for query operations.
-
-* Options to selectively override database schema data or entirely base on provided data through [config](#phrag-config).
+* Options to use schema retrieved from a database, selectively override it or entirely base on provided data through [config](#phrag-config).
 
 * Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
@@ -28,36 +30,30 @@ Instantly-operational yet customizable GraphQL handler for RDBMS
 
 * This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
-### Requirements
-
-* Each entitiy table should have an `id` column for row identities. It's typically a primary key of types such as auto-increment integer or UUID.
-* Pivot (bridge) tables for `many-to-many` relationships should have a composite primary key of pivoting foreign keys. `PRIMARY KEY (article_id, tag_id)` for example.
-* By default, relationships are identified with foreign key constraints on databases. There is an option to detect relations from table/column names, however it comes with a limitation since matching names such as `user_id` for `users` table are required.
-
 ### Usage
 
-##### reitit route
+Create ring app with reitit route using Integrant
 
 ```clojure
-;; Read schema data from DB (as data for Integrant)
 {:phrag.core/reitit-graphql-route {:db (ig/ref :my-db/connection)}
  ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
-
-;; Provide schema data (direct function call)
-(def routes (phrag.core/make-reitit-graphql-route {:tables [{:name "..."}]}))
 ```
 
-##### bidi route
+### Relationships in Scanned Schema
 
-```clojure
-;; Read schema data from DB (as data for Integrant)
-{:phrag.core/bidi-graphql-route {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
+* Relationships are identified with foreign key constraints on databases. (There is an option to detect relations from table/column names, however it comes with a limitation since matching names such as `user_id` for `users` table are required.)
 
-;; Provide schema data (direct function call)
-(def routes (phrag.core/make-bidi-graphql-route {:tables [{:name "..."}]}))
-```
-
+* Pivot (bridge) tables for `many-to-many` relationships should have a composite primary key of pivoting foreign keys.
+  Example:
+  ```sql
+  create table meetup_member (
+      meetup_id     integer,
+      member_id     integer,
+      foreign key(meetup_id) references meetups(id),
+      foreign key(member_id) references members(id),
+      primary key (meetup_id, member_id)
+  );
+  ```
 ### Phrag Config
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
@@ -163,7 +159,7 @@ Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is 
 
 ##### Example:
 
-`{users (where: {name: {like: "%ken%"} and: [{id: {gt: 100}}, {id: {lte: 200}}]})}` (`users` where `name` is `like` `ken` `AND` `id` is greater than `100` `AND` less than or equal to `200`)
+`{users (where: {name: {like: "%ken%"} or: [{age: {eq: 20}}, {age: {eq: 21}}]})}` (`users` where `name` is `like` `ken` `AND` `age` is `20` `OR` `21`)
 
 ### Resource Sorting
 
@@ -230,7 +226,7 @@ dev=> (test)
 But you can also run tests through Leiningen.
 
 ```sh
-lein test
+lein eftest
 ```
 
 ## Legal
