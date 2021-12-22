@@ -54,6 +54,7 @@ Create ring app with reitit route using Integrant
       primary key (meetup_id, member_id)
   );
   ```
+
 ### Phrag Config
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
@@ -116,10 +117,11 @@ Phrag can signal configurable functions per resource queries/mutations at pre/po
 > Notes:
 > * Resource operation types include `query`, `create`, `update` and `delete`.
 > * Signal receiver functions are called with different parameters per types:
->     * A pre-query function will have a list of `where` clauses in [HoneySQL](https://github.com/seancorfield/honeysql) format as its first argument, and its returned value will be passed to a subsequent DB operation.
->     * A pre-mutation function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
->     * A post-query/mutation function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
+>     * A `pre-query` function will have its first argument which is a map of SQL parameters including `where` (in [HoneySQL](https://github.com/seancorfield/honeysql) format), `sort`, `limit` and `offset`, and its returned value will be passed to a subsequent DB operation.
+>     * A `pre-mutation` function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
+>     * A `post-query/mutation` function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
 >     * All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config together with a DB connection and an incoming HTTP request. 
+>     * If `nil` is returned from `pre-mutation` functions, DB operations will be skipped and `id: nil` or `result: true` will be returned.
 
 Here's some examples:
 
@@ -129,7 +131,7 @@ Here's some examples:
   (let [user (user-info (:request ctx))]
     (if (admin-user? user))
       sql-args
-      (update sql-args :where conj [:= :id (:user-id user)])))
+      (update sql-args :where conj [:= :user-id (:id user)])))
 
 ;; Removes :internal-id for non-admin users
 (defn- hide-internal-id [result ctx]
@@ -139,11 +141,11 @@ Here's some examples:
       (update result :internal-id "")))
 
 ;; Updates owner data with a user ID from authenticated info in a request
-(defn- update-owner [sql-args ctx]
+(defn- update-owner [args ctx]
   (let [user (user-info (:request ctx))]
     (if (end-user? user)
-      (update sql-args :created_by (:user-id user))
-      (sql-args))))
+      (update args :created_by (:id user))
+      args)))
         
 (def example-config {:signals {:users {:query {:pre end-user-access :post hide-internal-id}
                                        :create {:pre update-owner}

@@ -1,5 +1,5 @@
 (defproject phrag "0.1.0-SNAPSHOT"
-  :description "Automatic GraphQL / REST API with RDBMS"
+  :description "Instantly operational GraphQL handler"
   :url "https://github.com/ykskb/phrag"
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.10.3"]
@@ -22,7 +22,9 @@
    :profiles/dev {}
    :project/dev  {:source-paths   ["dev/src"]
                   :resource-paths ["dev/resources"]
-                  :dependencies   [[bidi "2.1.6"]
+                  :dependencies   [[alekcz/charmander "1.0.2"]
+                                   [bidi "2.1.6"]
+                                   [cheshire "5.10.1"]
                                    [eftest "0.5.9"]
                                    [hawk "0.2.11"]
                                    [kerodon "0.9.1"]
@@ -31,6 +33,7 @@
                                    [ch.qos.logback/logback-classic "1.1.1"]
                                    [org.postgresql/postgresql "42.3.0"]
                                    [org.xerial/sqlite-jdbc "3.34.0"]
+                                   [ring-cors "0.1.13"]
                                    [ring/ring-json "0.5.1"]
                                    [ring/ring-jetty-adapter "1.9.3"]
                                    [threatgrid/ring-graphql-ui "0.1.3"]]}})

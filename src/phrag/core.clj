@@ -8,6 +8,8 @@
   (let [config {:router (:router options)
                 :db (:db options)
                 :tables (:tables options)
+                :signals (:signals options)
+                :middleware (:middleware options)
                 :scan-schema (:scan-schema options true)
                 :no-fk-on-db (:no-fk-on-db options false)
                 :plural-table-name (:plural-table-name options true)

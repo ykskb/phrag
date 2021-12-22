@@ -2,9 +2,7 @@
   (:refer-clojure :exclude [group-by update])
   (:require [clojure.core :as c]
             [clojure.java.jdbc :as jdbc]
-            [honey.sql.helpers :refer
-             [select update delete-from from where join order-by
-              limit offset group-by] :as h]
+            [honey.sql.helpers :as h]
             [honey.sql :as sql]))
 
 ;; Schema queries
@@ -81,57 +79,56 @@
 
 ;; Resource queries
 
-(defn list-up [db rsc & [filters]]
-  (let [whr (:where filters)
-        o-col (:order-col filters)
-        q (-> (select :*) (from (keyword rsc))
-              (limit (:limit filters 100)) (offset (:offset filters 0)))
-        q (if (not-empty whr) (apply where q whr) q)
-        q (if (some? o-col) (order-by q [o-col (:direc filters)]) q)]
+(defn list-up [db table & [params]]
+  (let [whr (:where params)
+        selects (:select params [:*])
+        o-col (:order-col params)
+        q (-> (apply h/select selects) (h/from table)
+              (h/limit (:limit params 100)) (h/offset (:offset params 0)))
+        q (if (not-empty whr) (apply h/where q whr) q)
+        q (if (some? o-col) (h/order-by q [o-col (:direc params)]) q)]
+    (println (sql/format q))
+    (->> (sql/format q)
+         (jdbc/query db))))
+
+(defn aggregate [db table aggrs & [params]]
+  (let [whr (:where params)
+        q (-> (apply h/select aggrs) (h/from table)
+              (h/limit (:limit params 100)) (h/offset (:offset params 0)))
+        q (if (not-empty whr) (apply h/where q whr) q)]
     ;;(println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn aggregate [db rsc aggrs & [filters]]
-  (let [whr (:where filters)
-        q (-> (apply select aggrs) (from (keyword rsc))
-              (limit (:limit filters 100)) (offset (:offset filters 0)))
-        q (if (not-empty whr) (apply where q whr) q)]
+(defn aggregate-grp-by [db table aggrs grp-by & [params]]
+  (let [whr (:where params)
+        q (-> (apply h/select aggrs) (h/select grp-by)
+              (h/from table) (h/group-by grp-by))
+        q (if (not-empty whr) (apply h/where q whr) q)]
     ;;(println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn aggregate-grp-by [db rsc aggrs grp-by & [filters]]
-  (let [whr (:where filters)
-        q (-> (apply select aggrs) (select grp-by)
-              (from (keyword rsc)) (group-by grp-by))
-        q (if (not-empty whr) (apply where q whr) q)]
-    ;;(println (sql/format q))
-    (->> (sql/format q)
-         (jdbc/query db))))
-
-(defn delete! [db rsc id & [p-col p-id]]
-  (let [whr (if (nil? p-id)
-              [[:= :id id]]
-              [[:= :id id] [:= (keyword p-col) p-id]])
-        q (apply where (delete-from (keyword rsc)) whr)]
+(defn delete! [db table id]
+  (let [whr [[:= :id id]]
+        q (apply h/where (h/delete-from table) whr)]
     (->> (sql/format q)
          (jdbc/execute! db))))
 
-(defn delete-where! [db rsc filters]
-  (let [whr (:where filters)
-        q (apply where (delete-from (keyword rsc)) whr)]
+(defn delete-where! [db table params]
+  (let [whr (:where params)
+        q (apply h/where (h/delete-from table) whr)]
     (->> (sql/format q)
          (jdbc/execute! db))))
 
 (defn create! [db rsc raw-map opts]
+  (prn db rsc raw-map)
   (jdbc/insert! db rsc raw-map opts))
 
-(defn update! [db rsc id raw-map & [p-col p-id]]
-  (let [whr (if (nil? p-id) [[:= :id id]]
-                    [[:= :id id] [:= (keyword p-col) p-id]])
-        q (-> (h/update (keyword rsc)) (h/set raw-map))]
-    (->> (apply where q whr)
+(defn update! [db table id raw-map]
+  (let [whr [[:= :id id]]
+        q (-> (h/update table) (h/set raw-map))]
+    (->> (apply h/where q whr)
          sql/format
          (jdbc/execute! db))))
 

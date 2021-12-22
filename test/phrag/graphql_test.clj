@@ -17,7 +17,7 @@
               :use-aggregation true}
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
-                         res (gql/exec conf schema q nil)]
+                         res (gql/exec conf schema q nil {})]
                      (is (= expected (get-in res res-keys)))))]
 
     ;; Root entities
@@ -396,12 +396,15 @@
   ;; Replace first_name with one from ctx
   [(assoc (first res) :first_name (:first-name ctx))])
 
-(defn- members-pre-create [sql-args ctx]
+(defn- members-pre-create [args ctx]
   ;; Replace email with one from ctx
-  (assoc sql-args :email (:email ctx)))
+  (assoc args :email (:email ctx)))
 
-(defn- members-post-create [res ctx]
+(defn- members-post-create [res _ctx]
   (assoc res :id (+ (:id res) (count (keys res)))))
+
+(defn- members-pre-update [args _ctx]
+  nil)
 
 (def ^:private signal-test-config
   {:table-name-plural true,
@@ -417,7 +420,8 @@
    :signals {:members {:query {:pre members-pre-query
                                :post members-post-query}
                        :create {:pre members-pre-create
-                                :post members-post-create}}}})
+                                :post members-post-create}
+                       :update {:pre members-pre-update}}}})
 
 (deftest graphql-signals
   (let [db (doto (create-db)
@@ -427,18 +431,26 @@
         conf (assoc signal-test-config :db db)
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
-                         res (gql/exec conf schema q nil)]
+                         res (gql/exec conf schema q nil {})]
                      (is (= expected (get-in res res-keys)))))]
 
-    (testing "create 2nd user"
+    (testing "post-create signal mutate with ctx"
       (test-gql (str "mutation {createMember (email: \"input-email\" "
                      "first_name: \"yoshi\" last_name: \"tanabe\") { id }}")
                 [:data :createMember :id] 6))
 
-   ;; Queries
-    (testing "list root type entity"
+    (testing "pre-create / post-query signal"
       (test-gql  "{ members { id email first_name }}"
                  [:data :members]
                  [{:id 2 :email "yoshi@test.com"
-                   :first_name "changed-first-name"}]))))
+                   :first_name "changed-first-name"}]))
+
+    (testing "pre-update signal"
+      (test-gql (str "mutation {updateMember (id: 2 email: \"fake-email\" "
+                     "first_name: \"fake-first-name\") { result }}")
+                [:data :updateMember :result] true)
+      (test-gql "{ members { id email first_name }}"
+                [:data :members]
+                [{:id 2 :email "yoshi@test.com"
+                  :first_name "changed-first-name"}]))))
 

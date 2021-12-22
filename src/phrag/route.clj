@@ -16,11 +16,13 @@
       (let [params (rtt-param-data req)
             query (get params "query")
             vars (w/keywordize-keys (get params "variables"))]
+        (prn req)
         {:status 200
-         :body (gql/exec config schema query vars)}))))
+         :body (gql/exec config schema query vars req)}))))
 
 (defmethod graphql-route :reitit [config]
-  ["/graphql" {:post {:handler (rtt-gql-handler config)}}])
+  ["/graphql" {:post {:handler (rtt-gql-handler config)}
+               :middleware (:middleware config)}])
 
 ;;; Bidi
 

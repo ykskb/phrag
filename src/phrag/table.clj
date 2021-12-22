@@ -10,11 +10,14 @@
 (defn col-names [table]
   (set (map :name (:columns table))))
 
+(defn col-kw-set [table]
+  (set (map #(keyword (:name %)) (:columns table))))
+
 (defn primary-fks [table]
   (vals (select-keys (:fk-map table) (keys (:pk-map table)))))
 
 (defn is-circular-m2m-fk?
-  "Circular many-to-many links records on the same table.
+  "Circular many-to-many bridge tables link records on the same table.
   Example: `user_follow` table where followers and the followed are both
   linked to `users` table."
   [table fk-from]
@@ -64,19 +67,19 @@
 
 ;;; Table schema map from config
 
-(defn- is-pivot-table? [table]
+(defn- pivot-table? [table]
   (and (> (count (:pks table)) 1)
        (let [fk-names (set (keys (:fk-map table)))
              pk-names (keys (:pk-map table))]
          (every? #(contains? fk-names %) pk-names))))
 
 (defn- table-type [table]
-  (if (is-pivot-table? table) :pivot :root))
+  (if (pivot-table? table) :pivot :root))
 
 (defn- update-table-types [tables]
   (map #(assoc % :table-type (table-type %)) tables))
 
-(defn- update-info-maps [tables]
+(defn- update-column-maps [tables]
   (map (fn [table]
          (let [cols (:columns table)
                fks (:fks table)
@@ -108,12 +111,12 @@
   [config]
   (let [scm (if (:scan-schema config)
               (cond-> (db/schema (:db config))
-                true (update-info-maps)
+                true (update-column-maps)
                 (:no-fk-on-db config) (update-fks-by-names config)
                 true (update-table-types)
                 true (merge-config-tables config))
               (cond-> (:tables config)
-                true (update-info-maps)
+                true (update-column-maps)
                 (:no-fk-on-db config) (update-fks-by-names config)))]
     (log :info "Origin DB schema:\n"
          (with-out-str (pp/pprint (map #(-> %
@@ -121,4 +124,3 @@
                                             (dissoc :fk-map)
                                             (dissoc :pk-map)) scm))))
     scm))
-

@@ -122,6 +122,7 @@
 (defn- root-schema [config rel-map]
   (reduce (fn [m table]
             (let [table-name (:name table)
+                  table-key (keyword table-name)
                   table-type (:table-type table)
                   use-aggr (:use-aggregation config)
                   rsc (inf/singular table-name)
@@ -140,7 +141,7 @@
                   update-key (keyword (str "update" rsc-name))
                   delete-key (keyword (str "delete" rsc-name))
                   obj-fields (rsc-object table)
-                  cols (tbl/col-names table)
+                  cols (tbl/col-kw-set table)
                   rels (rsc-relations rel-map table-name)]
               (cond-> m
                     true (assoc-in [:objects rsc-name-key]
@@ -171,32 +172,32 @@
                                       :limit {:type 'Int}
                                       :offset {:type 'Int}}
                                :resolve (partial rslv/list-query
-                                                 table-name rels)})
+                                                 table-key rels)})
                     use-aggr
                     (assoc-in [:queries aggr-q-key]
                               {:type rsc-aggr-key
                                :description (str "Aggrecate " rscs-name ".")
                                :args {:where {:type rsc-whr-key}}
                                :resolve (partial rslv/aggregate-root
-                                                 table-name)})
+                                                 table-key)})
 
                     (= table-type :root)
                     (assoc-in [:mutations create-key]
                               {:type :NewId
                                :args (dissoc obj-fields :id)
                                :resolve (partial rslv/create-root
-                                                 table-name cols)})
+                                                 table-key cols)})
                     (= table-type :root)
                     (assoc-in [:mutations update-key]
                               {:type :Result
                                :args obj-fields
                                :resolve (partial rslv/update-root
-                                                 table-name cols)})
+                                                 table-key cols)})
                     (= table-type :root)
                     (assoc-in [:mutations delete-key]
                               {:type :Result
                                :args {:id {:type '(non-null ID)}}
-                               :resolve (partial rslv/delete-root table-name)}))))
+                               :resolve (partial rslv/delete-root table-key)}))))
           {:enums (merge sort-op)
            :input-objects filter-inputs
            :objects {:Result {:fields {:result {:type 'Boolean}}}
@@ -220,6 +221,7 @@
 
 (defn- update-fk-schema [schema table rel-map use-aggr]
   (let [table-name (:name table)
+        table-key (keyword table-name)
         rsc (inf/singular table-name)
         rsc-name (csk/->PascalCase rsc)
         rsc-name-key (keyword rsc-name)
@@ -229,6 +231,7 @@
         rsc-rels (rsc-relations rel-map table-name)]
     (reduce (fn [m fk]
               (let [fk-to-tbl-name (:table fk)
+                    fk-to-tbl-key (keyword fk-to-tbl-name)
                     fk-to-rsc (inf/singular fk-to-tbl-name)
                     fk-to-rsc-name (csk/->PascalCase fk-to-rsc)
                     fk-to-rsc-name-key (keyword fk-to-rsc-name)
@@ -245,7 +248,7 @@
                                 :limit {:type 'Int}
                                 :offset {:type 'Int}}
                          :resolve (partial rslv/has-many fk-from-rsc-col
-                                           table-name rsc-rels)})
+                                           table-key rsc-rels)})
                   ;; has-many aggregate on linked tables
                   use-aggr (assoc-in
                             [:objects fk-to-rsc-name-key :fields
@@ -254,13 +257,13 @@
                             {:type rsc-aggr-key
                              :args {:where {:type rsc-whr-key}}
                              :resolve (partial rslv/aggregate-has-many
-                                               fk-from-rsc-col table-name)})
+                                               fk-from-rsc-col table-key)})
                   ;; has-one on fk origin tables
                   true (assoc-in
                         [:objects rsc-name-key :fields (has-one-field-key fk)]
                         {:type fk-to-rsc-name-key
                          :resolve (partial rslv/has-one fk-from-rsc-col
-                                           fk-to-tbl-name fk-to-rels)}))))
+                                           fk-to-tbl-key fk-to-rels)}))))
             schema (:fks table))))
 
 (defn- update-pivot-schema [schema table]
@@ -272,7 +275,7 @@
         create-key (keyword (str "create" rsc-name))
         delete-key (keyword (str "delete" rsc-name))
         obj-fields (rsc-object table)
-        cols (tbl/col-names table)]
+        cols (tbl/col-kw-set table)]
     (-> schema
         (assoc-in [:mutations create-key]
                   {:type :Result
@@ -319,9 +322,10 @@
     (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
     (schema/compile scm-map)))
 
-(defn exec [config schema query vars]
+(defn exec [config schema query vars req]
   (let [sl-ctx (sl-ctx config)
         ctx (-> (:signal-ctx config {})
+                (assoc :req req)
                 (assoc :sl-ctx sl-ctx)
                 (assoc :db (:db config))
                 (assoc :signals (:signals config)))
