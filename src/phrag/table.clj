@@ -118,7 +118,7 @@
               (cond-> (:tables config)
                 true (update-column-maps)
                 (:no-fk-on-db config) (update-fks-by-names config)))]
-    (log :info "Origin DB schema:\n"
+    (log :debug "Origin DB schema:\n"
          (with-out-str (pp/pprint (map #(-> %
                                             (dissoc :col-map)
                                             (dissoc :fk-map)

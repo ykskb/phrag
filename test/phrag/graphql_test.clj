@@ -140,18 +140,21 @@
 
     (testing "add member 1 to meetup 1"
       (test-gql (str "mutation {createMeetupsMember (meetup_id: 1"
-                     "member_id: 1) { result }}")
-                [:data :createMeetupsMember :result] true))
+                     "member_id: 1) { meetup_id member_id }}")
+                [:data :createMeetupsMember]
+                {:meetup_id 1 :member_id 1}))
 
     (testing "add member 1 to meetup 2"
       (test-gql (str "mutation {createMeetupsMember (meetup_id: 2"
-                     "member_id: 1) { result }}")
-                [:data :createMeetupsMember :result] true))
+                     "member_id: 1) { meetup_id member_id }}")
+                [:data :createMeetupsMember]
+                {:meetup_id 2 :member_id 1}))
 
     (testing "add member 2 to meetup 1"
       (test-gql (str "mutation {createMeetupsMember (meetup_id: 1"
-                     "member_id: 2) { result }}")
-                [:data :createMeetupsMember :result] true))
+                     "member_id: 2) { meetup_id member_id }}")
+                [:data :createMeetupsMember]
+                {:meetup_id 1 :member_id 2}))
 
     (testing "list entities with many-to-many param"
       (test-gql  "{ members { email meetups_members { meetup { id title }}}}"
@@ -165,7 +168,8 @@
     (testing "list entities with many-to-many param and aggregation"
       (test-gql  (str "{ members { email meetups_members { meetup { id title }} "
                       "meetups_members_aggregate { count "
-                      "max { meetup_id member_id } min { meetup_id member_id }}}}")
+                      "max { meetup_id member_id } "
+                      "min { meetup_id member_id }}}}")
                  [:data :members]
                  [{:email "jim@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
@@ -181,8 +185,9 @@
 
     (testing "list entities with many-to-many param and filtered aggregation"
       (test-gql  (str "{ members { email meetups_members { meetup { id title }} "
-                      "meetups_members_aggregate (where: {meetup_id: {lt: 2}}) { count "
-                      "max { meetup_id member_id } min { meetup_id member_id }}}}")
+                      "meetups_members_aggregate (where: {meetup_id: {lt: 2}}) "
+                      "{ count max { meetup_id member_id } "
+                      "min { meetup_id member_id }}}}")
                  [:data :members]
                  [{:email "jim@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
@@ -236,8 +241,9 @@
 
     (testing "add member 2 follow to member 1"
       (test-gql (str "mutation {createMemberFollow (member_id: 2"
-                     "created_by: 1) { result }}")
-                [:data :createMemberFollow :result] true))
+                     "created_by: 1) { member_id created_by }}")
+                [:data :createMemberFollow]
+                {:member_id 2 :created_by 1}))
 
     (testing "list entities with circular many-to-many pararm"
       (test-gql (str  "{ members { first_name member_follows_on_created_by "
@@ -366,7 +372,8 @@
 
     ;; Update mutation
     (testing "update entity"
-      (test-gql (str "mutation {updateMember (id: 1 email: \"ken@test.com\" "
+      (test-gql (str "mutation {updateMember "
+                     "(pk_columns: {id: 1} email: \"ken@test.com\" "
                      "first_name: \"Ken\" last_name: \"Spencer\") {result}}")
                 [:data :updateMember :result]
                 true)
@@ -378,7 +385,7 @@
 
     ;; Delete mutation
     (testing "delete entity"
-      (test-gql  "mutation {deleteMember (id: 1) { result }}"
+      (test-gql  "mutation {deleteMember (pk_columns: {id: 1}) { result }}"
                  [:data :deleteMember :result]
                  true)
       (test-gql  "{ members { id first_name }}"
@@ -401,6 +408,9 @@
   (assoc args :email (:email ctx)))
 
 (defn- members-post-create [res _ctx]
+  ;; expected: 7
+  ;; id: 2
+  ;; res keys: (:email :first_name :last_name :last_insert_rowid() :id)
   (assoc res :id (+ (:id res) (count (keys res)))))
 
 (defn- members-pre-update [args _ctx]
@@ -415,7 +425,8 @@
                        {:name "last_name" :type "text"}
                        {:name "email" :type "text"}]
              :table-type :root
-             :fks []}]
+             :fks []
+             :pks [{:name "id" :type "integer"}]}]
    :signal-ctx {:email "yoshi@test.com" :first-name "changed-first-name"}
    :signals {:members {:query {:pre members-pre-query
                                :post members-post-query}
@@ -432,12 +443,13 @@
         test-gql (fn [q res-keys expected]
                    (let [schema (gql/schema conf)
                          res (gql/exec conf schema q nil {})]
+                     (prn res)
                      (is (= expected (get-in res res-keys)))))]
 
     (testing "post-create signal mutate with ctx"
       (test-gql (str "mutation {createMember (email: \"input-email\" "
                      "first_name: \"yoshi\" last_name: \"tanabe\") { id }}")
-                [:data :createMember :id] 6))
+                [:data :createMember :id] 7))
 
     (testing "pre-create / post-query signal"
       (test-gql  "{ members { id email first_name }}"
@@ -446,7 +458,7 @@
                    :first_name "changed-first-name"}]))
 
     (testing "pre-update signal"
-      (test-gql (str "mutation {updateMember (id: 2 email: \"fake-email\" "
+      (test-gql (str "mutation {updateMember (pk_columns: {id: 2} email: \"fake-email\" "
                      "first_name: \"fake-first-name\") { result }}")
                 [:data :updateMember :result] true)
       (test-gql "{ members { id email first_name }}"

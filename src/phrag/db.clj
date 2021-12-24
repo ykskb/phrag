@@ -109,14 +109,8 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn delete! [db table id]
-  (let [whr [[:= :id id]]
-        q (apply h/where (h/delete-from table) whr)]
-    (->> (sql/format q)
-         (jdbc/execute! db))))
-
-(defn delete-where! [db table params]
-  (let [whr (:where params)
+(defn delete! [db table pk-map]
+  (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (apply h/where (h/delete-from table) whr)]
     (->> (sql/format q)
          (jdbc/execute! db))))
@@ -125,8 +119,8 @@
   (prn db rsc raw-map)
   (jdbc/insert! db rsc raw-map opts))
 
-(defn update! [db table id raw-map]
-  (let [whr [[:= :id id]]
+(defn update! [db table pk-map raw-map]
+  (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (-> (h/update table) (h/set raw-map))]
     (->> (apply h/where q whr)
          sql/format

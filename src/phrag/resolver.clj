@@ -200,56 +200,26 @@
 (def ^:private res-true
   {:result true})
 
-(def ^:private sqlite-last-id
-  (keyword "last_insert_rowid()"))
-
-(defn- created-id [result]
-  (some #(% (first result)) [sqlite-last-id :id]))
-
-(defn create-root [table cols ctx args _val]
+(defn create-root [table-key pk-keys cols ctx args _val]
   (prn args cols (select-keys args cols))
   (let [sql-args (-> (select-keys args cols)
-                     (signal ctx table :create :pre)
+                     (signal ctx table-key :create :pre)
                      (w/stringify-keys))
         res (if (not sql-args)
-              nil (hd/create-root sql-args (:db ctx) table cols))
-        created (assoc args :id (created-id res))
-        sgnl-res (signal created ctx table :create :post)]
-    {:id (:id sgnl-res)}))
+              nil (hd/create-root sql-args (:db ctx) table-key pk-keys))
+        created (merge args res)]
+    (signal created ctx table-key :create :post)))
 
 (defn update-root [table cols ctx args _val]
-  (let [sql-args (-> (select-keys args cols)
-                     (signal ctx table :update :pre)
-                     (w/stringify-keys))]
-    (when (not-empty sql-args)
-      ;; TODO: update id to pk
-      (hd/patch-root (:id args) sql-args (:db ctx) table cols))
+  (let [params (-> (select-keys args cols)
+                   (signal ctx table :update :pre)
+                   (w/stringify-keys))]
+    (when (not-empty params)
+      (hd/patch-root (:pk_columns args) params (:db ctx) table cols))
     (signal res-true ctx table :update :post)))
 
 (defn delete-root [table ctx args _val]
   (let [sql-args (signal args ctx table :delete :pre)]
     (when (not-empty sql-args)
-      ;; TODO: update id to pk
-      (hd/delete-root (:id sql-args) (:db ctx) table))
+      (hd/delete-root (:pk_columns args) (:db ctx) table))
     (signal res-true ctx table :delete :post)))
-
-(defn create-n-n [col-a col-b table cols ctx args _val]
-  (let [sql-args (-> (select-keys args cols)
-                     (signal ctx table :create :pre)
-                     (w/stringify-keys))
-        col-a-val (get sql-args col-a)
-        col-b-val (get sql-args col-b)]
-    (when (not-empty sql-args)
-      (hd/create-n-n col-a col-a-val col-b col-b-val sql-args (:db ctx) table cols))
-    (signal res-true ctx table :create :post)))
-
-(defn delete-n-n [col-a col-b table ctx args _val]
-  (let [sql-args (-> (signal args ctx table :delete :pre)
-                     (w/stringify-keys))
-        col-a-val (get sql-args col-a)
-        col-b-val (get sql-args col-b)]
-    (when (not-empty sql-args)
-      (hd/delete-n-n col-a col-a-val col-b col-b-val (:db ctx) table))
-    (signal res-true ctx table :delete :post)))
-
-

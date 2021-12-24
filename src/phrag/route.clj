@@ -16,7 +16,6 @@
       (let [params (rtt-param-data req)
             query (get params "query")
             vars (w/keywordize-keys (get params "variables"))]
-        (prn req)
         {:status 200
          :body (gql/exec config schema query vars req)}))))
 

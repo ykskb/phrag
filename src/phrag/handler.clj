@@ -56,16 +56,30 @@
 (defn list-root [db-con table params]
   (db/list-up db-con table params))
 
-(defn create-root [params db-con table cols]
-  (let [opts {:return-keys (if (contains? cols :id) ["id"] nil)}]
-    (db/create! db-con table params opts)))
+(def ^:private sqlite-last-id
+  (keyword "last_insert_rowid()"))
 
-(defn delete-root [id db-con table]
-  (db/delete! db-con table id)
+(defn- created-id [res-map]
+  (some #(% res-map) [sqlite-last-id :id]))
+
+(defn- return-keys [result pks]
+  (let [res-map (first result)]
+    (prn result (set pks))
+    (if (contains? (set pks) :id)
+      (assoc res-map :id (created-id res-map))
+      res-map)))
+
+(defn create-root [params db-con table-key pk-keys]
+  (let [opts {:return-keys pk-keys}
+        result (db/create! db-con table-key params opts)]
+   (return-keys result pk-keys)))
+
+(defn delete-root [pk-map db-con table]
+  (db/delete! db-con table pk-map)
   nil)
 
-(defn patch-root [id params db-con table _cols]
-  (db/update! db-con table id params)
+(defn patch-root [pk-map params db-con table _cols]
+  (db/update! db-con table pk-map params)
   nil)
 
 (defn aggregate-root [db-con table aggrs params]
@@ -73,18 +87,3 @@
 
 (defn aggregate-grp-by [db-con table aggrs grp-by params]
   (db/aggregate-grp-by db-con table aggrs grp-by params))
-
-;; n-n
-
-(defn create-n-n [col-a id-a col-b id-b params db-con table cols]
-  (let [params (-> params (assoc col-a id-a) (assoc col-b id-b))
-        opts {:return-keys (if (contains? cols :id) ["id"] nil)}]
-    (db/create! db-con table params opts)
-    nil))
-
-(defn delete-n-n [col-a id-a col-b id-b db-con table]
-  (let [where-a [:= col-a id-a]
-        where-b [:= col-b id-b]
-        params {:where [where-a where-b]}]
-    (db/delete-where! db-con table params)
-    nil))

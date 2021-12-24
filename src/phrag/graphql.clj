@@ -20,8 +20,7 @@
    "timestamp" 'String
    "character varying" 'String
    "timestamp without time zone" 'String
-   "boolean" 'Boolean
-   })
+   "boolean" 'Boolean})
 
 (defn- needs-non-null? [col]
   (and (= 1 (:notnull col)) (nil? (:dflt_value col))))
@@ -72,7 +71,8 @@
                        :gt {:type 'Int}
                        :lt {:type 'Int}
                        :gte {:type 'Int}
-                       :lte {:type 'Int}}}})
+                       :lte {:type 'Int}}}
+   :BoolWhere {:fields {:eq {:type 'Boolean}}}})
 
 (def ^:private flt-input-types
   {"int" :IntWhere
@@ -81,7 +81,8 @@
    "text" :StrWhere
    "timestamp" :StrWhere
    "character varying" :StrWhere
-   "timestamp without time zone" :StrWhere})
+   "timestamp without time zone" :StrWhere
+   "boolean" :BoolWhere})
 
 (defn- rsc-clauses [table]
   (reduce (fn [m col]
@@ -103,15 +104,26 @@
   (str "Sort format is {column: \"asc\" or \"desc\"}."))
 
 (def ^:private sort-op
-  {:SortOp {:values [:asc :desc]}})
+  {:SortOperator {:values [:asc :desc]}})
 
 (defn- sort-fields [table]
   (reduce (fn [m col]
             (let [col-name (:name col)
                   col-key (keyword col-name)
-                  field {:type :SortOp}]
+                  field {:type :SortOperator}]
               (assoc m col-key field)))
           {} (:columns table)))
+
+;; Primary key fields
+
+(defn- pk-obj [pk-kws obj-fields]
+  (reduce (fn [m k]
+            (let [t (get-in obj-fields [k :type])]
+              (assoc m k {:type `(~'non-null ~t)})))
+          {} pk-kws))
+
+(defn- update-obj [pk-kws obj-fields]
+  (reduce (fn [m k] (dissoc m k)) obj-fields pk-kws))
 
 ;;; GraphQL schema
 
@@ -129,6 +141,9 @@
                   rscs (inf/plural table-name)
                   rsc-name (csk/->PascalCase rsc)
                   rscs-name (csk/->PascalCase rscs)
+                  rsc-pk-key (csk/->PascalCaseKeyword (str rsc-name "Pks"))
+                  rsc-pk-input-key (csk/->PascalCaseKeyword
+                                    (str rsc-name "PkColumns"))
                   rsc-cls-key (csk/->PascalCaseKeyword (str rsc-name "Clauses"))
                   rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
                   rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
@@ -142,11 +157,19 @@
                   delete-key (keyword (str "delete" rsc-name))
                   obj-fields (rsc-object table)
                   cols (tbl/col-kw-set table)
+                  pk-keys (map #(keyword (:name %)) (:pks table))
+                  update-fields (update-obj pk-keys obj-fields)
                   rels (rsc-relations rel-map table-name)]
               (cond-> m
                     true (assoc-in [:objects rsc-name-key]
                                    {:description rsc-name
                                     :fields obj-fields})
+                    true (assoc-in [:objects rsc-pk-key]
+                                   {:description sort-desc
+                                    :fields (pk-obj pk-keys obj-fields)})
+                    true (assoc-in [:input-objects rsc-pk-input-key]
+                                   {:description sort-desc
+                                    :fields (pk-obj pk-keys obj-fields)})
                     true (assoc-in [:input-objects rsc-cls-key]
                                    {:description clauses-desc
                                     :fields (rsc-clauses table)})
@@ -156,6 +179,7 @@
                     true (assoc-in [:input-objects rsc-sort-key]
                                    {:description sort-desc
                                     :fields (sort-fields table)})
+
                     use-aggr (assoc-in [:objects rsc-fields-key]
                                        {:description rsc-name
                                         :fields obj-fields})
@@ -163,7 +187,7 @@
                                        {:description rsc-name
                                         :fields (aggr-object rsc-fields-key)})
 
-                    (= table-type :root)
+                    true
                     (assoc-in [:queries list-q-key]
                               {:type `(~'list ~rsc-name-key)
                                :description (str "Query " rscs-name ".")
@@ -181,30 +205,33 @@
                                :resolve (partial rslv/aggregate-root
                                                  table-key)})
 
-                    (= table-type :root)
+                    true
                     (assoc-in [:mutations create-key]
-                              {:type :NewId
+                              {:type rsc-pk-key
+                               ;; Assumption: `id` column is auto-incremental
                                :args (dissoc obj-fields :id)
                                :resolve (partial rslv/create-root
-                                                 table-key cols)})
-                    (= table-type :root)
+                                                 table-key pk-keys cols)})
+                    true
                     (assoc-in [:mutations update-key]
                               {:type :Result
-                               :args obj-fields
+                               :args
+                               (assoc update-fields :pk_columns
+                                      {:type `(~'non-null ~rsc-pk-input-key)})
                                :resolve (partial rslv/update-root
                                                  table-key cols)})
-                    (= table-type :root)
+                    true
                     (assoc-in [:mutations delete-key]
                               {:type :Result
-                               :args {:id {:type '(non-null ID)}}
+                               :args {:pk_columns
+                                      {:type `(~'non-null ~rsc-pk-input-key)}}
                                :resolve (partial rslv/delete-root table-key)}))))
           {:enums (merge sort-op)
            :input-objects filter-inputs
-           :objects {:Result {:fields {:result {:type 'Boolean}}}
-                     :NewId {:fields {:id {:type 'Int}}}}
+           :objects {:Result {:fields {:result {:type 'Boolean}}}}
            :queries {}} (:tables config)))
 
-(defn has-many-field-key [table fk]
+(defn- has-many-field-key [table fk]
   (let [tbl-name (:name table)
         rscs (inf/plural tbl-name)
         fk-from (:from fk)]
@@ -266,33 +293,9 @@
                                            fk-to-tbl-key fk-to-rels)}))))
             schema (:fks table))))
 
-(defn- update-pivot-schema [schema table]
-  (let [tbl-name (:name table)
-        primary-fks (tbl/primary-fks table)
-        rsc-a-col (:from (first primary-fks))
-        rsc-b-col (:from (second primary-fks))
-        rsc-name (csk/->PascalCase (inf/singular tbl-name))
-        create-key (keyword (str "create" rsc-name))
-        delete-key (keyword (str "delete" rsc-name))
-        obj-fields (rsc-object table)
-        cols (tbl/col-kw-set table)]
-    (-> schema
-        (assoc-in [:mutations create-key]
-                  {:type :Result
-                   :args (dissoc obj-fields :id)
-                   :resolve (partial rslv/create-n-n rsc-a-col rsc-b-col
-                                     tbl-name cols)})
-        (assoc-in [:mutations delete-key]
-                  {:type :Result
-                   :args (dissoc obj-fields :id)
-                   :resolve (partial rslv/delete-n-n rsc-a-col rsc-b-col
-                                     tbl-name)}))))
-
 (defn- update-relationships [schema config rel-map]
   (reduce (fn [m table]
-            (cond-> m
-              true (update-fk-schema table rel-map (:use-aggregation config))
-              (= (:table-type table) :pivot) (update-pivot-schema table)))
+            (update-fk-schema m table rel-map (:use-aggregation config)))
           schema (:tables config)))
 
 (defn- sl-config [config]
@@ -318,6 +321,7 @@
   (let [rel-map (tbl/full-rel-map config)
         scm-map (-> (root-schema config rel-map)
                     (update-relationships config rel-map))]
+    ;(pp/pprint scm-map)
     (log :info "Generated queries: " (sort (keys (:queries scm-map))))
     (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
     (schema/compile scm-map)))
