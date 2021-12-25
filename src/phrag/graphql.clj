@@ -114,6 +114,66 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
+;;; Queries
+
+(defn- rsc-relations [rel-map table-name]
+  (let [rels (get rel-map table-name)]
+    (into rels (map #(str % "_aggregate") rels))))
+
+(defn- assoc-queries [schema table rsc-name table-key obj-fields
+                      rel-map use-aggr]
+  (let [table-name (:name table)
+        rscs (inf/plural table-name)
+        rscs-name (csk/->PascalCase rscs)
+        query-key (keyword rscs)
+        rsc-name-key (keyword rsc-name)
+        rsc-cls-key (csk/->PascalCaseKeyword (str rsc-name "Clauses"))
+        rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
+        rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
+        rels (rsc-relations rel-map table-name)
+        entity-schema (-> schema
+        (assoc-in [:objects rsc-name-key]
+                  {:description rsc-name
+                   :fields obj-fields})
+        (assoc-in [:input-objects rsc-cls-key]
+                  {:description clauses-desc
+                   :fields (rsc-clauses table)})
+        (assoc-in [:input-objects rsc-whr-key]
+                  {:description where-desc
+                   :fields (rsc-where table rsc-cls-key)})
+        (assoc-in [:input-objects rsc-sort-key]
+                  {:description sort-desc
+                   :fields (sort-fields table)})
+        (assoc-in [:queries query-key]
+                  {:type `(~'list ~rsc-name-key)
+                   :description (str "Query " rscs-name ".")
+                   :args {:where {:type rsc-whr-key}
+                          :sort {:type rsc-sort-key}
+                          :limit {:type 'Int}
+                          :offset {:type 'Int}}
+                   :resolve (partial rslv/list-query
+                                     table-key rels)}))]
+    (if use-aggr
+      (let [rsc-fields-key (keyword (str rsc-name "Fields"))
+            rsc-aggr-key (keyword (str rsc-name "Aggregate"))
+            aggr-q-key (keyword (str rscs "_aggregate"))]
+        (-> entity-schema
+            (assoc-in [:objects rsc-fields-key]
+                      {:description rsc-name
+                       :fields obj-fields})
+            (assoc-in [:objects rsc-aggr-key]
+                      {:description rsc-name
+                       :fields (aggr-object rsc-fields-key)})
+            (assoc-in [:queries aggr-q-key]
+                      {:type rsc-aggr-key
+                       :description (str "Aggrecate " rscs-name ".")
+                       :args {:where {:type rsc-whr-key}}
+                       :resolve (partial rslv/aggregate-root
+                                         table-key)})))
+      entity-schema)))
+
+;;; Mutations
+
 ;; Primary key fields
 
 (defn- pk-obj [pk-kws obj-fields]
@@ -125,107 +185,58 @@
 (defn- update-obj [pk-kws obj-fields]
   (reduce (fn [m k] (dissoc m k)) obj-fields pk-kws))
 
-;;; GraphQL schema
+(defn- assoc-mutations [schema table rsc-name table-key obj-fields]
+  (let [create-key (keyword (str "create" rsc-name))
+        update-key (keyword (str "update" rsc-name))
+        delete-key (keyword (str "delete" rsc-name))
+        rsc-pk-key (csk/->PascalCaseKeyword (str rsc-name "Pks"))
+        rsc-pk-input-key (csk/->PascalCaseKeyword
+                          (str rsc-name "PkColumns"))
+        pk-keys (map #(keyword (:name %)) (:pks table))
+        update-fields (update-obj pk-keys obj-fields)
+        col-keys (tbl/col-kw-set table)]
+        (-> schema
+            (assoc-in [:objects rsc-pk-key]
+                      {:description sort-desc
+                       :fields (pk-obj pk-keys obj-fields)})
+            (assoc-in [:input-objects rsc-pk-input-key]
+                      {:description sort-desc
+                       :fields (pk-obj pk-keys obj-fields)})
+            (assoc-in [:mutations create-key]
+                      {:type rsc-pk-key
+                       ;; Assumption: `id` column is auto-incremental
+                       :args (dissoc obj-fields :id)
+                       :resolve (partial rslv/create-root
+                                         table-key pk-keys col-keys)})
+            (assoc-in [:mutations update-key]
+                      {:type :Result
+                       :args
+                       (assoc update-fields :pk_columns
+                              {:type `(~'non-null ~rsc-pk-input-key)})
+                       :resolve
+                       (partial rslv/update-root table-key col-keys)})
+            (assoc-in [:mutations delete-key]
+                      {:type :Result
+                       :args {:pk_columns
+                              {:type `(~'non-null ~rsc-pk-input-key)}}
+                       :resolve
+                       (partial rslv/delete-root table-key)}))))
 
-(defn- rsc-relations [rel-map table-name]
-  (let [rels (get rel-map table-name)]
-    (into rels (map #(str % "_aggregate") rels))))
+;;; GraphQL schema
 
 (defn- root-schema [config rel-map]
   (reduce (fn [m table]
             (let [table-name (:name table)
                   table-key (keyword table-name)
-                  table-type (:table-type table)
-                  use-aggr (:use-aggregation config)
                   rsc (inf/singular table-name)
-                  rscs (inf/plural table-name)
                   rsc-name (csk/->PascalCase rsc)
-                  rscs-name (csk/->PascalCase rscs)
-                  rsc-pk-key (csk/->PascalCaseKeyword (str rsc-name "Pks"))
-                  rsc-pk-input-key (csk/->PascalCaseKeyword
-                                    (str rsc-name "PkColumns"))
-                  rsc-cls-key (csk/->PascalCaseKeyword (str rsc-name "Clauses"))
-                  rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
-                  rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
-                  rsc-name-key (keyword rsc-name)
-                  rsc-fields-key (keyword (str rsc-name "Fields"))
-                  rsc-aggr-key (keyword (str rsc-name "Aggregate"))
-                  list-q-key (keyword rscs)
-                  aggr-q-key (keyword (str rscs "_aggregate"))
-                  create-key (keyword (str "create" rsc-name))
-                  update-key (keyword (str "update" rsc-name))
-                  delete-key (keyword (str "delete" rsc-name))
                   obj-fields (rsc-object table)
-                  cols (tbl/col-kw-set table)
-                  pk-keys (map #(keyword (:name %)) (:pks table))
-                  update-fields (update-obj pk-keys obj-fields)
-                  rels (rsc-relations rel-map table-name)]
-              (cond-> m
-                    true (assoc-in [:objects rsc-name-key]
-                                   {:description rsc-name
-                                    :fields obj-fields})
-                    true (assoc-in [:objects rsc-pk-key]
-                                   {:description sort-desc
-                                    :fields (pk-obj pk-keys obj-fields)})
-                    true (assoc-in [:input-objects rsc-pk-input-key]
-                                   {:description sort-desc
-                                    :fields (pk-obj pk-keys obj-fields)})
-                    true (assoc-in [:input-objects rsc-cls-key]
-                                   {:description clauses-desc
-                                    :fields (rsc-clauses table)})
-                    true (assoc-in [:input-objects rsc-whr-key]
-                                   {:description where-desc
-                                    :fields (rsc-where table rsc-cls-key)})
-                    true (assoc-in [:input-objects rsc-sort-key]
-                                   {:description sort-desc
-                                    :fields (sort-fields table)})
-
-                    use-aggr (assoc-in [:objects rsc-fields-key]
-                                       {:description rsc-name
-                                        :fields obj-fields})
-                    use-aggr (assoc-in [:objects rsc-aggr-key]
-                                       {:description rsc-name
-                                        :fields (aggr-object rsc-fields-key)})
-
-                    true
-                    (assoc-in [:queries list-q-key]
-                              {:type `(~'list ~rsc-name-key)
-                               :description (str "Query " rscs-name ".")
-                               :args {:where {:type rsc-whr-key}
-                                      :sort {:type rsc-sort-key}
-                                      :limit {:type 'Int}
-                                      :offset {:type 'Int}}
-                               :resolve (partial rslv/list-query
-                                                 table-key rels)})
-                    use-aggr
-                    (assoc-in [:queries aggr-q-key]
-                              {:type rsc-aggr-key
-                               :description (str "Aggrecate " rscs-name ".")
-                               :args {:where {:type rsc-whr-key}}
-                               :resolve (partial rslv/aggregate-root
-                                                 table-key)})
-
-                    true
-                    (assoc-in [:mutations create-key]
-                              {:type rsc-pk-key
-                               ;; Assumption: `id` column is auto-incremental
-                               :args (dissoc obj-fields :id)
-                               :resolve (partial rslv/create-root
-                                                 table-key pk-keys cols)})
-                    true
-                    (assoc-in [:mutations update-key]
-                              {:type :Result
-                               :args
-                               (assoc update-fields :pk_columns
-                                      {:type `(~'non-null ~rsc-pk-input-key)})
-                               :resolve (partial rslv/update-root
-                                                 table-key cols)})
-                    true
-                    (assoc-in [:mutations delete-key]
-                              {:type :Result
-                               :args {:pk_columns
-                                      {:type `(~'non-null ~rsc-pk-input-key)}}
-                               :resolve (partial rslv/delete-root table-key)}))))
+                  use-aggr (:use-aggregation config)]
+              (-> m
+                  (assoc-queries table rsc-name table-key obj-fields
+                                 rel-map use-aggr)
+                  (assoc-mutations table rsc-name table-key
+                                   obj-fields))))
           {:enums (merge sort-op)
            :input-objects filter-inputs
            :objects {:Result {:fields {:result {:type 'Boolean}}}}
@@ -235,8 +246,7 @@
   (let [tbl-name (:name table)
         rscs (inf/plural tbl-name)
         fk-from (:from fk)]
-    (keyword (if (and (= (:table-type table) :pivot)
-                      (tbl/is-circular-m2m-fk? table fk-from))
+    (keyword (if (tbl/is-circular-m2m-fk? table fk-from)
                (str rscs "_on_" fk-from)
                rscs))))
 
@@ -268,7 +278,8 @@
                 (cond-> m
                   ;; has-many on linked tables
                   true (assoc-in
-                        [:objects fk-to-rsc-name-key :fields has-many-fld-key]
+                        [:objects fk-to-rsc-name-key
+                         :fields has-many-fld-key]
                         {:type `(~'list ~rsc-name-key)
                          :args {:where {:type rsc-whr-key}
                                 :sort {:type rsc-sort-key}
@@ -283,31 +294,37 @@
                                            "_aggregate"))]
                             {:type rsc-aggr-key
                              :args {:where {:type rsc-whr-key}}
-                             :resolve (partial rslv/aggregate-has-many
-                                               fk-from-rsc-col table-key)})
+                             :resolve
+                             (partial rslv/aggregate-has-many
+                                      fk-from-rsc-col table-key)})
                   ;; has-one on fk origin tables
                   true (assoc-in
-                        [:objects rsc-name-key :fields (has-one-field-key fk)]
+                        [:objects rsc-name-key
+                         :fields (has-one-field-key fk)]
                         {:type fk-to-rsc-name-key
-                         :resolve (partial rslv/has-one fk-from-rsc-col
-                                           fk-to-tbl-key fk-to-rels)}))))
+                         :resolve
+                         (partial rslv/has-one fk-from-rsc-col
+                                  fk-to-tbl-key fk-to-rels)}))))
             schema (:fks table))))
 
 (defn- update-relationships [schema config rel-map]
   (reduce (fn [m table]
-            (update-fk-schema m table rel-map (:use-aggregation config)))
+            (update-fk-schema m table rel-map
+                              (:use-aggregation config)))
           schema (:tables config)))
 
 (defn- sl-config [config]
-  (let [buckets (reduce (fn [m tbl]
-                          (let [tbl-name (:name tbl)]
-                            (-> m
-                                (assoc (keyword tbl-name)
-                                       {:triggers {:elastic {:threshold 0}}})
-                                (assoc (keyword (str tbl-name "_aggregate"))
-                                       {:triggers {:elastic {:threshold 0}}}))))
-                        {:default {:triggers {:elastic {:threshold 0}}}}
-                        (:tables config))]
+  (let [buckets
+        (reduce (fn [m tbl]
+                  (let [tbl-name (:name tbl)
+                        aggr-name (str tbl-name "_aggregate")]
+                    (-> m
+                        (assoc (keyword tbl-name)
+                               {:triggers {:elastic {:threshold 0}}})
+                        (assoc (keyword aggr-name)
+                               {:triggers {:elastic {:threshold 0}}}))))
+                {:default {:triggers {:elastic {:threshold 0}}}}
+                (:tables config))]
     {:buckets buckets
      :urania-opts {:env {:db (:db config)}}}))
 
@@ -321,7 +338,6 @@
   (let [rel-map (tbl/full-rel-map config)
         scm-map (-> (root-schema config rel-map)
                     (update-relationships config rel-map))]
-    ;(pp/pprint scm-map)
     (log :info "Generated queries: " (sort (keys (:queries scm-map))))
     (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
     (schema/compile scm-map)))
