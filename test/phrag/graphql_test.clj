@@ -395,23 +395,26 @@
 
 ;;; Testing signals
 
-(defn- members-pre-query [sql-args ctx]
+(defn- change-where-from-ctx [sql-args ctx]
   ;; Apply filter with email from ctx
   (update sql-args :where conj [:= :email (:email ctx)]))
 
-(defn- members-post-query [res ctx]
+(defn- change-res-from-ctx [res ctx]
   ;; Replace first_name with one from ctx
   [(assoc (first res) :first_name (:first-name ctx))])
 
-(defn- members-pre-create [args ctx]
+(defn- change-arg-from-ctx [args ctx]
   ;; Replace email with one from ctx
   (assoc args :email (:email ctx)))
 
-(defn- members-post-create [res _ctx]
+(defn- change-id-to-count [res _ctx]
   ;; expected: 7
   ;; id: 2
   ;; res keys: (:email :first_name :last_name :last_insert_rowid() :id)
   (assoc res :id (+ (:id res) (count (keys res)))))
+
+(defn- increment-id-count [res _ctx]
+  (update res :id + 1))
 
 (defn- members-pre-update [args _ctx]
   nil)
@@ -428,10 +431,11 @@
              :fks []
              :pks [{:name "id" :type "integer"}]}]
    :signal-ctx {:email "yoshi@test.com" :first-name "changed-first-name"}
-   :signals {:members {:query {:pre members-pre-query
-                               :post members-post-query}
-                       :create {:pre members-pre-create
-                                :post members-post-create}
+   :signals {:members {:query {:pre change-where-from-ctx
+                               :post [change-res-from-ctx]}
+                       :create {:pre change-arg-from-ctx
+                                :post [change-id-to-count
+                                       increment-id-count]}
                        :update {:pre members-pre-update}}}})
 
 (deftest graphql-signals
@@ -449,7 +453,7 @@
     (testing "post-create signal mutate with ctx"
       (test-gql (str "mutation {createMember (email: \"input-email\" "
                      "first_name: \"yoshi\" last_name: \"tanabe\") { id }}")
-                [:data :createMember :id] 7))
+                [:data :createMember :id] 8))
 
     (testing "pre-create / post-query signal"
       (test-gql  "{ members { id email first_name }}"

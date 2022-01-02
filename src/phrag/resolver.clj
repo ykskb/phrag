@@ -54,7 +54,7 @@
 
 (defn- update-n-threshold [rel num trigger-opts]
   (log :debug "Updating" rel "queue with" num)
-  (update trigger-opts :threshold + num))
+  (assoc trigger-opts :threshold num))
 
 (defn- update-triggers-by-count! [res-p rels]
   (reduce (fn [p rel]
@@ -67,64 +67,64 @@
     (sl-core/update-trigger! ctx (keyword rel) :elastic
                              (partial update-n-threshold rel c))))
 
-(defn- signal [args ctx tbl-key op type]
-  (if-let [sgnl-fn (get-in ctx [:signals tbl-key op type])]
-    (sgnl-fn args ctx)
-    args))
+(defn- signal [args sgnl-fns ctx]
+  (reduce (fn [args sgnl-fn]
+            (sgnl-fn args ctx))
+          args sgnl-fns))
 
 ;;; Resolvers
 
 ;; Queries
 
-(defn list-query [table rels ctx args _val]
+(defn list-query [table-key rels sgnl-map ctx args _val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params args)
-                       (signal ctx table :query :pre))
+                       (signal (:pre sgnl-map) ctx))
           fetch-fn (fn [_this _env]
-                     (hd/list-root (:db ctx) table sql-args))
+                     (hd/list-root (:db ctx) table-key sql-args))
           res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
                     (update-triggers-by-count! rels))]
-      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
+      (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx))))))
 
-
-(defn has-one [id-key table rels ctx _args val]
+(defn has-one [id-key table-key rels sgnl-fn-map ctx _args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (signal nil ctx table :query :pre)
+    (let [sql-args (signal nil (:pre sgnl-fn-map) ctx)
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
                            whr (-> {:where [[:in :id ids]]}
                                    (update :where conj sql-args))
-                           res (hd/list-root (:db ctx) table whr)]
+                           res (hd/list-root (:db ctx) table-key whr)]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        res))
           map-n-fn (fn [muses batch-res]
                      (let [m (zipmap (map :id muses) (repeat nil))
                            vals (zipmap (map :id batch-res) batch-res)]
                        (merge m vals)))
-          res-p (sl-api/enqueue! table
+          res-p (sl-api/enqueue! table-key
                                  (->BatchDataSource (id-key val) batch-fn
                                                     first map-n-fn))]
-      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
 
-(defn has-many [id-key table rels ctx args val]
+      (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
+
+(defn has-many [id-key table-key rels sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params args)
-                       (signal ctx table :query :pre))
+                       (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
                            sql-args (update sql-args :where
                                            conj [:in id-key ids])
-                           res (hd/list-root (:db ctx) table sql-args)]
-                      (do-update-triggers! (:sl-ctx ctx) rels (count res))
+                           res (hd/list-root (:db ctx) table-key sql-args)]
+                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
                       res))
           map-n-fn (fn [muses batch-res]
                      (let [m (zipmap (map :id muses) (repeat []))
                            vals (group-by id-key batch-res)]
                        (merge-with concat m vals)))
-          res-p (sl-api/enqueue! table
+          res-p (sl-api/enqueue! table-key
                                  (->BatchDataSource (:id val) batch-fn
                                                     identity map-n-fn))]
-      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
+      (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
 ;; Aggregates
 
@@ -165,61 +165,61 @@
   (let [multi-res-map (zipmap (map #(id-key %) sql-multi-res) sql-multi-res)]
     (map #(aggr-result fields (get multi-res-map %) id-key %) ids)))
 
-(defn aggregate-root [table ctx args _val]
+(defn aggregate-root [table-key ctx args _val]
   (let [sql-args (hd/args->sql-params args)
         fields (aggr-fields ctx)
         selects (aggr-selects fields)
-        res (first (hd/aggregate-root (:db ctx) table selects sql-args))]
+        res (first (hd/aggregate-root (:db ctx) table-key selects sql-args))]
     (pp/pprint (-> ctx
              (:com.walmartlabs.lacinia/selection)
              (:selections)))
     (aggr-result fields res)))
 
-(defn aggregate-has-many [id-key table ctx args val]
+(defn aggregate-has-many [id-key table-key sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params args)
-                       (signal ctx table :query :pre))
+                       (signal (:pre sgnl-fn-map) ctx))
           fields (aggr-fields ctx)
           selects (aggr-selects fields )
           batch-fn (fn [many _env]
                      (let [ids (map :id many)
                            sql-args (update sql-args :where
                                             conj [:in id-key ids])
-                           sql-res (hd/aggregate-grp-by (:db ctx) table selects
+                           sql-res (hd/aggregate-grp-by (:db ctx) table-key selects
                                                    id-key sql-args)]
                        (aggr-many-result fields sql-res id-key ids)))
           map-n-fn (fn [_muses batch-res]
                      (zipmap (map id-key batch-res) batch-res))
-          res-p (sl-api/enqueue! (keyword (str (name table)"_aggregate"))
+          res-p (sl-api/enqueue! (keyword (str (name table-key)"_aggregate"))
                                  (->BatchDataSource (:id val) batch-fn
                                                     first map-n-fn))]
-      (prom/then res-p (fn [v] (signal v ctx table :query :post))))))
+      (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
 ;; Mutations
 
 (def ^:private res-true
   {:result true})
 
-(defn create-root [table-key pk-keys cols ctx args _val]
-  (prn args cols (select-keys args cols))
-  (let [sql-args (-> (select-keys args cols)
-                     (signal ctx table-key :create :pre)
+(defn create-root [table-key pk-keys col-keys sgnl-fn-map ctx args _val]
+  (prn args col-keys (select-keys args col-keys))
+  (let [sql-args (-> (select-keys args col-keys)
+                     (signal (:pre sgnl-fn-map) ctx)
                      (w/stringify-keys))
         res (if (not sql-args)
               nil (hd/create-root sql-args (:db ctx) table-key pk-keys))
         created (merge args res)]
-    (signal created ctx table-key :create :post)))
+    (signal created (:post sgnl-fn-map) ctx)))
 
-(defn update-root [table cols ctx args _val]
-  (let [params (-> (select-keys args cols)
-                   (signal ctx table :update :pre)
+(defn update-root [table-key col-keys sgnl-fn-map ctx args _val]
+  (let [params (-> (select-keys args col-keys)
+                   (signal (:pre sgnl-fn-map) ctx)
                    (w/stringify-keys))]
     (when (not-empty params)
-      (hd/patch-root (:pk_columns args) params (:db ctx) table cols))
-    (signal res-true ctx table :update :post)))
+      (hd/patch-root (:pk_columns args) params (:db ctx) table-key col-keys))
+    (signal res-true (:post sgnl-fn-map) ctx)))
 
-(defn delete-root [table ctx args _val]
-  (let [sql-args (signal args ctx table :delete :pre)]
+(defn delete-root [table-key sgnl-fn-map ctx args _val]
+  (let [sql-args (signal args (:pre sgnl-fn-map) ctx)]
     (when (not-empty sql-args)
-      (hd/delete-root (:pk_columns args) (:db ctx) table))
-    (signal res-true ctx table :delete :post)))
+      (hd/delete-root (:pk_columns args) (:db ctx) table-key))
+    (signal res-true (:post sgnl-fn-map) ctx)))

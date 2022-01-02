@@ -83,7 +83,6 @@ By default, Phrag retrieves DB schema data through a DB connection and it is suf
 ```edn
 {:tables [
    {:name "users"
-    :table-type :root
     :columns [{:name "id"
        	       :type "int"
                :notnull 0
@@ -105,7 +104,6 @@ By default, Phrag retrieves DB schema data through a DB connection and it is suf
 | Key           | Description                                                                                      |
 |---------------|--------------------------------------------------------------------------------------------------|
 | `:name`       | Table name.                                                                                      |
-| `:table-type` | Table type. `:root` or `:pivot` are supported.                                                   |
 | `:columns`    | List of columns. A column can contain `:name`, `:type`, `:notnull` and `:dflt_value` parameters. |
 | `:fks`        | List of foreign keys. A foreign key can contain `:table`, `:from` and `:to` parameters.          |
 | `:pks`        | List of primary keys. A primary key can contain `:name` and `:type` parameters.                  |
@@ -115,13 +113,14 @@ By default, Phrag retrieves DB schema data through a DB connection and it is suf
 Phrag can signal configurable functions per resource queries/mutations at pre/post-DB operation time. This is where things like access controls or custom business logics can be configured.
 
 > Notes:
-> * Resource operation types include `query`, `create`, `update` and `delete`.
+> * Resource operation types include `query`, `create`, `update` and `delete`. (`query` signals happen in relations as well.)
 > * Signal receiver functions are called with different parameters per types:
 >     * A `pre-query` function will have its first argument which is a map of SQL parameters including `where` (in [HoneySQL](https://github.com/seancorfield/honeysql) format), `sort`, `limit` and `offset`, and its returned value will be passed to a subsequent DB operation.
 >     * A `pre-mutation` function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
 >     * A `post-query/mutation` function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
 >     * All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config together with a DB connection and an incoming HTTP request. 
 >     * If `nil` is returned from `pre-mutation` functions, DB operations will be skipped and `id: nil` or `result: true` will be returned.
+>     * `:all` can be used at each level to signal functions for all tables, all operations for a table, or both timing for a specific operation.
 
 Here's some examples:
 
@@ -138,7 +137,7 @@ Here's some examples:
   (let [user (user-info (:request ctx))]
     (if (admin-user? user))
       result
-      (update result :internal-id "")))
+      (update result :internal-id nil)))
 
 ;; Updates owner data with a user ID from authenticated info in a request
 (defn- update-owner [args ctx]

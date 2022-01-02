@@ -122,6 +122,7 @@
 (defn update! [db table pk-map raw-map]
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (-> (h/update table) (h/set raw-map))]
+    (prn whr q)
     (->> (apply h/where q whr)
          sql/format
          (jdbc/execute! db))))

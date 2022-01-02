@@ -10,7 +10,7 @@
 (defn col-names [table]
   (set (map :name (:columns table))))
 
-(defn col-kw-set [table]
+(defn col-key-set [table]
   (set (map #(keyword (:name %)) (:columns table))))
 
 (defn primary-fks [table]
