@@ -78,7 +78,7 @@
   (db/delete! db-con table pk-map)
   nil)
 
-(defn patch-root [pk-map params db-con table _cols]
+(defn patch-root [pk-map params db-con table]
   (db/update! db-con table pk-map params)
   nil)
 

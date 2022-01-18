@@ -17,9 +17,9 @@
   (vals (select-keys (:fk-map table) (keys (:pk-map table)))))
 
 (defn is-circular-m2m-fk?
-  "Circular many-to-many bridge tables link records on the same table.
-  Example: `user_follow` table where followers and the followed are both
-  linked to `users` table."
+  "Bridge tables of circular many-to-many have 2 columns linked to the
+  same table. Example: `user_follow` table where following and the followed
+  are both linked to `users` table."
   [table fk-from]
   (let [p-fks (primary-fks table)
         p-fk-tbls (map :table p-fks)
@@ -28,18 +28,51 @@
         cycl-link-fks (filter #(contains? cycl-linked-tbls (:table %)) p-fks)]
     (contains? (set (map :from cycl-link-fks)) fk-from)))
 
-;;; Full relationship map per table including reverse relations
+(defn has-many-field-key
+  "Checks if a given table is a bridge table of cicular many-to-many or not,
+  and if it is, adds FK column name to the field key of nested object."
+  [table fk]
+  (let [tbl-name (:name table)
+        rscs (inf/plural tbl-name)
+        fk-from (:from fk)]
+    (keyword (if (is-circular-m2m-fk? table fk-from)
+               (str rscs "_on_" fk-from)
+               rscs))))
 
-(defn- rels [table]
+(defn has-one-field-key
+  "If a FK column has `_id` naming, nested objects get field keys with trailing
+  `_id` removed. If not, FK destination is added to FK origin column.
+  Example: `user_id` => `user` : `created_by` => `created_by_user`"
+  [fk]
+  (let [from (:from fk)]
+    (if (s/ends-with? from "_id")
+      (keyword (s/replace from #"_id" ""))
+      (keyword (str from "_" (inf/singular (:table fk)))))))
+
+;;; Object field map of relations
+
+(defn- relation-field-names-per-table [table]
   (let [table-name (:name table)
-        rel-map {table-name (set (map #(:table %) (:fks table)))}]
-    (reduce (fn [m fk] (assoc m (:table fk) #{table-name}))
-            rel-map (:fks table))))
+        ;; assoc has-one on FK origin table
+        origin-fks (set (map #(has-one-field-key %) (:fks table)))
+        has-one-mapped {table-name origin-fks}]
+    ;; assoc has-many inverse relation on FK destination tables
+    (reduce (fn [m fk]
+              (let [has-many-key (has-many-field-key table fk)
+                    has-many-aggr-key (keyword (str (name has-many-key) "_aggregate"))]
+                (merge-with into m {(:table fk) #{has-many-key has-many-aggr-key}})))
+            has-one-mapped (:fks table))))
 
-(defn full-rel-map [config]
+(defn relation-map [config]
   (reduce (fn [m table]
-            (merge-with into m (rels table)))
+            (merge-with into m (relation-field-names-per-table table)))
           {} (:tables config)))
+
+(defn relation-name-set [config]
+  (let [rel-map (relation-map config)]
+    (reduce-kv (fn [s _table rels]
+              (into s rels))
+            #{} rel-map)))
 
 ;;; Optional foreign key detection from table/column names
 
@@ -66,18 +99,6 @@
        tables))
 
 ;;; Table schema map from config
-
-(defn- pivot-table? [table]
-  (and (> (count (:pks table)) 1)
-       (let [fk-names (set (keys (:fk-map table)))
-             pk-names (keys (:pk-map table))]
-         (every? #(contains? fk-names %) pk-names))))
-
-(defn- table-type [table]
-  (if (pivot-table? table) :pivot :root))
-
-(defn- update-table-types [tables]
-  (map #(assoc % :table-type (table-type %)) tables))
 
 (defn- update-column-maps [tables]
   (map (fn [table]
@@ -113,7 +134,6 @@
               (cond-> (db/schema (:db config))
                 true (update-column-maps)
                 (:no-fk-on-db config) (update-fks-by-names config)
-                true (update-table-types)
                 true (merge-config-tables config))
               (cond-> (:tables config)
                 true (update-column-maps)

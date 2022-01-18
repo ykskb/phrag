@@ -86,7 +86,7 @@
                     (update-triggers-by-count! rels))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx))))))
 
-(defn has-one [id-key table-key rels sgnl-fn-map ctx _args val]
+(defn has-one [id-key table-key sl-key rels sgnl-fn-map ctx _args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (signal nil (:pre sgnl-fn-map) ctx)
           batch-fn (fn [many _env]
@@ -100,13 +100,13 @@
                      (let [m (zipmap (map :id muses) (repeat nil))
                            vals (zipmap (map :id batch-res) batch-res)]
                        (merge m vals)))
-          res-p (sl-api/enqueue! table-key
+          res-p (sl-api/enqueue! sl-key
                                  (->BatchDataSource (id-key val) batch-fn
                                                     first map-n-fn))]
 
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
-(defn has-many [id-key table-key rels sgnl-fn-map ctx args val]
+(defn has-many [id-key table-key sl-key rels sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params args)
                        (signal (:pre sgnl-fn-map) ctx))
@@ -121,7 +121,7 @@
                      (let [m (zipmap (map :id muses) (repeat []))
                            vals (group-by id-key batch-res)]
                        (merge-with concat m vals)))
-          res-p (sl-api/enqueue! table-key
+          res-p (sl-api/enqueue! sl-key
                                  (->BatchDataSource (:id val) batch-fn
                                                     identity map-n-fn))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
@@ -175,7 +175,7 @@
              (:selections)))
     (aggr-result fields res)))
 
-(defn aggregate-has-many [id-key table-key sgnl-fn-map ctx args val]
+(defn aggregate-has-many [id-key table-key sl-key sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params args)
                        (signal (:pre sgnl-fn-map) ctx))
@@ -190,7 +190,7 @@
                        (aggr-many-result fields sql-res id-key ids)))
           map-n-fn (fn [_muses batch-res]
                      (zipmap (map id-key batch-res) batch-res))
-          res-p (sl-api/enqueue! (keyword (str (name table-key)"_aggregate"))
+          res-p (sl-api/enqueue! sl-key
                                  (->BatchDataSource (:id val) batch-fn
                                                     first map-n-fn))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
@@ -211,15 +211,17 @@
     (signal created (:post sgnl-fn-map) ctx)))
 
 (defn update-root [table-key col-keys sgnl-fn-map ctx args _val]
-  (let [params (-> (select-keys args col-keys)
-                   (signal (:pre sgnl-fn-map) ctx)
+  (let [sql-args (-> (select-keys args col-keys)
+                     (assoc :pk_columns (:pk_columns args))
+                     (signal (:pre sgnl-fn-map) ctx))
+        params (-> (dissoc sql-args :pk_columns)
                    (w/stringify-keys))]
     (when (not-empty params)
-      (hd/patch-root (:pk_columns args) params (:db ctx) table-key col-keys))
+      (hd/patch-root (:pk_columns sql-args) params (:db ctx) table-key))
     (signal res-true (:post sgnl-fn-map) ctx)))
 
 (defn delete-root [table-key sgnl-fn-map ctx args _val]
   (let [sql-args (signal args (:pre sgnl-fn-map) ctx)]
     (when (not-empty sql-args)
-      (hd/delete-root (:pk_columns args) (:db ctx) table-key))
+      (hd/delete-root (:pk_columns sql-args) (:db ctx) table-key))
     (signal res-true (:post sgnl-fn-map) ctx)))

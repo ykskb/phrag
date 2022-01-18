@@ -1,34 +1,34 @@
 # Phrag
 
-**Instantly-operational yet customizable GraphQL handler for RDBMS**
+**Constraint-driven GraphQL from RDBMS Schema**
 
-Phrag creates a GraphQL-powered handler from a database connection.
+Phrag creates a GraphQL handler from a database connection in a constraint-driven manner.
 
 #### Features:
 
-* Queries and mutations (`create` / `update` / `delete`) created per resources with [Lacinia](https://github.com/walmartlabs/lacinia).
+- CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
 
-* `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships supported as nested object queries.
+- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships as nested object queries through a [strategy](#query-relationships).
 
-* Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
+- Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
 
-* Aggregation queries for root entity and has-many relationships.
+- Aggregation queries for root entity and has-many relationships.
 
-* Resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) for query operations.
+- Resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) as arguments in query operations.
 
-* [Signals](#signals) to inject custom logics before & after DB accesses per resource operations.
+- [Signals](#signals) to inject custom logics before & after DB accesses per resource operations.
 
-* Options to use schema retrieved from a database, selectively override it or entirely base on provided data through [config](#phrag-config).
+- Options to use schema retrieved from a database, selectively override it or entirely base on provided data through [config](#phrag-config).
 
-* Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
+- Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
-* GraphQL IDE (like GraphiQL) connectable.
+- GraphQL IDE (like GraphiQL) connectable.
 
 #### Notes:
 
-* Supported databases are SQLite and PostgreSQL.
+- Supported databases are SQLite and PostgreSQL.
 
-* This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
+- This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
 ### Usage
 
@@ -39,30 +39,33 @@ Create ring app with reitit route using Integrant
  ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
 ```
 
-### Relationships in Scanned Schema
+### Strategies
 
-* Relationships are identified with foreign key constraints on databases. (There is an option to detect relations from table/column names, however it comes with a limitation since matching names such as `user_id` for `users` table are required.)
+#####  Query relationships
 
-* Pivot (bridge) tables for `many-to-many` relationships should have a composite primary key of pivoting foreign keys.
-  Example:
-  ```sql
-  create table meetup_member (
-      meetup_id     integer,
-      member_id     integer,
-      foreign key(meetup_id) references meetups(id),
-      foreign key(member_id) references members(id),
-      primary key (meetup_id, member_id)
-  );
-  ```
+Phrag transforms a foreign key constraint to nested queries of GraphQL as the diagram below.
 
-### Phrag Config
+<img src="./docs/images/fk-transform.png" />
+
+This is a fundamental concept for Phrag to support multiple types of relationships. 
+
+##### Mutations
+
+Primary key (PK) constraints are the driver of mutations. `create` operations return PK column fields and `update`/`delete` operations require them as an identifier.
+
+<!---
+> Notes:
+> * There is an option to detect relations from table/column names, however it comes with a limitation since matching names such as `user_id` for `users` table are required.
+-->
+
+### Config
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
 
 #### Config Parameters
 
 | Key                  | description                                                                                                  | Required | Default Value |
-|----------------------|--------------------------------------------------------------------------------------------------------------|----------|---------------|
+| -------------------- | ------------------------------------------------------------------------------------------------------------ | -------- | ------------- |
 | `:db`                | Database connection object.                                                                                  | Yes      |               |
 | `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                         | No       |               |
 | `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                            | No       |               |
@@ -75,10 +78,6 @@ Though there are multiple options for customization, the only config parameter r
 #### Schema Data
 
 By default, Phrag retrieves DB schema data through a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
-
-> Notes:
-> * When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
-> * When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
 
 ```edn
 {:tables [
@@ -101,62 +100,75 @@ By default, Phrag retrieves DB schema data through a DB connection and it is suf
 
 ##### Table Data Details:
 
-| Key           | Description                                                                                      |
-|---------------|--------------------------------------------------------------------------------------------------|
-| `:name`       | Table name.                                                                                      |
-| `:columns`    | List of columns. A column can contain `:name`, `:type`, `:notnull` and `:dflt_value` parameters. |
-| `:fks`        | List of foreign keys. A foreign key can contain `:table`, `:from` and `:to` parameters.          |
-| `:pks`        | List of primary keys. A primary key can contain `:name` and `:type` parameters.                  |
+| Key        | Description                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `:name`    | Table name.                                                                                      |
+| `:columns` | List of columns. A column can contain `:name`, `:type`, `:notnull` and `:dflt_value` parameters. |
+| `:fks`     | List of foreign keys. A foreign key can contain `:table`, `:from` and `:to` parameters.          |
+| `:pks`     | List of primary keys. A primary key can contain `:name` and `:type` parameters.                  |
+
+> Notes:
+> - When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
+> - When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
 
 ### Signals
 
 Phrag can signal configurable functions per resource queries/mutations at pre/post-DB operation time. This is where things like access controls or custom business logics can be configured.
 
 > Notes:
-> * Resource operation types include `query`, `create`, `update` and `delete`. (`query` signals happen in relations as well.)
-> * Signal receiver functions are called with different parameters per types:
->     * A `pre-query` function will have its first argument which is a map of SQL parameters including `where` (in [HoneySQL](https://github.com/seancorfield/honeysql) format), `sort`, `limit` and `offset`, and its returned value will be passed to a subsequent DB operation.
->     * A `pre-mutation` function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
->     * A `post-query/mutation` function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
->     * All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config together with a DB connection and an incoming HTTP request. 
->     * If `nil` is returned from `pre-mutation` functions, DB operations will be skipped and `id: nil` or `result: true` will be returned.
->     * `:all` can be used at each level to signal functions for all tables, all operations for a table, or both timing for a specific operation.
+>
+> - Resource operation types include `query`, `create`, `update` and `delete`. (`query` signals happen in relations as well.)
+> - Signal receiver functions are called with different parameters per types:
+>   - A `pre-query` function will have its first argument which is a map of SQL parameters including `where` (in [HoneySQL](https://github.com/seancorfield/honeysql) format), `sort`, `limit` and `offset`, and its returned value will be passed to a subsequent DB operation.
+>   - A `pre-mutation` function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
+>   - A `post-query/mutation` function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
+>   - All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config together with a DB connection and an incoming HTTP request.
+>   - If `nil` is returned from `pre-mutation` functions, DB operations will be skipped and exception will be thrown.
+>   - `:all` can be used at each level of signal map to run signal functions across all tables, all operations for a table, or both timing for a specific operation.
 
 Here's some examples:
 
 ```clojure
-;; Restrict access to request user
-(defn- end-user-access [sql-args ctx]
+(defn- end-user-access
+  "Restrict access to request user"
+  [sql-args ctx]
   (let [user (user-info (:request ctx))]
     (if (admin-user? user))
       sql-args
-      (update sql-args :where conj [:= :user-id (:id user)])))
+      (update sql-args :where conj [:= :user_id (:id user)])))
 
-;; Removes :internal-id for non-admin users
-(defn- hide-internal-id [result ctx]
+(defn- hide-internal-id
+  "Removes :internal-id for non-admin users"
+  [result ctx]
   (let [user (user-info (:request ctx))]
     (if (admin-user? user))
       result
       (update result :internal-id nil)))
 
-;; Updates owner data with a user ID from authenticated info in a request
-(defn- update-owner [args ctx]
+(defn- update-owner
+  "Updates :created_by with auth user"
+  [args ctx]
   (let [user (user-info (:request ctx))]
     (if (end-user? user)
       (update args :created_by (:id user))
       args)))
-        
-(def example-config {:signals {:users {:query {:pre end-user-access :post hide-internal-id}
-                                       :create {:pre update-owner}
-                                       :update {:pre update-owner}}}})
+
+;; Multiple signal function can be specified as a vector.
+
+(def example-config
+  {:signals {:all [check-user-auth check-user-role]
+             :users {:query {:pre end-user-access
+                             :post hide-internal-id}
+                     :create {:pre update-owner}
+                     :update {:pre update-owner}}}})
 ```
 
 ### Resource Filtering
 
 Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is used in arguments for filtering. `AND` / `OR` group can be created as clause lists in `and` / `or` parameter under `where`.
 
-> * Supported operators are `eq`, `ne`, `gt`, `lt`, `gte`, `lte`, `in` and `like`.
-> * Multiple filters are applied with `AND` operator.
+> - Supported operators are `eq`, `ne`, `gt`, `lt`, `gte`, `lte`, `in` and `like`.
+> - Multiple filters are applied with `AND` operator.
 
 ##### Example:
 
@@ -172,10 +184,10 @@ Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorti
 
 ### Resource Pagination
 
-Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination. 
+Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination.
 
->* `limit` and `offset` can be used independently.
->* Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
+> - `limit` and `offset` can be used independently.
+> - Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
 
 ##### Example
 

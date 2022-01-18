@@ -35,10 +35,6 @@
 
 ;;; Queries
 
-(defn- rsc-relations [rel-map table-name]
-  (let [rels (get rel-map table-name)]
-    (into rels (map #(str % "_aggregate") rels))))
-
 (defn- assoc-queries [schema table rsc-name table-key obj-fields
                       rel-map use-aggr sgnl-conf]
   (let [table-name (:name table)
@@ -49,7 +45,7 @@
         rsc-cls-key (csk/->PascalCaseKeyword (str rsc-name "Clauses"))
         rsc-whr-key (csk/->PascalCaseKeyword (str rsc-name "Where"))
         rsc-sort-key (csk/->PascalCaseKeyword (str rsc-name "Sort"))
-        rels (rsc-relations rel-map table-name)
+        rels (get rel-map table-name)
         sgnl-map (signal-fn-map sgnl-conf table-key :query)
         entity-schema (-> schema
         (assoc-in [:objects rsc-name-key]
@@ -157,20 +153,6 @@
            :objects {:Result {:fields {:result {:type 'Boolean}}}}
            :queries {}} (:tables config)))
 
-(defn- has-many-field-key [table fk]
-  (let [tbl-name (:name table)
-        rscs (inf/plural tbl-name)
-        fk-from (:from fk)]
-    (keyword (if (tbl/is-circular-m2m-fk? table fk-from)
-               (str rscs "_on_" fk-from)
-               rscs))))
-
-(defn- has-one-field-key [fk]
-  (let [from (:from fk)]
-    (if (s/ends-with? from "_id")
-      (keyword (s/replace from #"_id" ""))
-      (keyword (str from "_" (inf/singular (:table fk)))))))
-
 (defn- update-fk-schema [schema table rel-map use-aggr sgnl-conf]
   (let [table-name (:name table)
         table-key (keyword table-name)
@@ -180,7 +162,7 @@
         rsc-aggr-key (keyword (str rsc-name "Aggregate"))
         rsc-whr-key (keyword (str rsc-name "Where"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
-        rsc-rels (rsc-relations rel-map table-name)
+        rsc-rels (get rel-map table-name)
         rsc-sgnl-map (signal-fn-map sgnl-conf table-key :query)]
     (reduce (fn [m fk]
               (let [fk-to-tbl-name (:table fk)
@@ -189,8 +171,11 @@
                     fk-to-rsc-name (csk/->PascalCase fk-to-rsc)
                     fk-to-rsc-name-key (keyword fk-to-rsc-name)
                     fk-from-rsc-col (keyword (:from fk))
-                    fk-to-rels (rsc-relations rel-map fk-to-tbl-name)
-                    has-many-fld-key (has-many-field-key table fk)]
+                    fk-to-rels (get rel-map fk-to-tbl-name)
+                    has-many-fld-key (tbl/has-many-field-key table fk)
+                    has-many-aggr-key (keyword (str (name has-many-fld-key)
+                                                    "_aggregate"))
+                    has-one-fld-key (tbl/has-one-field-key fk)]
                 (cond-> m
                   ;; has-many on linked tables
                   true (assoc-in
@@ -202,25 +187,26 @@
                                 :limit {:type 'Int}
                                 :offset {:type 'Int}}
                          :resolve (partial rslv/has-many fk-from-rsc-col
-                                           table-key rsc-rels rsc-sgnl-map)})
+                                           table-key has-many-fld-key rsc-rels
+                                           rsc-sgnl-map)})
                   ;; has-many aggregate on linked tables
                   use-aggr (assoc-in
                             [:objects fk-to-rsc-name-key :fields
-                             (keyword (str (name has-many-fld-key)
-                                           "_aggregate"))]
+                             has-many-aggr-key]
                             {:type rsc-aggr-key
                              :args {:where {:type rsc-whr-key}}
                              :resolve
                              (partial rslv/aggregate-has-many
-                                      fk-from-rsc-col table-key rsc-sgnl-map)})
+                                      fk-from-rsc-col table-key has-many-aggr-key
+                                      rsc-sgnl-map)})
                   ;; has-one on fk origin tables
                   true (assoc-in
                         [:objects rsc-name-key
-                         :fields (has-one-field-key fk)]
+                         :fields has-one-fld-key]
                         {:type fk-to-rsc-name-key
                          :resolve
                          (partial rslv/has-one fk-from-rsc-col
-                                  fk-to-tbl-key fk-to-rels
+                                  fk-to-tbl-key has-one-fld-key fk-to-rels
                                   (signal-fn-map sgnl-conf fk-to-tbl-key :query))}))))
             schema (:fks table))))
 
@@ -231,38 +217,33 @@
                               (:signals config)))
           schema (:tables config)))
 
-(defn- sl-config [config]
-  (let [buckets
-        (reduce
-         (fn [m tbl]
-           (let [tbl-name (:name tbl)
-                 aggr-name (str tbl-name "_aggregate")]
-             (-> m
-                 (assoc (keyword tbl-name)
-                        {:triggers {:elastic {:threshold 0}}})
-                 (assoc (keyword aggr-name)
-                        {:triggers {:elastic {:threshold 0}}}))))
-         {:default {:triggers {:elastic {:threshold 0}}}}
-         (:tables config))]
-    {:buckets buckets
-     :urania-opts {:env {:db (:db config)}}}))
-
-(defn- sl-ctx [config]
-  (sl-core/start! (sl-config config)))
-
-(defn- sl-stop! [sl-ctx]
-  (sl-core/stop! sl-ctx))
-
 (defn schema [config]
-  (let [rel-map (tbl/full-rel-map config)
+  (let [rel-map (tbl/relation-map config)
         scm-map (-> (root-schema config rel-map)
                     (update-relationships config rel-map))]
     (log :info "Generated queries: " (sort (keys (:queries scm-map))))
     (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
     (schema/compile scm-map)))
 
-(defn exec [config schema query vars req]
-  (let [sl-ctx (sl-ctx config)
+;;; Execution
+
+(defn sl-config [config]
+  (let [buckets (reduce (fn [m bucket-name]
+                          (assoc m (keyword bucket-name)
+                                 {:triggers {:elastic {:threshold 0}}}))
+                        {:default {:triggers {:elastic {:threshold 0}}}}
+                        (tbl/relation-name-set config))]
+    {:buckets buckets
+     :urania-opts {:env {:db (:db config)}}}))
+
+(defn- sl-start! [config]
+  (sl-core/start! config))
+
+(defn- sl-stop! [sl-ctx]
+  (sl-core/stop! sl-ctx))
+
+(defn exec [config sl-config schema query vars req]
+  (let [sl-ctx (sl-start! sl-config)
         ctx (-> (:signal-ctx config {})
                 (assoc :req req)
                 (assoc :sl-ctx sl-ctx)

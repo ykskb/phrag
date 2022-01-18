@@ -15,9 +15,10 @@
         conf {:db db
               :tables (tbl/schema-from-db opt)
               :use-aggregation true}
+        sl-conf (gql/sl-config conf)
+        schema (gql/schema conf)
         test-gql (fn [q res-keys expected]
-                   (let [schema (gql/schema conf)
-                         res (gql/exec conf schema q nil {})]
+                   (let [res (gql/exec conf sl-conf schema q nil {})]
                      (is (= expected (get-in res res-keys)))))]
 
     ;; Root entities
@@ -301,6 +302,31 @@
                    :max {:member_id 2 :created_by 1}
                    :min {:member_id 2 :created_by 1}}}]))
 
+    (testing "add member 1 follow to member 2"
+      (test-gql (str "mutation {createMemberFollow (member_id: 1"
+                     "created_by: 2) { member_id created_by }}")
+                [:data :createMemberFollow]
+                {:member_id 1 :created_by 2}))
+
+    (testing "list both entities of circular many-to-many relationship"
+      (prn (str "{ members { first_name member_follows_on_created_by "
+                "{ member { first_name }} "
+                "member_follow_on_member_id { member { first_name }}}}"))
+      (test-gql (str "{ members { first_name "
+                     "member_follows_on_created_by { member { first_name }} "
+                     "member_follows_on_member_id { created_by_member { first_name }}}}")
+                [:data :members]
+                [{:first_name "jim"
+                  :member_follows_on_member_id
+                  [{:created_by_member {:first_name "yoshi"}}]
+                  :member_follows_on_created_by
+                  [{:member {:first_name "yoshi"}}]}
+                 {:first_name "yoshi"
+                  :member_follows_on_member_id
+                  [{:created_by_member {:first_name "jim"}}]
+                  :member_follows_on_created_by
+                  [{:member {:first_name "jim"}}]}]))
+
     ;; Filters
     (testing "list entity with where arg"
       (test-gql (str "{ members (where: {first_name: {eq:  \"yoshi\"}}) "
@@ -444,9 +470,10 @@
                                      :first_name "jim"
                                      :last_name "smith"}))
         conf (assoc signal-test-config :db db)
+        sl-conf (gql/sl-config conf)
+        schema (gql/schema conf)
         test-gql (fn [q res-keys expected]
-                   (let [schema (gql/schema conf)
-                         res (gql/exec conf schema q nil {})]
+                   (let [res (gql/exec conf sl-conf schema q nil {})]
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
 
