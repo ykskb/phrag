@@ -22,7 +22,7 @@
    :profiles/dev {}
    :project/dev  {:source-paths   ["dev/src"]
                   :resource-paths ["dev/resources"]
-                  :dependencies   [[alekcz/charmander "1.0.2"]
+                  :dependencies   [[alekcz/charmander "1.0.3"]
                                    [bidi "2.1.6"]
                                    [cheshire "5.10.1"]
                                    [eftest "0.5.9"]
