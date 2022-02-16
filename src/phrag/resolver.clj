@@ -103,10 +103,9 @@
           res-p (sl-api/enqueue! sl-key
                                  (->BatchDataSource (id-key val) batch-fn
                                                     first map-n-fn))]
-
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
-(defn has-many [id-key table-key sl-key rels sgnl-fn-map ctx args val]
+(defn has-many [id-key pk-keys table-key sl-key rels sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params args)
                        (signal (:pre sgnl-fn-map) ctx))
@@ -114,7 +113,8 @@
                      (let [ids (map :id many)
                            sql-args (update sql-args :where
                                            conj [:in id-key ids])
-                           res (hd/list-root (:db ctx) table-key sql-args)]
+                           res (hd/list-partitioned (:db ctx) table-key id-key
+                                                    pk-keys sql-args)]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
                       res))
           map-n-fn (fn [muses batch-res]

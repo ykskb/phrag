@@ -7,16 +7,13 @@
 
 ;;; reitit
 
-(defn- rtt-param-data [req]
-  (w/stringify-keys (or (:body-params req) (:form-params req))))
-
 (defn- rtt-gql-handler [config]
   (let [schema (gql/schema config)
         sl-conf (gql/sl-config config)]
     (fn [req]
-      (let [params (rtt-param-data req)
-            query (get params "query")
-            vars (w/keywordize-keys (get params "variables"))]
+      (let [params (:body-params req)
+            query (:query params)
+            vars (:variables params)]
         {:status 200
          :body (gql/exec config sl-conf schema query vars req)}))))
 

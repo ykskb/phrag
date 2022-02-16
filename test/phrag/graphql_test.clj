@@ -64,12 +64,12 @@
                      "postal_code: \"234567\") { id }}")
                 [:data :createVenue :id] 2))
 
-    (testing "create 1st meetup"
+    (testing "create 1st meetup under venue 2"
       (test-gql (str "mutation {createMeetup (title: \"rust meetup\" "
                      "start_at: \"2021-01-01 18:00:00\" venue_id: 2) { id }}")
                 [:data :createMeetup :id] 1))
 
-    (testing "create 2nd meetup"
+    (testing "create 2nd meetup under venue 1"
       (test-gql (str "mutation {createMeetup (title: \"cpp meetup\" "
                      "start_at: \"2021-01-12 18:00:00\" venue_id: 1) { id }}")
                 [:data :createMeetup :id] 2))
@@ -165,6 +165,28 @@
                                      {:meetup {:id 2 :title "cpp meetup"}}]}
                   {:email "yoshi@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
+
+    (testing "list entities with limit on nested has-many query"
+      (test-gql  "{ members { email meetups_members (limit: 1) { meetup { id title }}}}"
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
+                  {:email "yoshi@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}])
+      (test-gql  "{ members { email meetups_members (offset: 1) { meetup { id title }}}}"
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 2 :title "cpp meetup"}}]}
+                  {:email "yoshi@test.com"
+                   :meetups_members []}])
+      (test-gql  (str "{ members { email meetups_members "
+                      "(sort: {meetup_id: desc}, offset: 1) "
+                      "{ meetup { id title }}}}")
+                 [:data :members]
+                 [{:email "jim@test.com"
+                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
+                  {:email "yoshi@test.com"
+                   :meetups_members []}]))
 
     (testing "list entities with many-to-many param and aggregation"
       (test-gql  (str "{ members { email meetups_members { meetup { id title }} "

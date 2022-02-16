@@ -83,18 +83,41 @@
   (let [whr (:where params)
         selects (:select params [:*])
         o-col (:order-col params)
-        q (-> (apply h/select selects) (h/from table)
-              (h/limit (:limit params 100)) (h/offset (:offset params 0)))
+        q (-> (apply h/select selects)
+              (h/from table)
+              (h/limit (:limit params 100))
+              (h/offset (:offset params 0)))
         q (if (not-empty whr) (apply h/where q whr) q)
         q (if (some? o-col) (h/order-by q [o-col (:direc params)]) q)]
     (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
+(defn list-partitioned [db table part-col-key order-col order-direc & [params]]
+  (let [whr (:where params)
+        sub-selects [:* (h/over [[:raw "row_number()"]
+                                 (-> (h/partition-by part-col-key)
+                                     (h/order-by [order-col order-direc]))
+                                 :p_id])]
+        sub-q (-> (apply h/select sub-selects)
+                  (h/from table))
+        sub-q (if (not-empty whr) (apply h/where sub-q whr) sub-q)
+        pid-gt (:offset params 0)
+        pid-lte (+ pid-gt (:limit params 100))
+        q (-> (h/select :*)
+              (h/from [sub-q :sub])
+              (h/where [:> :p_id pid-gt])
+              (h/where [:<= :p_id pid-lte]))]
+    (println (sql/format q))
+    (->> (sql/format q)
+         (jdbc/query db))))
+
 (defn aggregate [db table aggrs & [params]]
   (let [whr (:where params)
-        q (-> (apply h/select aggrs) (h/from table)
-              (h/limit (:limit params 100)) (h/offset (:offset params 0)))
+        q (-> (apply h/select aggrs)
+              (h/from table)
+              (h/limit (:limit params 100))
+              (h/offset (:offset params 0)))
         q (if (not-empty whr) (apply h/where q whr) q)]
     ;;(println (sql/format q))
     (->> (sql/format q)
@@ -102,8 +125,10 @@
 
 (defn aggregate-grp-by [db table aggrs grp-by & [params]]
   (let [whr (:where params)
-        q (-> (apply h/select aggrs) (h/select grp-by)
-              (h/from table) (h/group-by grp-by))
+        q (-> (apply h/select aggrs)
+              (h/select grp-by)
+              (h/from table)
+              (h/group-by grp-by))
         q (if (not-empty whr) (apply h/where q whr) q)]
     ;;(println (sql/format q))
     (->> (sql/format q)
@@ -112,6 +137,7 @@
 (defn delete! [db table pk-map]
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (apply h/where (h/delete-from table) whr)]
+    (prn (sql/format q))
     (->> (sql/format q)
          (jdbc/execute! db))))
 
@@ -121,8 +147,9 @@
 
 (defn update! [db table pk-map raw-map]
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
-        q (-> (h/update table) (h/set raw-map))]
-    (prn whr q)
+        q (-> (h/update table)
+              (h/set raw-map))]
+    (prn (sql/format (apply h/where q whr)))
     (->> (apply h/where q whr)
          sql/format
          (jdbc/execute! db))))

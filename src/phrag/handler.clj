@@ -56,6 +56,11 @@
 (defn list-root [db-con table params]
   (db/list-up db-con table params))
 
+(defn list-partitioned [db-con table p-col-key pk-keys params]
+  (db/list-partitioned db-con table p-col-key
+                       (:order-col params (first pk-keys))
+                       (:direc params :asc) params))
+
 (def ^:private sqlite-last-id
   (keyword "last_insert_rowid()"))
 

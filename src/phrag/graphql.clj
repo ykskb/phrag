@@ -159,6 +159,7 @@
         rsc (inf/singular table-name)
         rsc-name (csk/->PascalCase rsc)
         rsc-name-key (keyword rsc-name)
+        pk-keys (map #(keyword (:name %)) (:pks table))
         rsc-aggr-key (keyword (str rsc-name "Aggregate"))
         rsc-whr-key (keyword (str rsc-name "Where"))
         rsc-sort-key (keyword (str rsc-name "Sort"))
@@ -187,8 +188,8 @@
                                 :limit {:type 'Int}
                                 :offset {:type 'Int}}
                          :resolve (partial rslv/has-many fk-from-rsc-col
-                                           table-key has-many-fld-key rsc-rels
-                                           rsc-sgnl-map)})
+                                           pk-keys table-key has-many-fld-key
+                                           rsc-rels rsc-sgnl-map)})
                   ;; has-many aggregate on linked tables
                   use-aggr (assoc-in
                             [:objects fk-to-rsc-name-key :fields

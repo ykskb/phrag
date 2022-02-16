@@ -1,14 +1,16 @@
 # Phrag
 
-**Constraint-driven GraphQL from RDBMS Schema**
+**GraphQL directly from RDBMS Schema**
 
-Phrag creates a GraphQL handler from a database connection in a constraint-driven manner.
+Phrag creates a GraphQL handler by scanning DB schema. All needed is a DB connection.
+
+It also comes with a signal feature to inject custom logics per table accesses.
 
 #### Features:
 
 - CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
 
-- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships as nested object queries through a [strategy](#query-relationships).
+- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships as nested query objects according to a [design](#query-relationships).
 
 - Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
 
@@ -39,19 +41,21 @@ Create ring app with reitit route using Integrant
  ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
 ```
 
-### Strategies
+### Design
 
-#####  Query relationships
+Phrag focuses on constraints to let database schema represent application data structure.
 
-Phrag transforms a foreign key constraint to nested queries of GraphQL as the diagram below.
+##### Query Relationships
+
+Phrag transforms a foreign key (FK) constraint into nested query objects of GraphQL as the diagram below.
 
 <img src="./docs/images/fk-transform.png" />
 
-This is a fundamental concept for Phrag to support multiple types of relationships. 
+This is a fundamental concept for Phrag to support multiple types of relationships.
 
 ##### Mutations
 
-Primary key (PK) constraints are the driver of mutations. `create` operations return PK column fields and `update`/`delete` operations require them as an identifier.
+Primary key (PK) constraints are identifier constructs of mutations. `create` operations return PK column fields and `update`/`delete` operations require them as identifier data.
 
 <!---
 > Notes:
@@ -108,6 +112,7 @@ By default, Phrag retrieves DB schema data through a DB connection and it is suf
 | `:pks`     | List of primary keys. A primary key can contain `:name` and `:type` parameters.                  |
 
 > Notes:
+>
 > - When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
 > - When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
 
