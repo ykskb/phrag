@@ -1,6 +1,7 @@
 (ns phrag.graphql-test
   (:require [clojure.test :refer :all]
             [clojure.java.jdbc :as jdbc]
+            [phrag.core :as core]
             [phrag.core-test :refer [create-db postgres-db]]
             [phrag.table :as tbl]
             [phrag.graphql :as gql]))
@@ -13,7 +14,7 @@
         opt {:db db
              :scan-schema true}
         conf {:db db
-              :tables (tbl/schema-from-db opt)
+              :tables (tbl/db-schema opt)
               :use-aggregation true}
         sl-conf (gql/sl-config conf)
         schema (gql/schema conf)
@@ -167,44 +168,47 @@
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}]))
 
     (testing "list entities with limit on nested has-many query"
-      (test-gql  "{ members { email meetups_members (limit: 1) { meetup { id title }}}}"
-                 [:data :members]
-                 [{:email "jim@test.com"
-                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
-                  {:email "yoshi@test.com"
-                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}])
-      (test-gql  "{ members { email meetups_members (offset: 1) { meetup { id title }}}}"
-                 [:data :members]
-                 [{:email "jim@test.com"
-                   :meetups_members [{:meetup {:id 2 :title "cpp meetup"}}]}
-                  {:email "yoshi@test.com"
-                   :meetups_members []}])
-      (test-gql  (str "{ members { email meetups_members "
-                      "(sort: {meetup_id: desc}, offset: 1) "
-                      "{ meetup { id title }}}}")
-                 [:data :members]
-                 [{:email "jim@test.com"
-                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
-                  {:email "yoshi@test.com"
-                   :meetups_members []}]))
+      (test-gql (str "{ members { email meetups_members (limit: 1) "
+                     "{ meetup { id title }}}}")
+                [:data :members]
+                [{:email "jim@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
+                 {:email "yoshi@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}])
+      (test-gql (str "{ members { email meetups_members (offset: 1) "
+                     "{ meetup { id title }}}}")
+                [:data :members]
+                [{:email "jim@test.com"
+                  :meetups_members [{:meetup {:id 2 :title "cpp meetup"}}]}
+                 {:email "yoshi@test.com"
+                  :meetups_members []}])
+      (test-gql (str "{ members { email meetups_members "
+                     "(sort: {meetup_id: desc}, offset: 1) "
+                     "{ meetup { id title }}}}")
+                [:data :members]
+                [{:email "jim@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
+                 {:email "yoshi@test.com"
+                  :meetups_members []}]))
 
     (testing "list entities with many-to-many param and aggregation"
-      (test-gql  (str "{ members { email meetups_members { meetup { id title }} "
-                      "meetups_members_aggregate { count "
-                      "max { meetup_id member_id } "
-                      "min { meetup_id member_id }}}}")
-                 [:data :members]
-                 [{:email "jim@test.com"
-                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
-                                     {:meetup {:id 2 :title "cpp meetup"}}]
-                   :meetups_members_aggregate {:count 2
-                                               :max {:meetup_id 2 :member_id 1}
-                                               :min {:meetup_id 1 :member_id 1}}}
-                  {:email "yoshi@test.com"
-                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
-                   :meetups_members_aggregate {:count 1
-                                               :max {:meetup_id 1 :member_id 2}
-                                               :min {:meetup_id 1 :member_id 2}}}]))
+      (test-gql (str "{ members { email meetups_members { meetup { id title }} "
+                     "meetups_members_aggregate { count "
+                     "max { meetup_id member_id } "
+                     "min { meetup_id member_id }}}}")
+                [:data :members]
+                [{:email "jim@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}
+                                    {:meetup {:id 2 :title "cpp meetup"}}]
+                  :meetups_members_aggregate {:count 2
+                                              :max {:meetup_id 2 :member_id 1}
+                                              :min {:meetup_id 1 :member_id 1}}}
+                 {:email "yoshi@test.com"
+                  :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
+                  :meetups_members_aggregate
+                  {:count 1
+                   :max {:meetup_id 1 :member_id 2}
+                   :min {:meetup_id 1 :member_id 2}}}]))
 
     (testing "list entities with many-to-many param and filtered aggregation"
       (test-gql  (str "{ members { email meetups_members { meetup { id title }} "
@@ -220,9 +224,10 @@
                                                :min {:meetup_id 1 :member_id 1}}}
                   {:email "yoshi@test.com"
                    :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
-                   :meetups_members_aggregate {:count 1
-                                               :max {:meetup_id 1 :member_id 2}
-                                               :min {:meetup_id 1 :member_id 2}}}]))
+                   :meetups_members_aggregate
+                   {:count 1
+                    :max {:meetup_id 1 :member_id 2}
+                    :min {:meetup_id 1 :member_id 2}}}]))
 
     (testing "fetch entity with many-to-many param"
       (test-gql (str  "{ members (where: {id: {eq: 1}}) "
@@ -256,9 +261,10 @@
                 [:data :members]
                 [{:email "yoshi@test.com"
                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]
-                  :meetups_members_aggregate {:count 1
-                                              :max {:meetup_id 1 :member_id 2}
-                                              :min {:meetup_id 1 :member_id 2}}}]))
+                  :meetups_members_aggregate
+                  {:count 1
+                   :max {:meetup_id 1 :member_id 2}
+                   :min {:meetup_id 1 :member_id 2}}}]))
 
     ;; Circular many-to-many relationship
 
@@ -308,7 +314,8 @@
       (test-gql (str  "{ members { first_name member_follows_on_member_id "
                       "{ created_by_member { first_name }}"
                       "member_follows_on_member_id_aggregate { count "
-                      "max { member_id created_by } min { member_id created_by }}}}")
+                      "max { member_id created_by } "
+                      "min { member_id created_by }}}}")
                 [:data :members]
                 [{:first_name "jim"
                   :member_follows_on_member_id []
@@ -336,7 +343,8 @@
                 "member_follow_on_member_id { member { first_name }}}}"))
       (test-gql (str "{ members { first_name "
                      "member_follows_on_created_by { member { first_name }} "
-                     "member_follows_on_member_id { created_by_member { first_name }}}}")
+                     "member_follows_on_member_id { created_by_member "
+                     "{ first_name }}}}")
                 [:data :members]
                 [{:first_name "jim"
                   :member_follows_on_member_id
@@ -467,31 +475,31 @@
 (defn- members-pre-update [args _ctx]
   nil)
 
-(def ^:private signal-test-config
-  {:table-name-plural true,
-   :scan-schema false
-   :tables [{:name "members"
-             :columns [{:name "id" :type "integer"}
-                       {:name "first_name" :type "text"}
-                       {:name "last_name" :type "text"}
-                       {:name "email" :type "text"}]
-             :table-type :root
-             :fks []
-             :pks [{:name "id" :type "integer"}]}]
-   :signal-ctx {:email "yoshi@test.com" :first-name "changed-first-name"}
-   :signals {:members {:query {:pre change-where-from-ctx
-                               :post [change-res-from-ctx]}
-                       :create {:pre change-arg-from-ctx
-                                :post [change-id-to-count
-                                       increment-id-count]}
-                       :update {:pre members-pre-update}}}})
-
 (deftest graphql-signals
   (let [db (doto (create-db)
              (jdbc/insert! :members {:email "jim@test.com"
                                      :first_name "jim"
                                      :last_name "smith"}))
-        conf (assoc signal-test-config :db db)
+        opt {:db db
+             :tables [{:name "members"
+                       :columns [{:name "id" :type "integer"}
+                                 {:name "first_name" :type "text"}
+                                 {:name "last_name" :type "text"}
+                                 {:name "email" :type "text"}]
+                       :table-type :root
+                       :fks []
+                       :pks [{:name "id" :type "integer"}]}]
+             :scan-schema false
+             :use-aggregation true
+             :signal-ctx {:email "yoshi@test.com"
+                          :first-name "changed-first-name"}
+             :signals {:members {:query {:pre change-where-from-ctx
+                                         :post [change-res-from-ctx]}
+                                 :create {:pre change-arg-from-ctx
+                                          :post [change-id-to-count
+                                                 increment-id-count]}
+                                 :update {:pre members-pre-update}}}}
+        conf (core/options->config opt)
         sl-conf (gql/sl-config conf)
         schema (gql/schema conf)
         test-gql (fn [q res-keys expected]
@@ -511,7 +519,8 @@
                    :first_name "changed-first-name"}]))
 
     (testing "pre-update signal"
-      (test-gql (str "mutation {updateMember (pk_columns: {id: 2} email: \"fake-email\" "
+      (test-gql (str "mutation { updateMember (pk_columns: {id: 2}"
+                     "email: \"fake-email\" "
                      "first_name: \"fake-first-name\") { result }}")
                 [:data :updateMember :result] true)
       (test-gql "{ members { id email first_name }}"

@@ -1,14 +1,4 @@
-(ns phrag.field
-  (:require [phrag.table :as tbl]
-            [phrag.logging :refer [log]]
-            [phrag.resolver :as rslv]
-            [camel-snake-kebab.core :as csk]
-            [com.walmartlabs.lacinia :as lcn]
-            [com.walmartlabs.lacinia.schema :as schema]
-            [clojure.pprint :as pp]
-            [clojure.string :as s]
-            [inflections.core :as inf]
-            [superlifter.core :as sl-core]))
+(ns phrag.field)
 
 ;; Resource Object Fields
 
@@ -116,7 +106,7 @@
               (assoc m col-key field)))
           {} (:columns table)))
 
-;; Primary Key Fields
+;; Primary Key Fields for mutations
 
 (def pk-desc "Primary key fields.")
 
@@ -129,4 +119,6 @@
 (defn update-fields [pk-keys obj-fields]
   (reduce (fn [m k] (dissoc m k)) obj-fields pk-keys))
 
+;; Mutation Result Object
 
+(def result-object {:Result {:fields {:result {:type 'Boolean}}}})

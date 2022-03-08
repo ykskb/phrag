@@ -1,26 +1,28 @@
 # Phrag
 
-**GraphQL directly from RDBMS Schema**
+**RDBMS Schema to GraphQL with Interceptors**
 
-Phrag creates a GraphQL handler by scanning DB schema. All needed is a DB connection.
+Phrag creates a GraphQL handler from RDBMS schema. All needed is a connection to a DB with [proper constraints](#design).
 
-It also comes with a signal feature to inject custom logics per table accesses.
+Phrag has an [interceptor signal](#interceptor-signals) feature to inject custom logics per GraphQL operation. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
+
+![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
 #### Features:
 
 - CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
 
-- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships as nested query objects according to a [design](#query-relationships).
+- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships supported as nested query objects as per its [design](#query-relationships).
 
 - Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
 
-- Aggregation queries for root entity and has-many relationships.
+- [Aggregation queries](#aggregation) for root entity and has-many relationships.
 
 - Resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) as arguments in query operations.
 
-- [Signals](#signals) to inject custom logics before & after DB accesses per resource operations.
+- [Interceptor Signals](#interceptor-signals) to inject custom logics before/after DB accesses per resource operations.
 
-- Options to use schema retrieved from a database, selectively override it or entirely base on provided data through [config](#phrag-config).
+- Options to use schema retrieved from a database, selectively override it or entirely base on provided data through [config](#config).
 
 - Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
@@ -62,26 +64,30 @@ Primary key (PK) constraints are identifier constructs of mutations. `create` op
 > * There is an option to detect relations from table/column names, however it comes with a limitation since matching names such as `user_id` for `users` table are required.
 -->
 
+##### Tables
+
+Though schema data can be overriden, all the tables are transformed into queries at root level (of course with all the relationships). This allows API consumers to query data in any structure they wish without restricting them to query only in certain way.
+
 ### Config
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
 
 #### Config Parameters
 
-| Key                  | description                                                                                                  | Required | Default Value |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ | -------- | ------------- |
-| `:db`                | Database connection object.                                                                                  | Yes      |               |
-| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                         | No       |               |
-| `:signals`           | Map of singal functions per resources. Plz check [Signals](#signals) for details.                            | No       |               |
-| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Signals](#signals) for details.            | No       |               |
-| `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                          | No       | `true`        |
-| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                | No       | `true`        |
-| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names. | No       | `false`       |
-| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.  | No       | `true`        |
+| Key                  | description                                                                                                               | Required | Default Value |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
+| `:db`                | Database connection object.                                                                                               | Yes      |               |
+| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                                      | No       |               |
+| `:signals`           | Map of singal functions per resources. Plz check [Interceptor Signals](#interceptor-signals) for details.                 | No       |               |
+| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Interceptor Signals](#interceptor-signals) for details. | No       |               |
+| `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                                       | No       | `true`        |
+| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                             | No       | `true`        |
+| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.              | No       | `false`       |
+| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.               | No       | `true`        |
 
 #### Schema Data
 
-By default, Phrag retrieves DB schema data through a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
+By default, Phrag retrieves DB schema data from a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain tables, columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
 
 ```edn
 {:tables [
@@ -116,46 +122,62 @@ By default, Phrag retrieves DB schema data through a DB connection and it is suf
 > - When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
 > - When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
 
-### Signals
+### Interceptor Signals
 
-Phrag can signal configurable functions per resource queries/mutations at pre/post-DB operation time. This is where things like access controls or custom business logics can be configured.
+Phrag can signal configured functions per resource queries/mutations at pre/post-operation time. This is where things like access controls or custom business logics can be configured. Signal functions are called with different parameters as below:
+
+##### Pre-operation Signal Function
+
+| Type   | Signal function receives (as first parameter):                    | Returned value will be:                |
+| ------ | ----------------------------------------------------------------- | -------------------------------------- |
+| query  | SQL parameter map: `{:select #{} :where [] :offset 0 :limit 100}` | Passed to subsequent query operation.  |
+| create | Submitted mutation parameters                                     | Passed to subsequent create operation. |
+| update | Submitted mutation parameters                                     | Passed to subsequent update operation. |
+| delete | Submitted mutation parameters                                     | Passed to subsequent delete operation. |
 
 > Notes:
 >
-> - Resource operation types include `query`, `create`, `update` and `delete`. (`query` signals happen in relations as well.)
-> - Signal receiver functions are called with different parameters per types:
->   - A `pre-query` function will have its first argument which is a map of SQL parameters including `where` (in [HoneySQL](https://github.com/seancorfield/honeysql) format), `sort`, `limit` and `offset`, and its returned value will be passed to a subsequent DB operation.
->   - A `pre-mutation` function will have request parameters as its first argument, and its returned value will be passed to a subsequent DB operation.
->   - A `post-query/mutation` function will have a resolved result as its first argument when called, and its returned value will be passed to a result response.
->   - All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config together with a DB connection and an incoming HTTP request.
->   - If `nil` is returned from `pre-mutation` functions, DB operations will be skipped and exception will be thrown.
->   - `:all` can be used at each level of signal map to run signal functions across all tables, all operations for a table, or both timing for a specific operation.
+> - `query` signal functions will be called in nested queries (relations) as well.
+> - `:where` parameter for `query` operation is in [HoneySQL](https://github.com/seancorfield/honeysql) format.
 
-Here's some examples:
+##### Post-operation Signal Function
+
+| Type   | Signal function receives (as a first parameter):   | Returned value will be:  |
+| ------ | -------------------------------------------------- | ------------------------ |
+| query  | Result value(s) returned from query operation.     | Passed to response body. |
+| create | Primary key object of created item: e.g. `{:id 3}` | Passed to response body. |
+| update | Result object: `{:result true}`                    | Passed to response body. |
+| delete | Result object: `{:result true}`                    | Passed to response body. |
+
+##### All Signal Functions
+
+All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config (`:signal-ctx`) together with a DB connection (`:db`) and an incoming HTTP request (`:req`).
+
+##### Examples
 
 ```clojure
 (defn- end-user-access
-  "Restrict access to request user"
+  "Users can query only his/her own user info"
   [sql-args ctx]
-  (let [user (user-info (:request ctx))]
+  (let [user (user-info (:req ctx))]
     (if (admin-user? user))
       sql-args
       (update sql-args :where conj [:= :user_id (:id user)])))
 
 (defn- hide-internal-id
-  "Removes :internal-id for non-admin users"
+  "Removes internal-id for non-admin users"
   [result ctx]
-  (let [user (user-info (:request ctx))]
+  (let [user (user-info (:req ctx))]
     (if (admin-user? user))
       result
       (update result :internal-id nil)))
 
 (defn- update-owner
-  "Updates :created_by with auth user"
+  "Updates created_by with accessing user's id"
   [args ctx]
-  (let [user (user-info (:request ctx))]
+  (let [user (user-info (:req ctx))]
     (if (end-user? user)
-      (update args :created_by (:id user))
+      (assoc args :created_by (:id user))
       args)))
 
 ;; Multiple signal function can be specified as a vector.
@@ -168,9 +190,13 @@ Here's some examples:
                      :update {:pre update-owner}}}})
 ```
 
+> Notes:
+>
+> - `:all` can be used at each level of signal map to run signal functions across all tables, all operations for a table, or both timing for a specific operation.
+
 ### Resource Filtering
 
-Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is used in arguments for filtering. `AND` / `OR` group can be created as clause lists in `and` / `or` parameter under `where`.
+Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is used in arguments for filtering. `AND` / `OR` group can be created as clause lists in `and` / `or` parameter under `where`. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
 
 > - Supported operators are `eq`, `ne`, `gt`, `lt`, `gte`, `lte`, `in` and `like`.
 > - Multiple filters are applied with `AND` operator.
@@ -181,7 +207,7 @@ Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is 
 
 ### Resource Sorting
 
-Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting.
+Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
 
 ##### Example:
 
@@ -189,7 +215,7 @@ Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorti
 
 ### Resource Pagination
 
-Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination.
+Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
 
 > - `limit` and `offset` can be used independently.
 > - Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
@@ -197,6 +223,14 @@ Formats of `limit: [count]` and `offset: [count]` are used in query arguments fo
 ##### Example
 
 `(where: {id: {gt: 20}} limit: 25)` (25 items after/greater than `id`:`20`).
+
+### Aggregation
+
+`avg`, `count`, `max`, `min` and `sum` are supported and it can also be [filtered](#resource-filtering). Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
+
+##### Example
+
+`cart_items_aggregate (where: {cart_id: {eq: 1}}) {count max {price} min {price} avg {price} sum {price}}` (queries `count` of `cart_items` together with `max`, `min` `sum` and `avg` of `price` where `cart_id` is `1`).
 
 ### Environment
 

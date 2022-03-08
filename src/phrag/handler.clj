@@ -1,7 +1,21 @@
 (ns phrag.handler
-  (:require [phrag.db :as db]))
+  (:require [clojure.set :as clj-set]
+            [phrag.db :as db]))
 
-;;; GraphQL args to SQL params
+;;; Arg/DB Handler
+
+;; GraphQL args to SQL params
+
+(defn lacinia-selections [ctx]
+  (get-in ctx [:com.walmartlabs.lacinia/selection :selections]))
+
+(defn- query-fields [ctx]
+  (let [selections (lacinia-selections ctx)]
+    (set (map #(:field-name %) selections))))
+
+(defn- parse-selects [col-keys ctx]
+  (let [q-fields (query-fields ctx)]
+    (clj-set/intersection q-fields col-keys)))
 
 (def ^:private where-ops
   {:eq  :=
@@ -32,7 +46,7 @@
       (some? (:or whr)) (conj (parse-and-or :or (:or whr)))
       (some? (:and whr)) (conj (parse-and-or :and (:and whr))))))
 
-(defn- parse-sort [m v]
+(defn- update-sort [m v]
   (let [col (first (keys v))
         direc (col v :desc)]
     (if (and col direc)
@@ -41,17 +55,20 @@
           (assoc :direc direc))
       m)))
 
-(defn args->sql-params [args]
+(defn args->sql-params [col-keys args ctx default-limit]
   (reduce (fn [m [k v]]
             (cond
-              (= k :sort) (parse-sort m v)
+              (= k :sort) (update-sort m v)
               (= k :limit) (assoc m :limit v)
               (= k :offset) (assoc m :offset v)
               :else m))
-          {:where (parse-where args):limit 100 :offset 0}
+          (cond-> {:select (parse-selects col-keys ctx)
+                   :where (parse-where args)
+                   :offset 0}
+            (integer? default-limit) (assoc :limit default-limit))
           args))
 
-;;; DB handlers
+;; DB handlers
 
 (defn list-root [db-con table params]
   (db/list-up db-con table params))
@@ -69,7 +86,6 @@
 
 (defn- return-keys [result pks]
   (let [res-map (first result)]
-    (prn result (set pks))
     (if (contains? (set pks) :id)
       (assoc res-map :id (created-id res-map))
       res-map)))

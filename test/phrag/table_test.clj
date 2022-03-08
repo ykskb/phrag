@@ -93,7 +93,7 @@
         venues
         meetups
         meetups-members]
-       (tbl/schema-from-db {:db db
+       (tbl/db-schema {:db db
                             :scan-schema true
                             :no-fk-on-db false
                             :tables []})))
@@ -108,7 +108,7 @@
           meetups
           meetups-members
           extra-table]
-         (tbl/schema-from-db {:db db
+         (tbl/db-schema {:db db
                               :scan-schema true
                               :no-fk-on-db false
                               :tables [extra-table]}))))
@@ -122,7 +122,7 @@
           (assoc venues :columns venues-columns)
           (assoc meetups :fks meetups-fks)
           meetups-members]
-         (tbl/schema-from-db {:db db
+         (tbl/db-schema {:db db
                               :scan-schema true
                               :no-fk-on-db false
                               :tables [{:name "venues"
@@ -169,7 +169,7 @@
         venues
         meetups
         meetups-members]
-       (tbl/schema-from-db {:db db
+       (tbl/db-schema {:db db
                             :scan-schema true
                             :no-fk-on-db true
                             :plural-table-name true
