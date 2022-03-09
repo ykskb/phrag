@@ -22,13 +22,13 @@
 
 (defrecord FetchDataSource [fetch-fn]
   u/DataSource
-  (-identity [this] (:id this))
+  (-identity [this] (:u-id this))
   (-fetch [this env]
     (sl-api/unwrap (exec-sql (:fetch-fn this) this env))))
 
-(defrecord BatchDataSource [id batch-fn map-1-fn map-n-fn]
+(defrecord BatchDataSource [u-id batch-fn map-1-fn map-n-fn]
   u/DataSource
-  (-identity [this] (:id this))
+  (-identity [this] (:u-id this))
   (-fetch [this env]
     (let [responses (exec-sql (:batch-fn this) [this] env)]
       (sl-api/unwrap (:map-1-fn this) responses)))
@@ -91,21 +91,26 @@
                     (update-triggers-by-count! rels))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx))))))
 
-(defn has-one [table-key fk-from-key fk-to-key sl-key col-keys rel-cols rels
-               sgnl-fn-map ctx _args val]
+(defn has-one
+  "Resolves records of FK destination table. :u-id is upstream value of :from
+  column, and :to column value of retrieved records map them back.
+  e.g. (shopping_cart.user_id fk=> user.id)
+  Parent: [shopping_cart].user_id => [user].id "
+  [table-key fk-from-key fk-to-key sl-key col-keys rel-cols rels sgnl-fn-map
+   ctx _args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params col-keys nil ctx nil)
                        (update :select into rel-cols)
                        (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
-                     (let [ids (map :id many)
+                     (let [ids (map :u-id many)
                            sql-params (assoc sql-args
                                              :where [[:in fk-to-key ids]])
                            res (hd/list-root (:db ctx) table-key sql-params)]
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
                        res))
           map-n-fn (fn [muses batch-res]
-                     (let [m (zipmap (map :id muses) (repeat nil))
+                     (let [m (zipmap (map :u-id muses) (repeat nil))
                            vals (zipmap (map fk-to-key batch-res) batch-res)]
                        (merge m vals)))
           res-p (sl-api/enqueue! sl-key
@@ -113,14 +118,19 @@
                                                     first map-n-fn))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
-(defn has-many [table-key fk-from-key fk-to-key pk-keys sl-key col-keys rel-cols
+(defn has-many
+  "Resolves records of FK origin table. :u-id is upstream value of :to column,
+  and :from column value of retrieved records map them back.
+  e.g. (shopping_cart.user_id fk=> user.id)
+  Parent values: [user].id => [shopping_cart].user_id"
+  [table-key fk-from-key fk-to-key pk-keys sl-key col-keys rel-cols
                 rels sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params col-keys args ctx 100)
                        (update :select into rel-cols)
                        (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
-                     (let [ids (map :id many)
+                     (let [ids (map :u-id many)
                            sql-args (update sql-args :where
                                             conj [:in fk-from-key ids])
                            res (hd/list-partitioned
@@ -129,7 +139,7 @@
                        (do-update-triggers! (:sl-ctx ctx) rels (count res))
                       res))
           map-n-fn (fn [muses batch-res]
-                     (let [m (zipmap (map :id muses) (repeat []))
+                     (let [m (zipmap (map :u-id muses) (repeat []))
                            vals (group-by fk-from-key batch-res)]
                        (merge-with concat m vals)))
           res-p (sl-api/enqueue! sl-key
@@ -182,23 +192,23 @@
         res (first (hd/aggregate-root (:db ctx) table-key selects sql-args))]
     (aggr-result fields res)))
 
-(defn aggregate-has-many [id-key table-key sl-key sgnl-fn-map ctx args val]
+(defn aggregate-has-many [table-key fk-from fk-to sl-key sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params nil args nil nil)
                        (signal (:pre sgnl-fn-map) ctx))
           fields (aggr-fields ctx)
           selects (aggr-selects fields)
           batch-fn (fn [many _env]
-                     (let [ids (map :id many)
+                     (let [ids (map :u-id many)
                            sql-args (update sql-args :where
-                                            conj [:in id-key ids])
+                                            conj [:in fk-from ids])
                            sql-res (hd/aggregate-grp-by
-                                    (:db ctx) table-key selects id-key sql-args)]
-                       (aggr-many-result fields sql-res id-key ids)))
+                                    (:db ctx) table-key selects fk-from sql-args)]
+                       (aggr-many-result fields sql-res fk-from ids)))
           map-n-fn (fn [_muses batch-res]
-                     (zipmap (map id-key batch-res) batch-res))
+                     (zipmap (map fk-from batch-res) batch-res))
           res-p (sl-api/enqueue! sl-key
-                                 (->BatchDataSource (:id val) batch-fn
+                                 (->BatchDataSource (fk-to val) batch-fn
                                                     first map-n-fn))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 

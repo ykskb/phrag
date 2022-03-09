@@ -2,11 +2,11 @@
 
 **RDBMS Schema to GraphQL with Interceptors**
 
+![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
+
 Phrag creates a GraphQL handler from RDBMS schema. All needed is a connection to a DB with [proper constraints](#design).
 
 Phrag has an [interceptor signal](#interceptor-signals) feature to inject custom logics per GraphQL operation. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
-
-![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
 #### Features:
 

@@ -60,32 +60,34 @@
         sgl-names (rsc-names table-name :singular)
         plr-names (rsc-names table-name :plural)
         obj-keys (rsc-obj-keys (:bare sgl-names))
-        entity-schema (-> schema
-        (assoc-in [:objects (:pascal-key sgl-names)]
-                  {:description (:pascal sgl-names)
-                   :fields obj-fields})
-        (assoc-in [:input-objects (:clauses obj-keys)]
-                  {:description fld/clause-desc
-                   :fields (fld/clause-fields table)})
-        (assoc-in [:input-objects (:where obj-keys)]
-                  {:description fld/where-desc
-                   :fields (fld/where-fields table (:clauses obj-keys))})
-        (assoc-in [:input-objects (:sort obj-keys)]
-                  {:description fld/sort-desc
-                   :fields (fld/sort-fields table)})
+        entity-schema
+        (-> schema
+            (assoc-in [:objects (:pascal-key sgl-names)]
+                      {:description (:pascal sgl-names)
+                       :fields obj-fields})
+            (assoc-in [:input-objects (:clauses obj-keys)]
+                      {:description fld/clause-desc
+                       :fields (fld/clause-fields table)})
+            (assoc-in [:input-objects (:where obj-keys)]
+                      {:description fld/where-desc
+                       :fields (fld/where-fields table (:clauses obj-keys))})
+            (assoc-in [:input-objects (:sort obj-keys)]
+                      {:description fld/sort-desc
+                       :fields (fld/sort-fields table)})
 
-        (assoc-in [:queries (:bare-key plr-names)]
-                  {:type `(~'list ~(:pascal-key sgl-names))
-                   :description (str "Query " (:pascal plr-names) ".")
-                   :args {:where {:type (:where obj-keys)}
-                          :sort {:type (:sort obj-keys)}
-                          :limit {:type 'Int}
-                          :offset {:type 'Int}}
-                   :resolve (partial rslv/list-query table-key
-                                     (tbl/col-key-set table)
-                                     (get-in rel-ctx [:columns table-name])
-                                     (get-in rel-ctx [:fields table-name])
-                                     (signal-per-op config table-key :query))}))]
+            (assoc-in [:queries (:bare-key plr-names)]
+                      {:type `(~'list ~(:pascal-key sgl-names))
+                       :description (str "Query " (:pascal plr-names) ".")
+                       :args {:where {:type (:where obj-keys)}
+                              :sort {:type (:sort obj-keys)}
+                              :limit {:type 'Int}
+                              :offset {:type 'Int}}
+                       :resolve (partial
+                                 rslv/list-query table-key
+                                 (tbl/col-key-set table)
+                                 (get-in rel-ctx [:columns table-name])
+                                 (get-in rel-ctx [:fields table-name])
+                                 (signal-per-op config table-key :query))}))]
     (if (:use-aggregation config)
       (-> entity-schema
           (assoc-in [:objects (:fields obj-keys)]
@@ -205,8 +207,9 @@
             {:type (:aggregate input-keys)
              :args {:where {:type (:where input-keys)}}
              :resolve
-             (partial rslv/aggregate-has-many
-                      (get-in fk-ctx [:from :column-key]) table-key
+             (partial rslv/aggregate-has-many table-key
+                      (get-in fk-ctx [:from :column-key])
+                      (get-in fk-ctx [:to :column-key])
                       (get-in fk-q-keys [:has-many :aggregate-key])
                       rsc-sgnl-map)})
            ;; has-one on fk origin tables
