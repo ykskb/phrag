@@ -74,10 +74,10 @@
      (fn [m fk]
        (let [has-many-key (keyword (has-many-field table fk))
              has-many-aggr-key (keyword (str (name has-many-key) "_aggregate"))
-             to-columns (set (map #(keyword (:to %)) (:fks table)))]
+             to-col-key #{(keyword (:to fk))}]
          {:fields (merge-with into (:fields m)
                               {(:table fk) #{has-many-key has-many-aggr-key}})
-          :columns (merge-with into (:columns m) {(:table fk) to-columns})}))
+          :columns (merge-with into (:columns m) {(:table fk) to-col-key})}))
      has-one-mapped (:fks table))))
 
 (defn relation-context [config]

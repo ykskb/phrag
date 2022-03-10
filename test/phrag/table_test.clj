@@ -32,6 +32,8 @@
                         (keys exp-tbl))))
             sbj-map)))
 
+;; Expected table data
+
 (def ^:private members
   {:name "members"
    :columns [{:name "id" :type "integer"}
@@ -53,12 +55,12 @@
 
 (def ^:private venues
   {:name "venues"
-   :columns [{:name "id" :type "integer"}
+   :columns [{:name "vid" :type "integer"}
              {:name "name" :type "text"}
              {:name "postal_code" :type "text"}]
    :table-type :root
    :fks []
-   :pks [{:name "id" :type "integer"}]})
+   :pks [{:name "vid" :type "integer"}]})
 
 (def ^:private meetups
   {:name "meetups"
@@ -68,7 +70,7 @@
              {:name "venue_id" :type "int"}
              {:name "group_id" :type "int"}]
    :table-type :root
-   :fks [{:table "venues" :from "venue_id" :to "id"}
+   :fks [{:table "venues" :from "venue_id" :to "vid"}
          {:table "groups" :from "group_id" :to "id"}]
    :pks [{:name "id" :type "integer"}]})
 
@@ -81,8 +83,6 @@
          {:table "members" :from "member_id" :to "id"}]
    :pks [{:name "meetup_id" :type "int"}
          {:name "member_id" :type "int"}]})
-
-
 
 (deftest db-schema-with-fks
   (let [db (create-db)]
@@ -115,7 +115,7 @@
 
     (testing "scan DB with fk: config table data to override"
       (let [venues-columns [{:name "id" :type "integer"}]
-            meetups-fks [{:table "venues" :from "venue_id" :to "id"}]]
+            meetups-fks [{:table "venues" :from "venue_id" :to "vid"}]]
         (schema-as-expected?
          [members
           groups
@@ -160,14 +160,36 @@
                         "member_id   int, "
                         "primary key (group_id, member_id));"))))
 
+
+(def ^:private venues-fk-detection
+  {:name "venues"
+   :columns [{:name "id" :type "integer"}
+             {:name "name" :type "text"}
+             {:name "postal_code" :type "text"}]
+   :table-type :root
+   :fks []
+   :pks [{:name "id" :type "integer"}]})
+
+(def ^:private meetups-fk-detection
+  {:name "meetups"
+   :columns [{:name "id" :type "integer"}
+             {:name "title" :type "text"}
+             {:name "start_at" :type "timestamp"}
+             {:name "venue_id" :type "int"}
+             {:name "group_id" :type "int"}]
+   :table-type :root
+   :fks [{:table "venues" :from "venue_id" :to "id"}
+         {:table "groups" :from "group_id" :to "id"}]
+   :pks [{:name "id" :type "integer"}]})
+
 (deftest db-schema-without-fk
   (let [db (db-without-fk)]
     (testing  "scan DB without fk: no config table and plural table name"
       (schema-as-expected?
        [members
         groups
-        venues
-        meetups
+        venues-fk-detection
+        meetups-fk-detection
         meetups-members]
        (tbl/db-schema {:db db
                             :scan-schema true

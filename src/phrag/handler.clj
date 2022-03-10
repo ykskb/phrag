@@ -81,19 +81,17 @@
 (def ^:private sqlite-last-id
   (keyword "last_insert_rowid()"))
 
-(defn- created-id [res-map]
-  (some #(% res-map) [sqlite-last-id :id]))
-
-(defn- return-keys [result pks]
-  (let [res-map (first result)]
-    (if (contains? (set pks) :id)
-      (assoc res-map :id (created-id res-map))
-      res-map)))
+(defn- update-sqlite-pk [res-map pks]
+  (if (= (count pks) 1)
+    (assoc res-map (first pks) (sqlite-last-id res-map))
+    res-map))
 
 (defn create-root [params db-con table-key pk-keys]
   (let [opts {:return-keys pk-keys}
-        result (db/create! db-con table-key params opts)]
-   (return-keys result pk-keys)))
+        result (first (db/create! db-con table-key params opts))]
+    (if (contains? result sqlite-last-id)
+      (update-sqlite-pk result pk-keys)
+      result)))
 
 (defn delete-root [pk-map db-con table]
   (db/delete! db-con table pk-map)

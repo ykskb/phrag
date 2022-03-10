@@ -145,7 +145,7 @@
          (jdbc/execute! db))))
 
 (defn create! [db rsc raw-map opts]
-  (prn db rsc raw-map)
+  (prn rsc raw-map)
   (jdbc/insert! db rsc raw-map opts))
 
 (defn update! [db table pk-map raw-map]

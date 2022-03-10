@@ -7,7 +7,7 @@
 
 (defn postgres-db []
   (doto {:connection (jdbc/get-connection {:dbtype "postgresql"
-                                           :dbname "postgres"
+                                           :dbname "phrag_test"
                                            :host "localhost"
                                            :port 5432
                                            :user "postgres"
@@ -23,7 +23,7 @@
                         "name          varchar(128),"
                         "created_at    timestamp);"))
     (jdbc/execute! (str "create table venues ("
-                        "id               bigserial primary key,"
+                        "vid              bigserial primary key,"
                         "name             varchar(128),"
                         "postal_code      varchar(128));"))
     (jdbc/execute! (str "create table meetups ("
@@ -31,14 +31,26 @@
                         "title           varchar(128) not null, "
                         "start_at        timestamp,"
                         "venue_id        integer,"
-                        "group_id        integer);"))
+                        "group_id        integer,"
+                        "foreign key(venue_id) references venues(vid), "
+                        "foreign key(group_id) references groups(id));"))
+    (jdbc/execute! (str "create table member_follow ("
+                        "created_by    integer, "
+                        "member_id     integer, "
+                        "foreign key(created_by) references members(id), "
+                        "foreign key(member_id) references members(id), "
+                        "primary key (created_by, member_id));"))
     (jdbc/execute! (str "create table meetups_members ("
                         "meetup_id     integer,"
                         "member_id     integer,"
+                        "foreign key(meetup_id) references meetups(id), "
+                        "foreign key(member_id) references members(id), "
                         "primary key (meetup_id, member_id));"))
     (jdbc/execute! (str "create table groups_members ("
                         "group_id    integer,"
                         "member_id   integer,"
+                        "foreign key(group_id) references groups(id), "
+                        "foreign key(member_id) references members(id), "
                         "primary key (group_id, member_id));"))))
 
 (defn create-db []
@@ -53,7 +65,8 @@
                         "name          text, "
                         "created_at    timestamp);"))
     (jdbc/execute! (str "create table venues ("
-                        "id               integer primary key, "
+                        ;; testing non-"id" naming
+                        "vid              integer primary key, "
                         "name             text, "
                         "postal_code      text);"))
     (jdbc/execute! (str "create table meetups ("
@@ -62,7 +75,7 @@
                         "start_at        timestamp, "
                         "venue_id        int, "
                         "group_id        int, "
-                        "foreign key(venue_id) references venues(id), "
+                        "foreign key(venue_id) references venues(vid), "
                         "foreign key(group_id) references groups(id));"))
     (jdbc/execute! (str "create table member_follow ("
                         "created_by    int, "

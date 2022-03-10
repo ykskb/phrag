@@ -1,6 +1,7 @@
 (ns phrag.graphql-test
   (:require [clojure.test :refer :all]
             [clojure.java.jdbc :as jdbc]
+            [environ.core :refer [env]]
             [phrag.core :as core]
             [phrag.core-test :refer [create-db postgres-db]]
             [phrag.table :as tbl]
@@ -10,7 +11,9 @@
 ;; postgres-db: real PostgreSQL
 
 (deftest graphql-queries
-  (let [db (create-db)
+  (let [db (if (env :test-on-postgres)
+             (postgres-db)
+             (create-db))
         opt {:db db
              :scan-schema true}
         conf {:db db
@@ -20,6 +23,7 @@
         schema (gql/schema conf)
         test-gql (fn [q res-keys expected]
                    (let [res (gql/exec conf sl-conf schema q nil {})]
+                     (prn res)
                      (is (= expected (get-in res res-keys)))))]
 
     ;; Root entities
@@ -57,13 +61,13 @@
 
     (testing "create 1st venue"
       (test-gql (str "mutation {createVenue (name: \"office one\" "
-                     "postal_code: \"123456\") { id }}")
-                [:data :createVenue :id] 1))
+                     "postal_code: \"123456\") { vid }}")
+                [:data :createVenue :vid] 1))
 
     (testing "create 2nd venue"
       (test-gql (str "mutation {createVenue (name: \"city hall\" "
-                     "postal_code: \"234567\") { id }}")
-                [:data :createVenue :id] 2))
+                     "postal_code: \"234567\") { vid }}")
+                [:data :createVenue :vid] 2))
 
     (testing "create 1st meetup under venue 2"
       (test-gql (str "mutation {createMeetup (title: \"rust meetup\" "
@@ -77,60 +81,60 @@
 
     (testing "list entities with has-one param"
       (test-gql  (str "{ meetups { id title start_at venue_id "
-                      "venue { id name }}}")
+                      "venue { vid name }}}")
                  [:data :meetups]
                  [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
-                   :venue_id 2 :venue {:id 2 :name "city hall"}}
+                   :venue_id 2 :venue {:vid 2 :name "city hall"}}
                   {:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
-                   :venue_id 1 :venue {:id 1 :name "office one"}}]))
+                   :venue_id 1 :venue {:vid 1 :name "office one"}}]))
 
     (testing "fetch entity with has-one param"
       (test-gql  (str "{ meetups (where: {id: {eq: 1}}) "
-                      "{ id title start_at venue_id venue { id name }}}")
+                      "{ id title start_at venue_id venue { vid name }}}")
                  [:data :meetups]
                  [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
-                   :venue_id 2 :venue {:id 2 :name "city hall"}}])
+                   :venue_id 2 :venue {:vid 2 :name "city hall"}}])
       (test-gql (str  "{ meetups (where: {id: {eq: 2}}) "
-                      "{ id title start_at venue_id venue { id name }}}")
+                      "{ id title start_at venue_id venue { vid name }}}")
                  [:data :meetups]
                  [{:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
-                   :venue_id 1 :venue {:id 1 :name "office one"}}]))
+                   :venue_id 1 :venue {:vid 1 :name "office one"}}]))
 
     (testing "list entities with has-many param"
-      (test-gql (str "{ venues { id name postal_code meetups { id title }}}")
+      (test-gql (str "{ venues { vid name postal_code meetups { id title }}}")
                 [:data :venues]
-                [{:id 1 :name "office one" :postal_code "123456"
+                [{:vid 1 :name "office one" :postal_code "123456"
                   :meetups [{:id 2 :title "cpp meetup"}]}
-                 {:id 2 :name "city hall" :postal_code "234567"
+                 {:vid 2 :name "city hall" :postal_code "234567"
                   :meetups [{:id 1 :title "rust meetup"}]}]))
 
     (testing "list entities with has-many param and aggregation"
-      (test-gql (str "{ venues { id name postal_code meetups { id title } "
+      (test-gql (str "{ venues { vid name postal_code meetups { id title } "
                      "meetups_aggregate {count max {id title} min {id}}}}")
                 [:data :venues]
-                [{:id 1 :name "office one" :postal_code "123456"
+                [{:vid 1 :name "office one" :postal_code "123456"
                   :meetups [{:id 2 :title "cpp meetup"}]
                   :meetups_aggregate {:count 1 :min {:id 2}
                                       :max {:id 2 :title "cpp meetup"}}}
-                 {:id 2 :name "city hall" :postal_code "234567"
+                 {:vid 2 :name "city hall" :postal_code "234567"
                   :meetups [{:id 1 :title "rust meetup"}]
                   :meetups_aggregate {:count 1 :min {:id 1}
                                       :max {:id 1 :title "rust meetup"}}}]))
 
     (testing "fetch entity with has-many param"
-      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+      (test-gql (str "{ venues (where: {vid: {eq: 1}}) "
                       "{ name postal_code meetups { id title }}}")
                  [:data :venues]
                  [{:name "office one" :postal_code "123456"
                    :meetups [{:id 2 :title "cpp meetup"}]}])
-      (test-gql (str  "{ venues (where: {id: {eq: 2}}) "
+      (test-gql (str  "{ venues (where: {vid: {eq: 2}}) "
                       "{ name postal_code meetups { id title }}}")
                  [:data :venues]
                  [{:name "city hall" :postal_code "234567"
                    :meetups [{:id 1 :title "rust meetup"}]}]))
 
     (testing "fetch entity with has-many param and aggregate"
-      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+      (test-gql (str "{ venues (where: {vid: {eq: 1}}) "
                      "{ name postal_code meetups { id title } "
                      "meetups_aggregate {count max {id} min {id}}}}")
                 [:data :venues]
@@ -394,12 +398,12 @@
                 [{:id 2 :last_name "tanabe"}]))
 
     (testing "fetch entity with has-many param filtered with where"
-      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+      (test-gql (str "{ venues (where: {vid: {eq: 1}}) "
                      "{ name postal_code meetups { id title }}}")
                  [:data :venues]
                  [{:name "office one" :postal_code "123456"
                    :meetups [{:id 2 :title "cpp meetup"}]}])
-      (test-gql (str "{ venues (where: {id: {eq: 1}}) "
+      (test-gql (str "{ venues (where: {vid: {eq: 1}}) "
                      "{ name postal_code meetups "
                      "(where: {title: {like: \"%rust%\"}}) { id title }}}")
                  [:data :venues]
