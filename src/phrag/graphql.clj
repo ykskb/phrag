@@ -239,8 +239,6 @@
   (let [rel-ctx (tbl/relation-context config)
         scm-map (-> (root-schema config rel-ctx)
                     (update-relationships config rel-ctx))]
-    ;; (pp/pprint scm-map)
-    ;; (pp/pprint rel-ctx)
     (log :info "Generated queries: " (sort (keys (:queries scm-map))))
     (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
     (prn "env" (env :test-on-postgres))

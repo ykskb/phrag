@@ -153,12 +153,12 @@
   [config]
   (let [scm (if (:scan-schema config)
               (cond-> (db/schema (:db config))
-                true (update-column-maps)
+                true (merge-config-tables config)
                 (:no-fk-on-db config) (update-fks-by-names config)
-                true (merge-config-tables config))
+                true (update-column-maps))
               (cond-> (:tables config)
-                true (update-column-maps)
-                (:no-fk-on-db config) (update-fks-by-names config)))]
+                (:no-fk-on-db config) (update-fks-by-names config)
+                true (update-column-maps)))]
     (log :debug "Origin DB schema:\n"
          (with-out-str (pp/pprint (map #(-> %
                                             (dissoc :col-map)
