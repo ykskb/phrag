@@ -15,14 +15,12 @@
              (postgres-db)
              (create-db))
         opt {:db db
-             :scan-schema true}
-        conf {:db db
-              :tables (tbl/db-schema opt)
-              :use-aggregation true}
-        sl-conf (gql/sl-config conf)
+             :scan-schema true
+             :use-aggregation true}
+        conf (core/options->config opt)
         schema (gql/schema conf)
         test-gql (fn [q res-keys expected]
-                   (let [res (gql/exec conf sl-conf schema q nil {})]
+                   (let [res (gql/exec conf schema q nil {})]
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
 
@@ -504,10 +502,9 @@
                                                  increment-id-count]}
                                  :update {:pre members-pre-update}}}}
         conf (core/options->config opt)
-        sl-conf (gql/sl-config conf)
         schema (gql/schema conf)
         test-gql (fn [q res-keys expected]
-                   (let [res (gql/exec conf sl-conf schema q nil {})]
+                   (let [res (gql/exec conf schema q nil {})]
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
 

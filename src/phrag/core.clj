@@ -1,8 +1,8 @@
 (ns phrag.core
   (:require [phrag.route :as rt]
             [phrag.table :as tbl]
-            [integrant.core :as ig]
-            [clojure.pprint :as pp]))
+            [phrag.context :as ctx]
+            [integrant.core :as ig]))
 
 (defn options->config [options]
   (let [config {:router (:router options)
@@ -14,8 +14,11 @@
                 :scan-schema (:scan-schema options true)
                 :no-fk-on-db (:no-fk-on-db options false)
                 :plural-table-name (:plural-table-name options true)
-                :use-aggregation (:use-aggregation options true)}]
-    (assoc config :tables (tbl/db-schema config))))
+                :use-aggregation (:use-aggregation options true)}
+        db-scm (tbl/db-schema config)]
+    (-> config
+        (assoc :tables (ctx/schema-context db-scm))
+        (assoc :sl-config (ctx/sl-config db-scm (:db options))))))
 
 ;;; reitit
 
