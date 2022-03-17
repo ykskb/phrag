@@ -20,6 +20,18 @@
         fk-map (zipmap (map :from fks) fks)]
     (vals (select-keys fk-map pk-names))))
 
+(defn is-circular-m2m-fk?
+  "Bridge tables of circular many-to-many have 2 columns linked to the
+  same table. Example: `user_follow` table where following and the followed
+  are both linked to `users` table."
+  [table fk-from]
+  (let [p-fks (primary-fks table)
+        p-fk-tbls (map :table p-fks)
+        cycl-linked-tbls (set (for [[tbl freq] (frequencies p-fk-tbls)
+                                    :when (> freq 1)] tbl))
+        cycl-link-fks (filter #(contains? cycl-linked-tbls (:table %)) p-fks)]
+    (contains? (set (map :from cycl-link-fks)) fk-from)))
+
 ;;; Optional foreign key detection from table/column names
 
 (defn- to-table-name [rsc config]

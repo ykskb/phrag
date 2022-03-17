@@ -3,6 +3,7 @@
             [clojure.pprint :as pp]
             [phrag.logging :refer [log]]
             [phrag.handler :as hd]
+            [phrag.field :as fld]
             [urania.core :as u]
             [com.walmartlabs.lacinia.resolve :as resolve]
             [promesa.core :as prom]
@@ -80,70 +81,72 @@
 
 ;; Queries
 
-(defn list-query [table-key col-keys rel-cols rels sgnl-map ctx args _val]
+(defn list-query [table-key table sgnl-map ctx args _val]
   (with-superlifter (:sl-ctx ctx)
-    (let [sql-params (-> (hd/args->sql-params col-keys args ctx 100)
+    (let [{:keys [col-keys rel-cols rel-flds]} table
+          sql-params (-> (hd/args->sql-params col-keys args ctx 100)
                          (update :select into rel-cols)
                          (signal (:pre sgnl-map) ctx))
           fetch-fn (fn [_this _env]
                      (hd/list-root (:db ctx) table-key sql-params))
           res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
-                    (update-triggers-by-count! rels))]
+                    (update-triggers-by-count! rel-flds))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx))))))
 
 (defn has-one
-  "Resolves records of FK destination table. :u-id is upstream value of :from
-  column, and :to column value of retrieved records map them back.
-  e.g. (shopping_cart.user_id fk=> user.id)
-  Parent: [shopping_cart].user_id => [user].id "
-  [table-key fk-from-key fk-to-key sl-key col-keys rel-cols rels sgnl-fn-map
-   ctx _args val]
+  "e.g. (shopping_cart.user_id fk=> user.id)
+  Parent: [shopping_cart].user_id => [user].id"
+  [fk sgnl-fn-map ctx _args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (-> (hd/args->sql-params col-keys nil ctx nil)
-                       (update :select into rel-cols)
+    (let [{:keys [to-tbl-key from-key to-key to-tbl-col-keys
+                  to-tbl-rel-cols to-tbl-rel-flds]
+           {:keys [has-one]} :field-keys} fk
+          sql-args (-> (hd/args->sql-params to-tbl-col-keys nil ctx nil)
+                       (update :select into to-tbl-rel-cols)
                        (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
                      (let [ids (map :u-id many)
                            sql-params (assoc sql-args
-                                             :where [[:in fk-to-key ids]])
-                           res (hd/list-root (:db ctx) table-key sql-params)]
-                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
+                                             :where [[:in to-key ids]])
+                           res (hd/list-root (:db ctx) to-tbl-key sql-params)]
+                       (do-update-triggers! (:sl-ctx ctx) to-tbl-rel-flds
+                                            (count res))
                        res))
           map-n-fn (fn [muses batch-res]
                      (let [m (zipmap (map :u-id muses) (repeat nil))
-                           vals (zipmap (map fk-to-key batch-res) batch-res)]
+                           vals (zipmap (map to-key batch-res) batch-res)]
                        (merge m vals)))
-          res-p (sl-api/enqueue! sl-key
-                                 (->BatchDataSource (fk-from-key val) batch-fn
+          res-p (sl-api/enqueue! has-one
+                                 (->BatchDataSource (from-key val) batch-fn
                                                     first map-n-fn))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
 (defn has-many
-  "Resolves records of FK origin table. :u-id is upstream value of :to column,
-  and :from column value of retrieved records map them back.
-  e.g. (shopping_cart.user_id fk=> user.id)
+  "e.g. (shopping_cart.user_id fk=> user.id)
   Parent values: [user].id => [shopping_cart].user_id"
-  [table-key fk-from-key fk-to-key pk-keys sl-key col-keys rel-cols
-                rels sgnl-fn-map ctx args val]
+  [table-key table fk sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (-> (hd/args->sql-params col-keys args ctx 100)
+    (let [{:keys [from-key to-key]} fk
+          {:keys [pk-keys col-keys rel-cols rel-flds]
+           {:keys [has-many]} :field-keys} table
+          sql-args (-> (hd/args->sql-params col-keys args ctx 100)
                        (update :select into rel-cols)
                        (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
                      (let [ids (map :u-id many)
                            sql-args (update sql-args :where
-                                            conj [:in fk-from-key ids])
+                                            conj [:in from-key ids])
                            res (hd/list-partitioned
-                                (:db ctx) table-key fk-from-key pk-keys
+                                (:db ctx) table-key from-key pk-keys
                                 sql-args)]
-                       (do-update-triggers! (:sl-ctx ctx) rels (count res))
+                       (do-update-triggers! (:sl-ctx ctx) rel-flds (count res))
                       res))
           map-n-fn (fn [muses batch-res]
                      (let [m (zipmap (map :u-id muses) (repeat []))
-                           vals (group-by fk-from-key batch-res)]
+                           vals (group-by from-key batch-res)]
                        (merge-with concat m vals)))
-          res-p (sl-api/enqueue! sl-key
-                                 (->BatchDataSource (fk-to-key val) batch-fn
+          res-p (sl-api/enqueue! has-many
+                                 (->BatchDataSource (to-key val) batch-fn
                                                     identity map-n-fn))]
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
@@ -214,9 +217,6 @@
 
 ;; Mutations
 
-(def ^:private res-true
-  {:result true})
-
 (defn create-root [table-key pk-keys col-keys sgnl-fn-map ctx args _val]
   (let [sql-args (-> (select-keys args col-keys)
                      (signal (:pre sgnl-fn-map) ctx)
@@ -234,10 +234,10 @@
                    (w/stringify-keys))]
     (when (not-empty params)
       (hd/patch-root (:pk_columns sql-args) params (:db ctx) table-key))
-    (signal res-true (:post sgnl-fn-map) ctx)))
+    (signal fld/result-true-object (:post sgnl-fn-map) ctx)))
 
 (defn delete-root [table-key sgnl-fn-map ctx args _val]
   (let [sql-args (signal args (:pre sgnl-fn-map) ctx)]
     (when (not-empty sql-args)
       (hd/delete-root (:pk_columns sql-args) (:db ctx) table-key))
-    (signal res-true (:post sgnl-fn-map) ctx)))
+    (signal fld/result-true-object (:post sgnl-fn-map) ctx)))

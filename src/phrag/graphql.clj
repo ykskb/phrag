@@ -45,9 +45,7 @@
                     :sort {:type (get-in table [:lcn-obj-keys :sort])}
                     :limit {:type 'Int}
                     :offset {:type 'Int}}
-             :resolve (partial
-                       rslv/list-query table-key (:col-keys table)
-                       (:rel-cols table) (:rel-flds table)
+             :resolve (partial rslv/list-query table-key table
                        (signal-per-op config table-key :query))}))
 
 (defn- assoc-aggregation [schema table-key table]
@@ -111,6 +109,16 @@
 
 ;;; Relationships
 
+(defn- assoc-has-one
+  "Updates fk-origin object with a has-one object field."
+  [schema table fk config]
+  (assoc-in schema  [:objects (get-in table [:lcn-obj-keys :rsc])
+                     :fields (get-in fk [:field-keys :has-one])]
+            {:type (get-in fk [:field-keys :to])
+             :resolve
+             (partial rslv/has-one fk
+                      (signal-per-op config (:to-tbl-key fk) :query))}))
+
 (defn- assoc-has-many
   "Updates fk-destination object with a has-many resource field."
   [schema table-key table fk config]
@@ -122,9 +130,7 @@
                     :limit {:type 'Int}
                     :offset {:type 'Int}}
              :resolve
-             (partial rslv/has-many table-key (:from-key fk) (:to-key fk)
-                      (:pk-keys table) (get-in fk [:field-keys :has-many])
-                      (:col-keys table) (:rel-cols table) (:rel-flds table)
+             (partial rslv/has-many table-key table fk
                       (signal-per-op config table-key :query))}))
 
 (defn- assoc-has-many-aggregate
@@ -138,18 +144,6 @@
              (partial rslv/aggregate-has-many table-key (:from-key fk)
                       (:to-key fk) (get-in fk [:field-keys :has-many-aggr])
                       (signal-per-op config table-key :query))}))
-
-(defn- assoc-has-one
-  "Updates fk-origin object with a has-one object field."
-  [schema table fk config]
-  (assoc-in schema  [:objects (get-in table [:lcn-obj-keys :rsc])
-                     :fields (get-in fk [:field-keys :has-one])]
-            {:type (get-in fk [:field-keys :to])
-             :resolve
-             (partial rslv/has-one (:to-tbl-key fk) (:from-key fk) (:to-key fk)
-                      (get-in fk [:field-keys :has-one]) (:to-tbl-col-keys fk)
-                      (:to-tbl-rel-cols fk) (:to-tbl-rel-flds fk)
-                      (signal-per-op config (:to-tbl-key fk) :query))}))
 
 ;;; GraphQL schema
 

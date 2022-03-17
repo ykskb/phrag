@@ -6,19 +6,7 @@
             [phrag.table :as tbl]
             [phrag.field :as fld]))
 
-;;; Relation Context
-
-(defn- is-circular-m2m-fk?
-  "Bridge tables of circular many-to-many have 2 columns linked to the
-  same table. Example: `user_follow` table where following and the followed
-  are both linked to `users` table."
-  [table fk-from]
-  (let [p-fks (tbl/primary-fks table)
-        p-fk-tbls (map :table p-fks)
-        cycl-linked-tbls (set (for [[tbl freq] (frequencies p-fk-tbls)
-                                    :when (> freq 1)] tbl))
-        cycl-link-fks (filter #(contains? cycl-linked-tbls (:table %)) p-fks)]
-    (contains? (set (map :from cycl-link-fks)) fk-from)))
+;;; Relation Context (field names & columns)
 
 (defn- has-many-field
   "Checks if a given table is a bridge table of cicular many-to-many or not,
@@ -27,7 +15,7 @@
   (let [tbl-name (:name table)
         rscs (inf/plural tbl-name)
         fk-from (:from fk)]
-    (if (is-circular-m2m-fk? table fk-from)
+    (if (tbl/is-circular-m2m-fk? table fk-from)
       (str rscs "_on_" fk-from)
       rscs)))
 
@@ -116,66 +104,13 @@
                  (assoc m k (fk-context k v table table-map rel-ctx)))
                {} fk-map)))
 
-;;; Lacinia Schema Context for Tables
-
-(defn- lcn-obj-key [rsc-name obj-name]
-  (keyword (str rsc-name obj-name)))
-
-(defn- lcn-obj-keys [table-name]
-  (let [sgl-pascal (csk/->PascalCase (inf/singular table-name))]
-    {:rsc (keyword sgl-pascal)
-     :clauses (lcn-obj-key sgl-pascal "Clauses")
-     :where (lcn-obj-key sgl-pascal "Where")
-     :sort (lcn-obj-key sgl-pascal "Sort")
-     :fields (lcn-obj-key sgl-pascal "Fields")
-     :aggregate (lcn-obj-key sgl-pascal "Aggregate")
-     :pks (lcn-obj-key sgl-pascal "Pks")
-     :pk-input (lcn-obj-key sgl-pascal "PkColumns")}))
-
-(defn- lcn-qry-keys [table-name]
-  (let [plr-bare (csk/->snake_case (inf/plural table-name))]
-    {:queries (keyword plr-bare)
-     :aggregate (keyword (str plr-bare "_aggregate"))}))
-
-(defn- lcn-mut-key [rsc-name verb]
-  (keyword (str verb rsc-name)))
-
-(defn- lcn-mut-keys [table-name]
-  (let [sgl-pascal (csk/->PascalCase (inf/singular table-name))]
-    {:create (lcn-mut-key sgl-pascal "create")
-     :update (lcn-mut-key sgl-pascal "update")
-     :delete (lcn-mut-key sgl-pascal "delete")}))
-
-(defn- lcn-descs [table-name]
-  (let [rsc-name (csk/->PascalCase (inf/plural table-name))]
-    {:rsc rsc-name
-     :query (str "Query " rsc-name ".")
-     :clauses fld/clause-desc
-     :where fld/where-desc
-     :sort fld/sort-desc
-     :fields (str rsc-name "fields for aggregation.")
-     :aggregate (str "Aggrecate " rsc-name ".")
-     :pks fld/pk-desc
-     :pk-input fld/pk-desc}))
-
-(defn- lcn-fields [table lcn-keys pk-keys]
-  (let [rsc-fields (fld/rsc-fields table)
-        pk-fields (fld/pk-fields pk-keys rsc-fields)]
-    {:rsc rsc-fields
-     :clauses (fld/clause-fields table)
-     :where (fld/where-fields table (:clauses lcn-keys))
-     :sort (fld/sort-fields table)
-     :fields rsc-fields
-     :aggregate (fld/aggr-fields (:fields lcn-keys))
-     :pks pk-fields
-     :pk-input pk-fields
-     :update (fld/update-fields pk-keys rsc-fields)}))
+;;; Lacinia Schema Context from Table Data
 
 (defn- update-tables [table-map rel-ctx]
   (reduce-kv
    (fn [m k table]
      (let [table-name (:name table)
-           obj-keys (lcn-obj-keys table-name)
+           obj-keys (fld/lcn-obj-keys table-name)
            pk-keys (tbl/pk-keys table)]
        (assoc m k
               (-> m
@@ -185,10 +120,10 @@
                   (assoc :fks (fk-ctx-map table table-map rel-ctx))
                   (assoc :pk-keys pk-keys)
                   (assoc :lcn-obj-keys obj-keys)
-                  (assoc :lcn-qry-keys (lcn-qry-keys table-name))
-                  (assoc :lcn-mut-keys (lcn-mut-keys table-name))
-                  (assoc :lcn-descs (lcn-descs table-name))
-                  (assoc :lcn-fields (lcn-fields table obj-keys pk-keys))
+                  (assoc :lcn-qry-keys (fld/lcn-qry-keys table-name))
+                  (assoc :lcn-mut-keys (fld/lcn-mut-keys table-name))
+                  (assoc :lcn-descs (fld/lcn-descs table-name))
+                  (assoc :lcn-fields (fld/lcn-fields table obj-keys pk-keys))
                   (assoc :rel-flds (get-in rel-ctx [:fields table-name]))
                   (assoc :rel-cols (get-in rel-ctx [:columns table-name]))))))
    {} table-map))
