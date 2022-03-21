@@ -11,7 +11,7 @@
 
 (defn- query-fields [ctx]
   (let [selections (lacinia-selections ctx)]
-    (set (map #(:field-name %) selections))))
+    (set (map :field-name selections))))
 
 (defn- parse-selects [col-keys ctx]
   (let [q-fields (query-fields ctx)]
@@ -35,10 +35,9 @@
        rsc-where))
 
 (defn- parse-and-or [op rsc-where-list]
-  (let [whr-list (reduce (fn [v rsc-where]
-                           (concat v (parse-rsc-where rsc-where)))
-                         [] rsc-where-list)]
-    (concat [op] whr-list)))
+  (concat [op] (reduce (fn [v rsc-where]
+                         (concat v (parse-rsc-where rsc-where)))
+                       [] rsc-where-list)))
 
 (defn- parse-where [args]
   (let [whr (:where args)]
@@ -55,18 +54,19 @@
           (assoc :direc direc))
       m)))
 
-(defn args->sql-params [col-keys args ctx default-limit]
-  (reduce (fn [m [k v]]
-            (cond
-              (= k :sort) (update-sort m v)
-              (= k :limit) (assoc m :limit v)
-              (= k :offset) (assoc m :offset v)
-              :else m))
-          (cond-> {:select (parse-selects col-keys ctx)
-                   :where (parse-where args)
-                   :offset 0}
-            (integer? default-limit) (assoc :limit default-limit))
-          args))
+(defn args->sql-params [col-keys args ctx]
+  (let [default-limit (:default-limit ctx)]
+    (reduce (fn [m [k v]]
+              (cond
+                (= k :sort) (update-sort m v)
+                (= k :limit) (assoc m :limit v)
+                (= k :offset) (assoc m :offset v)
+                :else m))
+            (cond-> {:select (parse-selects col-keys ctx)
+                     :where (parse-where args)
+                     :offset 0}
+              (integer? default-limit) (assoc :limit default-limit))
+            args)))
 
 ;; DB handlers
 

@@ -11,7 +11,7 @@
             [superlifter.core :as sl-core]))
 
 ;; Workaround as error/reject in fetch method make promises stuck in pending
-;; state without being caught in subsequent codes. Fallback is to return nil
+;; state without being caught in subsequent catch. Fallback is to return nil
 ;; after error log output.
 (defn- exec-sql [sql-fn records env]
   (try (sql-fn records env)
@@ -84,7 +84,7 @@
 (defn list-query [table-key table sgnl-map ctx args _val]
   (with-superlifter (:sl-ctx ctx)
     (let [{:keys [col-keys rel-cols rel-flds]} table
-          sql-params (-> (hd/args->sql-params col-keys args ctx 100)
+          sql-params (-> (hd/args->sql-params col-keys args ctx)
                          (update :select into rel-cols)
                          (signal (:pre sgnl-map) ctx))
           fetch-fn (fn [_this _env]
@@ -101,7 +101,7 @@
     (let [{:keys [to-tbl-key from-key to-key to-tbl-col-keys
                   to-tbl-rel-cols to-tbl-rel-flds]
            {:keys [has-one]} :field-keys} fk
-          sql-args (-> (hd/args->sql-params to-tbl-col-keys nil ctx nil)
+          sql-args (-> (hd/args->sql-params to-tbl-col-keys nil ctx)
                        (update :select into to-tbl-rel-cols)
                        (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
@@ -129,16 +129,17 @@
     (let [{:keys [from-key to-key]} fk
           {:keys [pk-keys col-keys rel-cols rel-flds]
            {:keys [has-many]} :field-keys} table
-          sql-args (-> (hd/args->sql-params col-keys args ctx 100)
+          sql-args (-> (hd/args->sql-params col-keys args ctx)
                        (update :select into rel-cols)
                        (signal (:pre sgnl-fn-map) ctx))
           batch-fn (fn [many _env]
                      (let [ids (map :u-id many)
                            sql-args (update sql-args :where
                                             conj [:in from-key ids])
-                           res (hd/list-partitioned
-                                (:db ctx) table-key from-key pk-keys
-                                sql-args)]
+                           res (if (> (:limit sql-args 0) 0)
+                                 (hd/list-partitioned (:db ctx) table-key
+                                                      from-key pk-keys sql-args)
+                                 (hd/list-root (:db ctx) table-key sql-args))]
                        (do-update-triggers! (:sl-ctx ctx) rel-flds (count res))
                       res))
           map-n-fn (fn [muses batch-res]
@@ -189,15 +190,16 @@
     (map #(aggr-result fields (get multi-res-map %) id-key %) ids)))
 
 (defn aggregate-root [table-key ctx args _val]
-  (let [sql-args (hd/args->sql-params nil args nil nil)
+  (let [sql-args (hd/args->sql-params nil args nil)
         fields (aggr-fields ctx)
         selects (aggr-selects fields)
         res (first (hd/aggregate-root (:db ctx) table-key selects sql-args))]
     (aggr-result fields res)))
 
-(defn aggregate-has-many [table-key fk-from fk-to sl-key sgnl-fn-map ctx args val]
+(defn aggregate-has-many [table-key fk-from fk-to sl-key sgnl-fn-map
+                          ctx args val]
   (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (-> (hd/args->sql-params nil args nil nil)
+    (let [sql-args (-> (hd/args->sql-params nil args nil)
                        (signal (:pre sgnl-fn-map) ctx))
           fields (aggr-fields ctx)
           selects (aggr-selects fields)
@@ -205,8 +207,9 @@
                      (let [ids (map :u-id many)
                            sql-args (update sql-args :where
                                             conj [:in fk-from ids])
-                           sql-res (hd/aggregate-grp-by
-                                    (:db ctx) table-key selects fk-from sql-args)]
+                           sql-res (hd/aggregate-grp-by (:db ctx) table-key
+                                                        selects fk-from
+                                                        sql-args)]
                        (aggr-many-result fields sql-res fk-from ids)))
           map-n-fn (fn [_muses batch-res]
                      (zipmap (map fk-from batch-res) batch-res))

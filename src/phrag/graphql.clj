@@ -190,7 +190,8 @@
         ctx (-> (:signal-ctx config {})
                 (assoc :req req)
                 (assoc :sl-ctx sl-ctx)
-                (assoc :db (:db config)))
+                (assoc :db (:db config))
+                (assoc :default-limit (:default-limit config)))
         res (lcn/execute schema query vars ctx)]
     (let [_ctx (sl-stop! sl-ctx)]
       res)))

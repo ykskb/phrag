@@ -4,11 +4,15 @@
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
-Phrag creates a GraphQL handler from RDBMS schema. All needed is a connection to a DB with [proper constraints](#design).
+### Overview
 
-Phrag has an [interceptor signal](#interceptor-signals) feature to inject custom logics per GraphQL operation. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
+Phrag transforms RDBMS to GraphQL with an idea that DB schema with PKs/FKs can sufficiently represent data models/relationships of GraphQL.
 
-#### Features:
+Tables become queryable as root objects containing nested objects of relationships. Mutations (`create`, `update` and `delete`) are also created per tables with their PKs as identifiers.
+
+Additionally, Phrag allows custom functions to be configured before & after DB accesses per resource operations. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
+
+### Features:
 
 - CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
 
@@ -22,17 +26,9 @@ Phrag has an [interceptor signal](#interceptor-signals) feature to inject custom
 
 - [Interceptor Signals](#interceptor-signals) to inject custom logics before/after DB accesses per resource operations.
 
-- Options to use schema retrieved from a database, selectively override it or entirely base on provided data through [config](#config).
-
-- Automatic router wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
+- Automatic route wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
 - GraphQL IDE (like GraphiQL) connectable.
-
-#### Notes:
-
-- Supported databases are SQLite and PostgreSQL.
-
-- This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
 ### Usage
 
@@ -43,9 +39,11 @@ Create ring app with reitit route using Integrant
  ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
 ```
 
-### Design
+### Notes:
 
-Phrag focuses on constraints to let database schema represent application data structure.
+- Supported databases are SQLite and PostgreSQL.
+
+- This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
 ##### Query Relationships
 
@@ -55,24 +53,11 @@ Phrag transforms a foreign key (FK) constraint into nested query objects of Grap
 
 This is a fundamental concept for Phrag to support multiple types of relationships.
 
-##### Mutations
-
-Primary key (PK) constraints are identifier constructs of mutations. `create` operations return PK column fields and `update`/`delete` operations require them as identifier data.
-
-<!---
-> Notes:
-> * There is an option to detect relations from table/column names, however it comes with a limitation since matching names such as `user_id` for `users` table are required.
--->
-
-##### Tables
-
-Though schema data can be overriden, all the tables are transformed into queries at root level (of course with all the relationships). This allows API consumers to query data in any structure they wish without restricting them to query only in certain way.
-
 ### Config
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
 
-#### Config Parameters
+##### Parameters
 
 | Key                  | description                                                                                                               | Required | Default Value |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
@@ -85,7 +70,7 @@ Though there are multiple options for customization, the only config parameter r
 | `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.              | No       | `false`       |
 | `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.               | No       | `true`        |
 
-#### Schema Data
+##### Schema Data
 
 By default, Phrag retrieves DB schema data from a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain tables, columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
 
