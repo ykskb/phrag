@@ -46,13 +46,9 @@
       (some? (:and whr)) (conj (parse-and-or :and (:and whr))))))
 
 (defn- update-sort [m v]
-  (let [col (first (keys v))
-        direc (col v :desc)]
-    (if (and col direc)
-      (-> m
-          (assoc :order-col col)
-          (assoc :direc direc))
-      m)))
+  (assoc m :sort (reduce-kv (fn [vec k v]
+                              (conj vec [k v]))
+                            [] v)))
 
 (defn args->sql-params [col-keys args ctx]
   (let [default-limit (:default-limit ctx)]
@@ -74,9 +70,9 @@
   (db/list-up db-con table params))
 
 (defn list-partitioned [db-con table p-col-key pk-keys params]
-  (db/list-partitioned db-con table p-col-key
-                       (:order-col params (first pk-keys))
-                       (:direc params :asc) params))
+  (let [sort-params (:sort params [[(first pk-keys) :asc]])]
+    (db/list-partitioned db-con table p-col-key
+                         (assoc params :sort sort-params))))
 
 (def ^:private sqlite-last-id
   (keyword "last_insert_rowid()"))

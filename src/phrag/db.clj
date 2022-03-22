@@ -82,26 +82,25 @@
 
 ;; Resource queries
 
-(defn list-up [db table & [params]]
+(defn list-up [db table params]
+  (prn params)
   (let [whr (:where params)
         selects (:select params [:*])
-        o-col (:order-col params)
+        sorts (:sort params)
         q (-> (apply h/select selects)
               (h/from table)
               (h/limit (:limit params 100))
               (h/offset (:offset params 0)))
         q (if (not-empty whr) (apply h/where q whr) q)
-        q (if (some? o-col) (h/order-by q [o-col (:direc params)]) q)]
+        q (if (not-empty sorts) (apply h/order-by q sorts) q)]
     (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn list-partitioned [db table part-col-key order-col order-direc & [params]]
+(defn list-partitioned [db table part-col-key params]
   (let [whr (:where params)
-        sub-selects [:* (h/over [[:raw "row_number()"]
-                                 (-> (h/partition-by part-col-key)
-                                     (h/order-by [order-col order-direc]))
-                                 :p_id])]
+        sub-part (apply h/order-by (h/partition-by part-col-key) (:sort params))
+        sub-selects [:* (h/over [[:raw "row_number()"] sub-part :p_id])]
         sub-q (-> (apply h/select sub-selects)
                   (h/from table))
         sub-q (if (not-empty whr) (apply h/where sub-q whr) sub-q)

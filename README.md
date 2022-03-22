@@ -4,19 +4,17 @@
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
-### Overview
+Phrag creates a GraphQL handler from RDBMS connection with an idea that DB schema with primary/foreign keys can sufficiently represent data models/relationships for GraphQL.
 
-Phrag transforms RDBMS to GraphQL with an idea that DB schema with PKs/FKs can sufficiently represent data models/relationships of GraphQL.
+Tables become queryable as root objects containing nested objects of relationships. Mutations (`create`, `update` and `delete`) are also created per tables with primary keys as their identifiers.
 
-Tables become queryable as root objects containing nested objects of relationships. Mutations (`create`, `update` and `delete`) are also created per tables with their PKs as identifiers.
-
-Additionally, Phrag allows custom functions to be configured before & after DB accesses per resource operations. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
+In addition, Phrag allows custom functions to be configured before & after DB accesses per resource operations. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
 
 ### Features:
 
 - CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
 
-- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships supported as nested query objects as per its [design](#query-relationships).
+- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships supported as nested query objects.
 
 - Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
 
@@ -45,13 +43,11 @@ Create ring app with reitit route using Integrant
 
 - This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
-##### Query Relationships
+- Not all database column types are mapped to GraphQL fields yet. Any help such as reports and PRs would be appreciated.
 
-Phrag transforms a foreign key (FK) constraint into nested query objects of GraphQL as the diagram below.
-
-<img src="./docs/images/fk-transform.png" />
-
-This is a fundamental concept for Phrag to support multiple types of relationships.
+- Phrag transforms a foreign key constraint into nested query objects of GraphQL as the diagram below.
+  <img src="./docs/images/fk-transform.png" />
+  This is a fundamental concept for Phrag to support multiple types of relationships.
 
 ### Config
 
