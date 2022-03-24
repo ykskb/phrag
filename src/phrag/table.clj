@@ -7,14 +7,20 @@
 
 ;; Table utils
 
-(defn col-key-set [table]
+(defn col-key-set
+  "Returns a set of column keywords from a table map."
+  [table]
   (set (map #(keyword (:name %)) (:columns table))))
 
-(defn pk-keys [table]
+(defn pk-keys
+  "Returns a list of PK keywords from a table map"
+  [table]
   (let [pk-names (map :name (:pks table))]
     (map keyword pk-names)))
 
-(defn primary-fks [table]
+(defn primary-fks
+  "Returns a list of FK maps that are also primary keys."
+  [table]
   (let [fks (:fks table)
         pk-names (map :name (:pks table))
         fk-map (zipmap (map :from fks) fks)]
@@ -71,9 +77,8 @@
     (concat merged cfg-tbl-diff)))
 
 (defn db-schema
-  "By default foreign keys constraints in a database are used for relationships.
-  Alternatively, `:no-fk-on-db` can be used to detect relations by table/column
-  names, but it has limitations as tables and columns need to be matching."
+  "Conditionally retrieves DB schema data from a DB connection and merge table
+  data provided into config if there's any."
   [config]
   (let [scm (if (:scan-schema config)
               (cond-> (db/schema (:db config))

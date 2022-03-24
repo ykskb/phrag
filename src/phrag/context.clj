@@ -1,4 +1,5 @@
 (ns phrag.context
+  "Context for constructing Phrag's GraphQL schema from DB schema data."
   (:require [camel-snake-kebab.core :as csk]
             [clojure.string :as s]
             [clojure.pprint :as pp]
@@ -128,17 +129,22 @@
                   (assoc :rel-cols (get-in rel-ctx [:columns table-name]))))))
    {} table-map))
 
-(defn schema-context [tables]
+(defn- schema-context
+  "Compiles resource names, Lacinia fields and relationships from table data."
+  [tables]
   (let [table-map (zipmap (map #(keyword (:name %)) tables) tables)
         rel-ctx (relation-context tables)]
     (update-tables table-map rel-ctx)))
 
-(def init-schema {:enums fld/sort-op-enum
-                  :input-objects fld/filter-input-objects
-                  :objects fld/result-object
-                  :queries {}})
+(def ^:no-doc init-schema {:enums fld/sort-op-enum
+                           :input-objects fld/filter-input-objects
+                           :objects fld/result-object
+                           :queries {}})
 
-(defn sl-config [tables db]
+(defn- sl-config
+  "Creates a bucket config for Superlifter.
+  It needs to include all the nested object keys for relationships."
+  [tables db]
   (let [buckets (reduce (fn [m bucket-name]
                           (assoc m (keyword bucket-name)
                                  {:triggers {:elastic {:threshold 0}}}))
@@ -146,3 +152,21 @@
                         (relation-name-set tables))]
     {:buckets buckets
      :urania-opts {:env {:db db}}}))
+
+(defn options->config [options]
+  (let [config {:router (:router options)
+                :db (:db options)
+                :tables (:tables options)
+                :signals (:signals options)
+                :signal-ctx (:signal-ctx options)
+                :middleware (:middleware options)
+                :scan-schema (:scan-schema options true)
+                :default-limit (:default-limit options)
+                :no-fk-on-db (:no-fk-on-db options false)
+                :plural-table-name (:plural-table-name options true)
+                :use-aggregation (:use-aggregation options true)}
+        db-scm (tbl/db-schema config)]
+    (-> config
+        (assoc :tables (schema-context db-scm))
+        (assoc :sl-config (sl-config db-scm (:db options))))))
+

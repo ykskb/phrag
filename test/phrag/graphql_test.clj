@@ -3,9 +3,8 @@
             [clojure.java.jdbc :as jdbc]
             [environ.core :refer [env]]
             [phrag.core :as core]
-            [phrag.core-test :refer [create-db postgres-db]]
-            [phrag.table :as tbl]
-            [phrag.graphql :as gql]))
+            [phrag.context :as ctx]
+            [phrag.core-test :refer [create-db postgres-db]]))
 
 ;; create-db: in-memory SQLite
 ;; postgres-db: real PostgreSQL
@@ -17,10 +16,10 @@
         opt {:db db
              :scan-schema true
              :use-aggregation true}
-        conf (core/options->config opt)
-        schema (gql/schema conf)
+        conf (ctx/options->config opt)
+        schema (core/schema conf)
         test-gql (fn [q res-keys expected]
-                   (let [res (gql/exec conf schema q nil {})]
+                   (let [res (core/exec conf schema q nil {})]
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
 
@@ -501,10 +500,10 @@
                                           :post [change-id-to-count
                                                  increment-id-count]}
                                  :update {:pre members-pre-update}}}}
-        conf (core/options->config opt)
-        schema (gql/schema conf)
+        conf (ctx/options->config opt)
+        schema (core/schema conf)
         test-gql (fn [q res-keys expected]
-                   (let [res (gql/exec conf schema q nil {})]
+                   (let [res (core/exec conf schema q nil {})]
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
 

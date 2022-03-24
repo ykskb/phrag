@@ -4,7 +4,7 @@
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
-Phrag creates a GraphQL handler from RDBMS connection with an idea that DB schema with primary/foreign keys can sufficiently represent data models/relationships for GraphQL.
+Phrag creates a GraphQL handler from a RDBMS connection with an idea that DB schema with primary/foreign keys can sufficiently represent data models/relationships for GraphQL.
 
 Tables become queryable as root objects containing nested objects of relationships. Mutations (`create`, `update` and `delete`) are also created per tables with primary keys as their identifiers.
 
@@ -20,9 +20,9 @@ In addition, Phrag allows custom functions to be configured before & after DB ac
 
 - [Aggregation queries](#aggregation) for root entity and has-many relationships.
 
-- Resource [filtering](#resource-filtering), [sorting](#resource-sorting) and [pagination](#resource-pagination) as arguments in query operations.
+- [Filtering](#filtering), [sorting](#sorting) and [pagination](#pagination) as arguments in query operations.
 
-- [Interceptor Signals](#interceptor-signals) to inject custom logics before/after DB accesses per resource operations.
+- [Interceptor signals](#interceptor-signals) to inject custom logics before/after DB accesses per resource operations.
 
 - Automatic route wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
@@ -30,11 +30,11 @@ In addition, Phrag allows custom functions to be configured before & after DB ac
 
 ### Usage
 
-Create ring app with reitit route using Integrant
+Create a ring app with reitit using Integrant
 
 ```clojure
-{:phrag.core/reitit-graphql-route {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit-graphql-route)}}
+{:phrag.route/reitit {:db (ig/ref :my-db/connection)}
+ ::app {:routes (ig/ref :phrag.core/reitit)}}
 ```
 
 ### Notes:
@@ -46,7 +46,7 @@ Create ring app with reitit route using Integrant
 - Not all database column types are mapped to GraphQL fields yet. Any help such as reports and PRs would be appreciated.
 
 - Phrag transforms a foreign key constraint into nested query objects of GraphQL as the diagram below.
-  <img src="./docs/images/fk-transform.png" />
+  <img src="./docs/images/fk-transform.png" width="600px" />
   This is a fundamental concept for Phrag to support multiple types of relationships.
 
 ### Config
@@ -61,6 +61,7 @@ Though there are multiple options for customization, the only config parameter r
 | `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                                      | No       |               |
 | `:signals`           | Map of singal functions per resources. Plz check [Interceptor Signals](#interceptor-signals) for details.                 | No       |               |
 | `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Interceptor Signals](#interceptor-signals) for details. | No       |               |
+| `:default-limit`     | Default number for SQL `LIMIT` value to be applied when there's no `:limit` argument is specified in a query.             | No       | `nil`         |
 | `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                                       | No       | `true`        |
 | `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                             | No       | `true`        |
 | `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.              | No       | `false`       |
@@ -107,21 +108,21 @@ By default, Phrag retrieves DB schema data from a DB connection and it is suffic
 
 Phrag can signal configured functions per resource queries/mutations at pre/post-operation time. This is where things like access controls or custom business logics can be configured. Signal functions are called with different parameters as below:
 
-##### Pre-operation Signal Function
+##### Pre-operation Interceptor Function
 
-| Type   | Signal function receives (as first parameter):                    | Returned value will be:                |
-| ------ | ----------------------------------------------------------------- | -------------------------------------- |
-| query  | SQL parameter map: `{:select #{} :where [] :offset 0 :limit 100}` | Passed to subsequent query operation.  |
-| create | Submitted mutation parameters                                     | Passed to subsequent create operation. |
-| update | Submitted mutation parameters                                     | Passed to subsequent update operation. |
-| delete | Submitted mutation parameters                                     | Passed to subsequent delete operation. |
+| Type   | Signal function receives (as first parameter):                             | Returned value will be:                |
+| ------ | -------------------------------------------------------------------------- | -------------------------------------- |
+| query  | SQL parameter map: `{:select #{} :where [] :sort [] :offset 0 :limit 100}` | Passed to subsequent query operation.  |
+| create | Submitted mutation parameters                                              | Passed to subsequent create operation. |
+| update | Submitted mutation parameters                                              | Passed to subsequent update operation. |
+| delete | Submitted mutation parameters                                              | Passed to subsequent delete operation. |
 
 > Notes:
 >
-> - `query` signal functions will be called in nested queries (relations) as well.
-> - `:where` parameter for `query` operation is in [HoneySQL](https://github.com/seancorfield/honeysql) format.
+> - `query` signal functions for matching table will be called in nested queries (relations) as well.
+> - `:where` and `:limit` parameter for `query` operation are in [HoneySQL](https://github.com/seancorfield/honeysql) format.
 
-##### Post-operation Signal Function
+##### Post-operation Interceptor Function
 
 | Type   | Signal function receives (as a first parameter):   | Returned value will be:  |
 | ------ | -------------------------------------------------- | ------------------------ |
@@ -130,7 +131,7 @@ Phrag can signal configured functions per resource queries/mutations at pre/post
 | update | Result object: `{:result true}`                    | Passed to response body. |
 | delete | Result object: `{:result true}`                    | Passed to response body. |
 
-##### All Signal Functions
+##### All Interceptor Functions
 
 All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config (`:signal-ctx`) together with a DB connection (`:db`) and an incoming HTTP request (`:req`).
 
@@ -175,7 +176,7 @@ All receiver functions will have a context map as its second argument. It'd cont
 >
 > - `:all` can be used at each level of signal map to run signal functions across all tables, all operations for a table, or both timing for a specific operation.
 
-### Resource Filtering
+### Filtering
 
 Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is used in arguments for filtering. `AND` / `OR` group can be created as clause lists in `and` / `or` parameter under `where`. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
 
@@ -186,7 +187,7 @@ Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is 
 
 `{users (where: {name: {like: "%ken%"} or: [{age: {eq: 20}}, {age: {eq: 21}}]})}` (`users` where `name` is `like` `ken` `AND` `age` is `20` `OR` `21`)
 
-### Resource Sorting
+### Sorting
 
 Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
 
@@ -194,7 +195,7 @@ Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorti
 
 `sort: {id: asc}` (sort by `id` column in ascending order)
 
-### Resource Pagination
+### Pagination
 
 Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
 

@@ -1,4 +1,5 @@
 (ns phrag.field
+  "Lacinia fields for a context of Phrag's schema."
   (:require [camel-snake-kebab.core :as csk]
             [inflections.core :as inf]))
 
@@ -18,7 +19,9 @@
 
 (def ^:private pk-desc "Primary key fields.")
 
-(defn lcn-descs [table-name]
+(defn lcn-descs
+  "Returns Lacinia descriptions for a table."
+  [table-name]
   (let [rsc-name (csk/->PascalCase (inf/plural table-name))]
     {:rsc rsc-name
      :query (str "Query " rsc-name ".")
@@ -32,7 +35,7 @@
 
 ;;; Objects
 
-(def filter-input-objects
+(def ^:no-doc filter-input-objects
   {:StrWhere {:fields {:in {:type '(list String)}
                        :eq {:type 'String}
                        :like {:type 'String}}}
@@ -50,9 +53,9 @@
                        :lte {:type 'Int}}}
    :BoolWhere {:fields {:eq {:type 'Boolean}}}})
 
-(def result-object {:Result {:fields {:result {:type 'Boolean}}}})
+(def ^:no-doc result-object {:Result {:fields {:result {:type 'Boolean}}}})
 
-(def result-true-object {:result true})
+(def ^:no-doc result-true-object {:result true})
 
 ;;; Resource Object Fields
 
@@ -119,7 +122,7 @@
 
 ;; Sort Fields
 
-(def sort-op-enum
+(def ^:no-doc sort-op-enum
   {:SortOperator {:values [:asc :desc]}})
 
 (defn- sort-fields [table]
@@ -141,7 +144,9 @@
 (defn- update-fields [pk-keys obj-fields]
   (reduce (fn [m k] (dissoc m k)) obj-fields pk-keys))
 
-(defn lcn-fields [table lcn-keys pk-keys]
+(defn lcn-fields
+  "Returns Lacinia fields for a table."
+  [table lcn-keys pk-keys]
   (let [rsc-fields (rsc-fields table)
         pk-fields (pk-fields pk-keys rsc-fields)]
     {:rsc rsc-fields
@@ -159,7 +164,9 @@
 (defn- lcn-obj-key [rsc-name obj-name]
   (keyword (str rsc-name obj-name)))
 
-(defn lcn-obj-keys [table-name]
+(defn lcn-obj-keys
+  "Returns Lacinia object keys for a table."
+  [table-name]
   (let [sgl-pascal (csk/->PascalCase (inf/singular table-name))]
     {:rsc (keyword sgl-pascal)
      :clauses (lcn-obj-key sgl-pascal "Clauses")
@@ -170,7 +177,9 @@
      :pks (lcn-obj-key sgl-pascal "Pks")
      :pk-input (lcn-obj-key sgl-pascal "PkColumns")}))
 
-(defn lcn-qry-keys [table-name]
+(defn lcn-qry-keys
+  "Returns Lacinia query keys for a table."
+  [table-name]
   (let [plr-bare (csk/->snake_case (inf/plural table-name))]
     {:queries (keyword plr-bare)
      :aggregate (keyword (str plr-bare "_aggregate"))}))
@@ -178,7 +187,9 @@
 (defn- lcn-mut-key [rsc-name verb]
   (keyword (str verb rsc-name)))
 
-(defn lcn-mut-keys [table-name]
+(defn lcn-mut-keys
+  "Returns Lacinia mutation keys for a table."
+  [table-name]
   (let [sgl-pascal (csk/->PascalCase (inf/singular table-name))]
     {:create (lcn-mut-key sgl-pascal "create")
      :update (lcn-mut-key sgl-pascal "update")

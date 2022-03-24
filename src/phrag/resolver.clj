@@ -1,4 +1,6 @@
 (ns phrag.resolver
+  "Resolvers for Phrag's GraphQL schema. Queries are executed with Superlifter
+  and Urania to batch nested queries and avoid N+1 problem.."
   (:require [clojure.walk :as w]
             [clojure.pprint :as pp]
             [phrag.logging :refer [log]]
@@ -81,7 +83,9 @@
 
 ;; Queries
 
-(defn list-query [table-key table sgnl-map ctx args _val]
+(defn list-query
+  "Resolves root-level query. Superlifter queue is always :default."
+  [table-key table sgnl-map ctx args _val]
   (with-superlifter (:sl-ctx ctx)
     (let [{:keys [col-keys rel-cols rel-flds]} table
           sql-params (-> (hd/args->sql-params col-keys args ctx)
@@ -94,7 +98,8 @@
       (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx))))))
 
 (defn has-one
-  "e.g. (shopping_cart.user_id fk=> user.id)
+  "Resolves has-one relationship.
+  e.g. (shopping_cart.user_id fk=> user.id)
   Parent: [shopping_cart].user_id => [user].id"
   [fk sgnl-fn-map ctx _args val]
   (with-superlifter (:sl-ctx ctx)
@@ -122,7 +127,8 @@
       (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
 
 (defn has-many
-  "e.g. (shopping_cart.user_id fk=> user.id)
+  "Resolves has-many relationship.
+  e.g. (shopping_cart.user_id fk=> user.id)
   Parent values: [user].id => [shopping_cart].user_id"
   [table-key table fk sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
@@ -189,15 +195,18 @@
   (let [multi-res-map (zipmap (map #(id-key %) sql-multi-res) sql-multi-res)]
     (map #(aggr-result fields (get multi-res-map %) id-key %) ids)))
 
-(defn aggregate-root [table-key ctx args _val]
+(defn aggregate-root
+  "Resolves aggregation query at root level."
+  [table-key ctx args _val]
   (let [sql-args (hd/args->sql-params nil args nil)
         fields (aggr-fields ctx)
         selects (aggr-selects fields)
         res (first (hd/aggregate-root (:db ctx) table-key selects sql-args))]
     (aggr-result fields res)))
 
-(defn aggregate-has-many [table-key fk-from fk-to sl-key sgnl-fn-map
-                          ctx args val]
+(defn aggregate-has-many
+  "Resolves aggregation query for has-many relationship."
+  [table-key fk-from fk-to sl-key sgnl-fn-map ctx args val]
   (with-superlifter (:sl-ctx ctx)
     (let [sql-args (-> (hd/args->sql-params nil args nil)
                        (signal (:pre sgnl-fn-map) ctx))
@@ -220,7 +229,9 @@
 
 ;; Mutations
 
-(defn create-root [table-key pk-keys col-keys sgnl-fn-map ctx args _val]
+(defn create-root
+  "Resolves create mutation."
+  [table-key pk-keys col-keys sgnl-fn-map ctx args _val]
   (let [sql-args (-> (select-keys args col-keys)
                      (signal (:pre sgnl-fn-map) ctx)
                      (w/stringify-keys))
@@ -229,7 +240,9 @@
         created (merge args res)]
     (signal created (:post sgnl-fn-map) ctx)))
 
-(defn update-root [table-key col-keys sgnl-fn-map ctx args _val]
+(defn update-root
+  "Resolves update mutation. Takes `pk_columns` parameter as a record identifier."
+  [table-key col-keys sgnl-fn-map ctx args _val]
   (let [sql-args (-> (select-keys args col-keys)
                      (assoc :pk_columns (:pk_columns args))
                      (signal (:pre sgnl-fn-map) ctx))
@@ -239,7 +252,9 @@
       (hd/patch-root (:pk_columns sql-args) params (:db ctx) table-key))
     (signal fld/result-true-object (:post sgnl-fn-map) ctx)))
 
-(defn delete-root [table-key sgnl-fn-map ctx args _val]
+(defn delete-root
+  "Resolves delete mutation. Takes `pk_columns` parameter as a record identifier."
+  [table-key sgnl-fn-map ctx args _val]
   (let [sql-args (signal args (:pre sgnl-fn-map) ctx)]
     (when (not-empty sql-args)
       (hd/delete-root (:pk_columns sql-args) (:db ctx) table-key))

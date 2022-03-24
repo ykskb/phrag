@@ -1,4 +1,5 @@
 (ns phrag.db
+  "DB operations for DB schema retrieval and GraphQL operations."
   (:refer-clojure :exclude [group-by update])
   (:require [clojure.core :as c]
             [clojure.java.jdbc :as jdbc]
@@ -42,8 +43,7 @@
 
 (defmethod column-info "PostgreSQL" [db table]
   (jdbc/query db (str "SELECT column_name AS name, data_type AS type, "
-                      "(is_nullable = 'NO') AS notnull, "
-                      "column_default AS dflt_value "
+                      "(is_nullable = 'NO') AS notnull, " "column_default AS dflt_value "
                       "FROM information_schema.columns "
                       "WHERE table_name = '" table "';")))
 
@@ -72,7 +72,9 @@
                       "WHERE constraint_type = 'PRIMARY KEY' "
                       "AND tc.table_name = '" table "';")))
 
-(defn schema [db]
+(defn schema
+  "Queries DB schema including primary keys and foreign keys."
+  [db]
   (map (fn [table-name]
          {:name table-name
           :columns (column-info db table-name)
@@ -82,8 +84,9 @@
 
 ;; Resource queries
 
-(defn list-up [db table params]
-  (prn params)
+(defn list-up
+  "Executes a select statement from a table with provided parameters."
+  [db table params]
   (let [whr (:where params)
         selects (:select params [:*])
         sorts (:sort params)
@@ -97,7 +100,9 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn list-partitioned [db table part-col-key params]
+(defn list-partitioned
+  "Executes select statements with partitions by a column."
+  [db table part-col-key params]
   (let [whr (:where params)
         sub-part (apply h/order-by (h/partition-by part-col-key) (:sort params))
         sub-selects [:* (h/over [[:raw "row_number()"] sub-part :p_id])]
@@ -114,7 +119,9 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn aggregate [db table aggrs & [params]]
+(defn aggregate
+  "Executes aggregation query with provided paramters."
+  [db table aggrs & [params]]
   (let [whr (:where params)
         q (-> (apply h/select aggrs)
               (h/from table)
@@ -125,7 +132,9 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn aggregate-grp-by [db table aggrs grp-by & [params]]
+(defn aggregate-grp-by
+  "Executes aggregation with a single group-by clause."
+  [db table aggrs grp-by & [params]]
   (let [whr (:where params)
         q (-> (apply h/select aggrs)
               (h/select grp-by)
@@ -136,18 +145,24 @@
     (->> (sql/format q)
          (jdbc/query db))))
 
-(defn delete! [db table pk-map]
+(defn delete!
+  "Executes delete statement with primary key map."
+  [db table pk-map]
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (apply h/where (h/delete-from table) whr)]
     (prn (sql/format q))
     (->> (sql/format q)
          (jdbc/execute! db))))
 
-(defn create! [db rsc raw-map opts]
+(defn create!
+  "Executes create statement with parameter map."
+  [db rsc raw-map opts]
   (prn rsc raw-map)
   (jdbc/insert! db rsc raw-map opts))
 
-(defn update! [db table pk-map raw-map]
+(defn update!
+  "Executes update statement with primary key map and parameter map."
+  [db table pk-map raw-map]
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (-> (h/update table)
               (h/set raw-map))]

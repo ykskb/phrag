@@ -1,8 +1,8 @@
 (ns phrag.handler
+  "Handles arguments and DB operations for Phrag's GraphQL resolvers."
   (:require [clojure.set :as clj-set]
             [phrag.db :as db]))
 
-;;; Arg/DB Handler
 
 ;; GraphQL args to SQL params
 
@@ -82,7 +82,10 @@
     (assoc res-map (first pks) (sqlite-last-id res-map))
     res-map))
 
-(defn create-root [params db-con table-key pk-keys]
+(defn create-root
+  "Creates root object and attempts to return primary keys. `last_insert_rowid`
+  is checked and replaced with first primary key in case of SQLite."
+  [params db-con table-key pk-keys]
   (let [opts {:return-keys pk-keys}
         result (first (db/create! db-con table-key params opts))]
     (if (contains? result sqlite-last-id)

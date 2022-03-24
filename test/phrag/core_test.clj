@@ -1,9 +1,6 @@
 (ns phrag.core-test
   (:require [clojure.java.jdbc :as jdbc]
-            [clojure.test :refer :all]
-            [phrag.core :as phrag]
-            [phrag.table :as tbl]
-            [integrant.core :as ig]))
+            [clojure.test :refer :all]))
 
 (defn postgres-db []
   (doto {:connection (jdbc/get-connection {:dbtype "postgresql"

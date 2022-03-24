@@ -1,4 +1,4 @@
-(ns phrag.logging
+(ns ^:no-doc phrag.logging
   (:require [clojure.tools.logging]))
 
 (defmacro log [level & args]
