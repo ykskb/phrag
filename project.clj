@@ -1,4 +1,4 @@
-(defproject phrag "0.1.0-SNAPSHOT"
+(defproject phrag "0.1.0"
   :description "Instantly operational GraphQL handler"
   :url "https://github.com/ykskb/phrag"
   :min-lein-version "2.0.0"

@@ -473,8 +473,11 @@
 (defn- increment-id-count [res _ctx]
   (update res :id + 1))
 
-(defn- members-pre-update [args _ctx]
+(defn- members-pre-update [_args _ctx]
   nil)
+
+(defn- members-post-update [_args _ctx]
+  {:result true})
 
 (deftest graphql-signals
   (let [db (doto (create-db)
@@ -499,7 +502,8 @@
                                  :create {:pre change-arg-from-ctx
                                           :post [change-id-to-count
                                                  increment-id-count]}
-                                 :update {:pre members-pre-update}}}}
+                                 :update {:pre members-pre-update
+                                          :post members-post-update}}}}
         conf (ctx/options->config opt)
         schema (core/schema conf)
         test-gql (fn [q res-keys expected]
@@ -519,12 +523,11 @@
                    :first_name "changed-first-name"}]))
 
     (testing "pre-update signal"
-      (test-gql (str "mutation { updateMember (pk_columns: {id: 2}"
-                     "email: \"fake-email\" "
-                     "first_name: \"fake-first-name\") { result }}")
-                [:data :updateMember :result] true)
-      (test-gql "{ members { id email first_name }}"
-                [:data :members]
-                [{:id 2 :email "yoshi@test.com"
-                  :first_name "changed-first-name"}]))))
+      (let [q (str "mutation { updateMember (pk_columns: {id: 2}"
+                   "email: \"fake-email\" "
+                   "first_name: \"fake-first-name\") { result }}")
+            res (core/exec conf schema q nil {})]
+        (is (= (get-in res [:data :updateMember :result]) nil))
+        (is (= (:message (first (:errors res)))
+               "These SQL clauses are unknown or have nil values: :set"))))))
 

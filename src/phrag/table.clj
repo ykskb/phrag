@@ -18,24 +18,16 @@
   (let [pk-names (map :name (:pks table))]
     (map keyword pk-names)))
 
-(defn primary-fks
-  "Returns a list of FK maps that are also primary keys."
-  [table]
-  (let [fks (:fks table)
-        pk-names (map :name (:pks table))
-        fk-map (zipmap (map :from fks) fks)]
-    (vals (select-keys fk-map pk-names))))
-
 (defn is-circular-m2m-fk?
   "Bridge tables of circular many-to-many have 2 columns linked to the
   same table. Example: `user_follow` table where following and the followed
   are both linked to `users` table."
   [table fk-from]
-  (let [p-fks (primary-fks table)
-        p-fk-tbls (map :table p-fks)
-        cycl-linked-tbls (set (for [[tbl freq] (frequencies p-fk-tbls)
+  (let [fk-tbls (map :table (:fks table))
+        cycl-linked-tbls (set (for [[tbl freq] (frequencies fk-tbls)
                                     :when (> freq 1)] tbl))
-        cycl-link-fks (filter #(contains? cycl-linked-tbls (:table %)) p-fks)]
+        cycl-link-fks (filter #(contains? cycl-linked-tbls (:table %))
+                              (:fks table))]
     (contains? (set (map :from cycl-link-fks)) fk-from)))
 
 ;;; Optional foreign key detection from table/column names

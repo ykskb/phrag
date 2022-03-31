@@ -12,14 +12,9 @@
             [superlifter.api :as sl-api]
             [superlifter.core :as sl-core]))
 
-;; Workaround as error/reject in fetch method make promises stuck in pending
-;; state without being caught in subsequent catch. Fallback is to return nil
-;; after error log output.
-(defn- exec-sql [sql-fn records env]
-  (try (sql-fn records env)
-       (catch Throwable e
-         (log :error e)
-         nil)))
+(defn- on-error [e]
+  (log :error e)
+  (resolve/resolve-as nil {:message (ex-message e)}))
 
 ;; Urania / Super Lifter
 
@@ -27,21 +22,24 @@
   u/DataSource
   (-identity [this] (:u-id this))
   (-fetch [this env]
-    (sl-api/unwrap (exec-sql (:fetch-fn this) this env))))
+    (try (sl-api/unwrap ((:fetch-fn this) this env))
+         (catch Throwable e (on-error e)))))
 
 (defrecord BatchDataSource [u-id batch-fn map-1-fn map-n-fn]
   u/DataSource
   (-identity [this] (:u-id this))
   (-fetch [this env]
-    (let [responses (exec-sql (:batch-fn this) [this] env)]
-      (sl-api/unwrap (:map-1-fn this) responses)))
+    (try (let [responses ((:batch-fn this) [this] env)]
+           (sl-api/unwrap (:map-1-fn this) responses))
+         (catch Throwable e (on-error e))))
 
   u/BatchedSource
   (-fetch-multi [muse muses env]
-    (let [muses (cons muse muses)
-          responses (exec-sql (:batch-fn muse) muses env)
-          map-fn (partial (:map-n-fn muse) muses)]
-      (sl-api/unwrap map-fn responses))))
+    (try (let [muses (cons muse muses)
+               responses ((:batch-fn muse) muses env)
+               map-fn (partial (:map-n-fn muse) muses)]
+           (sl-api/unwrap map-fn responses))
+         (catch Throwable e (on-error e)))))
 
 (defn- ->lacinia-promise [sl-result]
   (let [l-prom (resolve/resolve-promise)]
@@ -75,9 +73,10 @@
 ;; Interceptor Signal
 
 (defn- signal [args sgnl-fns ctx]
-  (reduce (fn [args sgnl-fn]
-            (sgnl-fn args ctx))
-          args sgnl-fns))
+  (if (satisfies? resolve/ResolverResult args) args
+      (reduce (fn [args sgnl-fn]
+                (sgnl-fn args ctx))
+              args sgnl-fns)))
 
 ;;; Resolvers
 
@@ -86,76 +85,84 @@
 (defn list-query
   "Resolves root-level query. Superlifter queue is always :default."
   [table-key table sgnl-map ctx args _val]
-  (with-superlifter (:sl-ctx ctx)
-    (let [{:keys [col-keys rel-cols rel-flds]} table
-          sql-params (-> (hd/args->sql-params col-keys args ctx)
-                         (update :select into rel-cols)
-                         (signal (:pre sgnl-map) ctx))
-          fetch-fn (fn [_this _env]
-                     (hd/list-root (:db ctx) table-key sql-params))
-          res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
-                    (update-triggers-by-count! rel-flds))]
-      (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx))))))
+  (try
+    (with-superlifter (:sl-ctx ctx)
+      (let [{:keys [col-keys rel-cols rel-flds]} table
+            sql-params (-> (hd/args->sql-params col-keys args ctx)
+                           (update :select into rel-cols)
+                           (signal (:pre sgnl-map) ctx))
+            fetch-fn (fn [_this _env]
+                       (hd/list-root (:db ctx) table-key sql-params))
+            res-p (-> (sl-api/enqueue! (->FetchDataSource fetch-fn))
+                      (update-triggers-by-count! rel-flds))]
+        (prom/then res-p (fn [v] (signal v (:post sgnl-map) ctx)))))
+    (catch Throwable e (on-error e))))
 
 (defn has-one
   "Resolves has-one relationship.
   e.g. (shopping_cart.user_id fk=> user.id)
   Parent: [shopping_cart].user_id => [user].id"
   [fk sgnl-fn-map ctx _args val]
-  (with-superlifter (:sl-ctx ctx)
-    (let [{:keys [to-tbl-key from-key to-key to-tbl-col-keys
-                  to-tbl-rel-cols to-tbl-rel-flds]
-           {:keys [has-one]} :field-keys} fk
-          sql-args (-> (hd/args->sql-params to-tbl-col-keys nil ctx)
-                       (update :select into to-tbl-rel-cols)
-                       (signal (:pre sgnl-fn-map) ctx))
-          batch-fn (fn [many _env]
-                     (let [ids (map :u-id many)
-                           sql-params (assoc sql-args
-                                             :where [[:in to-key ids]])
-                           res (hd/list-root (:db ctx) to-tbl-key sql-params)]
-                       (do-update-triggers! (:sl-ctx ctx) to-tbl-rel-flds
-                                            (count res))
-                       res))
-          map-n-fn (fn [muses batch-res]
-                     (let [m (zipmap (map :u-id muses) (repeat nil))
-                           vals (zipmap (map to-key batch-res) batch-res)]
-                       (merge m vals)))
-          res-p (sl-api/enqueue! has-one
-                                 (->BatchDataSource (from-key val) batch-fn
-                                                    first map-n-fn))]
-      (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
+  (try
+    (with-superlifter (:sl-ctx ctx)
+      (let [{:keys [to-tbl-key from-key to-key to-tbl-col-keys
+                    to-tbl-rel-cols to-tbl-rel-flds]
+             {:keys [has-one]} :field-keys} fk
+            sql-args (-> (hd/args->sql-params to-tbl-col-keys nil ctx)
+                         (update :select into to-tbl-rel-cols)
+                         (signal (:pre sgnl-fn-map) ctx))
+            batch-fn (fn [many _env]
+                       (let [ids (map :u-id many)
+                             sql-params (assoc sql-args
+                                               :where [[:in to-key ids]])
+                             res (hd/list-root (:db ctx) to-tbl-key sql-params)]
+                         (do-update-triggers! (:sl-ctx ctx) to-tbl-rel-flds
+                                              (count res))
+                         res))
+            map-n-fn (fn [muses batch-res]
+                       (let [m (zipmap (map :u-id muses) (repeat nil))
+                             vals (zipmap (map to-key batch-res) batch-res)]
+                         (merge m vals)))
+            res-p (sl-api/enqueue! has-one
+                                   (->BatchDataSource (from-key val) batch-fn
+                                                      first map-n-fn))]
+        (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx)))))
+    (catch Throwable e (on-error e))))
 
 (defn has-many
   "Resolves has-many relationship.
   e.g. (shopping_cart.user_id fk=> user.id)
   Parent values: [user].id => [shopping_cart].user_id"
   [table-key table fk sgnl-fn-map ctx args val]
-  (with-superlifter (:sl-ctx ctx)
-    (let [{:keys [from-key to-key]} fk
-          {:keys [pk-keys col-keys rel-cols rel-flds]
-           {:keys [has-many]} :field-keys} table
-          sql-args (-> (hd/args->sql-params col-keys args ctx)
-                       (update :select into rel-cols)
-                       (signal (:pre sgnl-fn-map) ctx))
-          batch-fn (fn [many _env]
-                     (let [ids (map :u-id many)
-                           sql-args (update sql-args :where
-                                            conj [:in from-key ids])
-                           res (if (> (:limit sql-args 0) 0)
-                                 (hd/list-partitioned (:db ctx) table-key
-                                                      from-key pk-keys sql-args)
-                                 (hd/list-root (:db ctx) table-key sql-args))]
-                       (do-update-triggers! (:sl-ctx ctx) rel-flds (count res))
-                      res))
-          map-n-fn (fn [muses batch-res]
-                     (let [m (zipmap (map :u-id muses) (repeat []))
-                           vals (group-by from-key batch-res)]
-                       (merge-with concat m vals)))
-          res-p (sl-api/enqueue! has-many
-                                 (->BatchDataSource (to-key val) batch-fn
-                                                    identity map-n-fn))]
-      (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
+  (try
+    (with-superlifter (:sl-ctx ctx)
+      (let [{:keys [from-key to-key]
+             {:keys [has-many]} :field-keys} fk
+            {:keys [pk-keys col-keys rel-cols rel-flds]} table
+            sql-args (-> (hd/args->sql-params col-keys args ctx)
+                         (update :select into rel-cols)
+                         (signal (:pre sgnl-fn-map) ctx))
+            batch-fn
+            (fn [many _env]
+              (let [ids (map :u-id many)
+                    sql-args (update sql-args :where
+                                     conj [:in from-key ids])
+                    res (if (or (> (:limit sql-args 0) 0)
+                                (> (:offset sql-args 0) 0))
+                          (hd/list-partitioned (:db ctx) table-key from-key
+                                               pk-keys sql-args)
+                          (hd/list-root (:db ctx) table-key sql-args))]
+                (do-update-triggers! (:sl-ctx ctx) rel-flds (count res))
+                res))
+            map-n-fn (fn [muses batch-res]
+                       (let [m (zipmap (map :u-id muses) (repeat []))
+                             vals (group-by from-key batch-res)]
+                         (merge-with concat m vals)))
+            res-p (sl-api/enqueue! has-many
+                                   (->BatchDataSource (to-key val) batch-fn
+                                                      identity map-n-fn))]
+        (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx)))))
+    (catch Throwable e (on-error e))))
 
 ;; Aggregates
 
@@ -198,64 +205,71 @@
 (defn aggregate-root
   "Resolves aggregation query at root level."
   [table-key ctx args _val]
-  (let [sql-args (hd/args->sql-params nil args nil)
-        fields (aggr-fields ctx)
-        selects (aggr-selects fields)
-        res (first (hd/aggregate-root (:db ctx) table-key selects sql-args))]
-    (aggr-result fields res)))
+  (try
+    (let [sql-args (hd/args->sql-params nil args nil)
+          fields (aggr-fields ctx)
+          selects (aggr-selects fields)
+          res (first (hd/aggregate-root (:db ctx) table-key selects sql-args))]
+      (aggr-result fields res))
+    (catch Throwable e (on-error e))))
 
 (defn aggregate-has-many
   "Resolves aggregation query for has-many relationship."
   [table-key fk-from fk-to sl-key sgnl-fn-map ctx args val]
-  (with-superlifter (:sl-ctx ctx)
-    (let [sql-args (-> (hd/args->sql-params nil args nil)
-                       (signal (:pre sgnl-fn-map) ctx))
-          fields (aggr-fields ctx)
-          selects (aggr-selects fields)
-          batch-fn (fn [many _env]
-                     (let [ids (map :u-id many)
-                           sql-args (update sql-args :where
-                                            conj [:in fk-from ids])
-                           sql-res (hd/aggregate-grp-by (:db ctx) table-key
-                                                        selects fk-from
-                                                        sql-args)]
-                       (aggr-many-result fields sql-res fk-from ids)))
-          map-n-fn (fn [_muses batch-res]
-                     (zipmap (map fk-from batch-res) batch-res))
-          res-p (sl-api/enqueue! sl-key
-                                 (->BatchDataSource (fk-to val) batch-fn
-                                                    first map-n-fn))]
-      (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx))))))
+  (try
+    (with-superlifter (:sl-ctx ctx)
+      (let [sql-args (-> (hd/args->sql-params nil args nil)
+                         (signal (:pre sgnl-fn-map) ctx))
+            fields (aggr-fields ctx)
+            selects (aggr-selects fields)
+            batch-fn (fn [many _env]
+                       (let [ids (map :u-id many)
+                             sql-args (update sql-args :where
+                                              conj [:in fk-from ids])
+                             sql-res (hd/aggregate-grp-by (:db ctx) table-key
+                                                          selects fk-from
+                                                          sql-args)]
+                         (aggr-many-result fields sql-res fk-from ids)))
+            map-n-fn (fn [_muses batch-res]
+                       (zipmap (map fk-from batch-res) batch-res))
+            res-p (sl-api/enqueue! sl-key
+                                   (->BatchDataSource (fk-to val) batch-fn
+                                                      first map-n-fn))]
+        (prom/then res-p (fn [v] (signal v (:post sgnl-fn-map) ctx)))))
+    (catch Throwable e (on-error e))))
 
 ;; Mutations
 
 (defn create-root
   "Resolves create mutation."
   [table-key pk-keys col-keys sgnl-fn-map ctx args _val]
-  (let [sql-args (-> (select-keys args col-keys)
-                     (signal (:pre sgnl-fn-map) ctx)
-                     (w/stringify-keys))
-        res (if (not sql-args)
-              nil (hd/create-root sql-args (:db ctx) table-key pk-keys))
-        created (merge args res)]
-    (signal created (:post sgnl-fn-map) ctx)))
+  (try
+    (let [sql-args (-> (select-keys args col-keys)
+                       (signal (:pre sgnl-fn-map) ctx)
+                       (w/stringify-keys))
+          res (hd/create-root sql-args (:db ctx) table-key pk-keys)
+          created (merge args res)]
+      (signal created (:post sgnl-fn-map) ctx))
+    (catch Throwable e (on-error e))))
 
 (defn update-root
   "Resolves update mutation. Takes `pk_columns` parameter as a record identifier."
   [table-key col-keys sgnl-fn-map ctx args _val]
-  (let [sql-args (-> (select-keys args col-keys)
-                     (assoc :pk_columns (:pk_columns args))
-                     (signal (:pre sgnl-fn-map) ctx))
-        params (-> (dissoc sql-args :pk_columns)
-                   (w/stringify-keys))]
-    (when (not-empty params)
-      (hd/patch-root (:pk_columns sql-args) params (:db ctx) table-key))
-    (signal fld/result-true-object (:post sgnl-fn-map) ctx)))
+  (try
+    (let [sql-args (-> (select-keys args col-keys)
+                       (assoc :pk_columns (:pk_columns args))
+                       (signal (:pre sgnl-fn-map) ctx))
+          params (-> (dissoc sql-args :pk_columns)
+                     (w/stringify-keys))]
+      (hd/patch-root (:pk_columns sql-args) params (:db ctx) table-key)
+      (signal fld/result-true-object (:post sgnl-fn-map) ctx))
+    (catch Throwable e (on-error e))))
 
 (defn delete-root
   "Resolves delete mutation. Takes `pk_columns` parameter as a record identifier."
   [table-key sgnl-fn-map ctx args _val]
-  (let [sql-args (signal args (:pre sgnl-fn-map) ctx)]
-    (when (not-empty sql-args)
-      (hd/delete-root (:pk_columns sql-args) (:db ctx) table-key))
-    (signal fld/result-true-object (:post sgnl-fn-map) ctx)))
+  (try
+    (let [sql-args (signal args (:pre sgnl-fn-map) ctx)]
+      (hd/delete-root (:pk_columns sql-args)(:db ctx) table-key)
+      (signal fld/result-true-object (:post sgnl-fn-map) ctx))
+    (catch Throwable e (on-error e))))
