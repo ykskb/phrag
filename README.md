@@ -43,7 +43,7 @@ Create a ring app with reitit using Integrant
 
 - This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
-- Not all database column types are mapped to GraphQL fields yet. Any help such as reports and PRs would be appreciated.
+- Not all database column types are mapped to GraphQL fields yet. Any help would be appreciated through issues and PRs.
 
 - Phrag transforms a foreign key constraint into nested query objects of GraphQL as the diagram below. This is a fundamental concept for Phrag to support multiple types of relationships:
   <img src="./docs/images/fk-transform.png" width="600px" />
