@@ -1,6 +1,6 @@
 # Phrag
 
-**RDBMS Schema to GraphQL with Interceptors**
+**RDBMS Connection to GraphQL with Interceptors**
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
@@ -8,7 +8,7 @@ Phrag creates a GraphQL handler from a RDBMS connection with an idea that DB sch
 
 Tables become queryable as root objects containing nested objects of relationships. Mutations (`create`, `update` and `delete`) are also created per tables with primary keys as their identifiers.
 
-In addition, Phrag allows custom functions to be configured before & after DB accesses per resource operations. It can make GraphQL more practical with things like access control and event firing per queries/mutations.
+Phrag also allows custom functions to be configured before & after DB accesses per resource operations. It makes GraphQL more practical with things like access control and event firing per resource queries/mutations.
 
 ### Features:
 

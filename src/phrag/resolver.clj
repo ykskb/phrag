@@ -16,7 +16,7 @@
   `(try ~body
         (catch Throwable e#
           (log :error e#)
-          (resolve/resolve-as nil {:message (ex-message e#)}))))
+          (sl-api/unwrap (resolve/resolve-as nil {:message (ex-message e#)})))))
 
 ;; Urania / Super Lifter
 
