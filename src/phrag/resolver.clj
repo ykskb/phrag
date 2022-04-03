@@ -12,11 +12,17 @@
             [superlifter.api :as sl-api]
             [superlifter.core :as sl-core]))
 
-(defmacro resolve-error [body]
+(defmacro resolve-error-promise [body]
   `(try ~body
         (catch Throwable e#
           (log :error e#)
           (sl-api/unwrap (resolve/resolve-as nil {:message (ex-message e#)})))))
+
+(defmacro resolve-error [body]
+  `(try ~body
+        (catch Throwable e#
+          (log :error e#)
+          (resolve/resolve-as nil {:message (ex-message e#)}))))
 
 ;; Urania / Super Lifter
 
@@ -24,18 +30,18 @@
   u/DataSource
   (-identity [this] (:u-id this))
   (-fetch [this env]
-    (resolve-error (sl-api/unwrap ((:fetch-fn this) this env)))))
+    (resolve-error-promise (sl-api/unwrap ((:fetch-fn this) this env)))))
 
 (defrecord BatchDataSource [u-id batch-fn map-1-fn map-n-fn]
   u/DataSource
   (-identity [this] (:u-id this))
   (-fetch [this env]
-    (resolve-error (let [responses ((:batch-fn this) [this] env)]
+    (resolve-error-promise (let [responses ((:batch-fn this) [this] env)]
                      (sl-api/unwrap (:map-1-fn this) responses))))
 
   u/BatchedSource
   (-fetch-multi [muse muses env]
-    (resolve-error (let [muses (cons muse muses)
+    (resolve-error-promise (let [muses (cons muse muses)
                          responses ((:batch-fn muse) muses env)
                          map-fn (partial (:map-n-fn muse) muses)]
                      (sl-api/unwrap map-fn responses)))))
