@@ -4,17 +4,17 @@
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
-Phrag creates a GraphQL handler from a RDBMS connection with an idea that DB schema with primary/foreign keys can sufficiently represent data models/relationships for GraphQL.
+Phrag creates a GraphQL handler of CRUD operations from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys.
 
-Tables become queryable as root objects containing nested objects of relationships. Mutations (`create`, `update` and `delete`) are also created per tables with primary keys as their identifiers.
+All tables become queryable as root objects containing nested objects of `has-one` / `has-many` relationships. Mutations (`create`, `update` and `delete`) are also created per tables with primary keys as their identifiers.
 
-Phrag also allows custom functions to be configured before & after DB accesses per resource operations. It makes GraphQL more practical with things like access control and event firing per resource queries/mutations.
+In addition, Phrag comes with an interceptor capability to control behaviors of GraphQL. Custom functions can be configured before & after DB accesses per GraphQL operations, which can make GraphQL more practical with things like access control and event firing per resource queries/mutations.
 
 ### Features:
 
 - CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
 
-- `One-to-one`, `one-to-many`, `many-to-many` and `circular many-to-many` relationships supported as nested query objects.
+- `One-to-one`, `one-to-many` and `many-to-many` relationships supported as nested query objects.
 
 - Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
 
@@ -26,7 +26,7 @@ Phrag also allows custom functions to be configured before & after DB accesses p
 
 - Automatic route wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
 
-- GraphQL IDE (like GraphiQL) connectable.
+- GraphQL IDE (like GraphiQL) connectable through introspection.
 
 ### Usage
 
@@ -44,9 +44,6 @@ Create a ring app with reitit using Integrant
 - This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
 
 - Not all database column types are mapped to GraphQL fields yet. Any help would be appreciated through issues and PRs.
-
-- Phrag transforms a foreign key constraint into nested query objects of GraphQL as the diagram below. This is a fundamental concept for Phrag to support multiple types of relationships:
-  <img src="./docs/images/fk-transform.png" width="600px" />
 
 ### Config
 

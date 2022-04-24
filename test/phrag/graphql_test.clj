@@ -412,7 +412,7 @@
       (test-gql  "{ members (limit: 1) { id first_name }}"
                  [:data :members]
                  [{:id 1 :first_name "jim"}])
-      (test-gql  "{ members (offset: 1) { id first_name }}"
+      (test-gql  "{ members (limit: 1, offset: 1) { id first_name }}"
                  [:data :members]
                  [{:id 2 :first_name "yoshi"}]))
 

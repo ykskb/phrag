@@ -90,13 +90,13 @@
   (let [whr (:where params)
         selects (:select params [:*])
         sorts (:sort params)
-        q (-> (apply h/select selects)
-              (h/from table)
-              (h/limit (:limit params 100))
-              (h/offset (:offset params 0)))
+        q (cond-> (apply h/select selects)
+            true (h/from table)
+            (:limit params) (h/limit (:limit params))
+            (:offset params) (h/offset (:offset params)))
         q (if (not-empty whr) (apply h/where q whr) q)
         q (if (not-empty sorts) (apply h/order-by q sorts) q)]
-    (println (sql/format q))
+    ;; (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
@@ -111,11 +111,11 @@
         sub-q (if (not-empty whr) (apply h/where sub-q whr) sub-q)
         pid-gt (:offset params 0)
         pid-lte (+ pid-gt (:limit params 100))
-        q (-> (h/select :*)
-              (h/from [sub-q :sub])
-              (h/where [:> :p_id pid-gt])
-              (h/where [:<= :p_id pid-lte]))]
-    (println (sql/format q))
+        q (cond-> (h/select :*)
+              true (h/from [sub-q :sub])
+              (:offset params) (h/where [:> :p_id pid-gt])
+              (:limit params) (h/where [:<= :p_id pid-lte]))]
+    ;; (println (sql/format q))
     (->> (sql/format q)
          (jdbc/query db))))
 
@@ -123,10 +123,10 @@
   "Executes aggregation query with provided paramters."
   [db table aggrs & [params]]
   (let [whr (:where params)
-        q (-> (apply h/select aggrs)
-              (h/from table)
-              (h/limit (:limit params 100))
-              (h/offset (:offset params 0)))
+        q (cond-> (apply h/select aggrs)
+            true (h/from table)
+            (:limit params) (h/limit (:limit params))
+            (:offset params) (h/offset (:offset params)))
         q (if (not-empty whr) (apply h/where q whr) q)]
     ;;(println (sql/format q))
     (->> (sql/format q)
@@ -150,14 +150,14 @@
   [db table pk-map]
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (apply h/where (h/delete-from table) whr)]
-    (prn (sql/format q))
+    ;; (prn (sql/format q))
     (->> (sql/format q)
          (jdbc/execute! db))))
 
 (defn create!
   "Executes create statement with parameter map."
   [db rsc raw-map opts]
-  (prn rsc raw-map)
+  ;; (prn rsc raw-map)
   (jdbc/insert! db rsc raw-map opts))
 
 (defn update!
@@ -166,7 +166,7 @@
   (let [whr (map (fn [[k v]] [:= k v]) pk-map)
         q (-> (h/update table)
               (h/set raw-map))]
-    (prn (sql/format (apply h/where q whr)))
+    ;; (prn (sql/format (apply h/where q whr)))
     (->> (apply h/where q whr)
          sql/format
          (jdbc/execute! db))))

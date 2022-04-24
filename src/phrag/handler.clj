@@ -59,8 +59,7 @@
                 (= k :offset) (assoc m :offset v)
                 :else m))
             (cond-> {:select (parse-selects col-keys ctx)
-                     :where (parse-where args)
-                     :offset 0}
+                     :where (parse-where args)}
               (integer? default-limit) (assoc :limit default-limit))
             args)))
 
