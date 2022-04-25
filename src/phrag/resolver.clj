@@ -42,9 +42,9 @@
   u/BatchedSource
   (-fetch-multi [muse muses env]
     (resolve-error-promise (let [muses (cons muse muses)
-                         responses ((:batch-fn muse) muses env)
-                         map-fn (partial (:map-n-fn muse) muses)]
-                     (sl-api/unwrap map-fn responses)))))
+                                 responses ((:batch-fn muse) muses env)
+                                 map-fn (partial (:map-n-fn muse) muses)]
+                             (sl-api/unwrap map-fn responses)))))
 
 (defn- ->lacinia-promise [sl-result]
   (let [l-prom (resolve/resolve-promise)]
