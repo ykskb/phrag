@@ -8,6 +8,7 @@
                  [com.github.seancorfield/honeysql "2.0.0-rc3"]
                  [com.walmartlabs/lacinia "0.39-alpha-9"]
                  [ring/ring-core "1.9.3"]
+                 [hikari-cp "2.14.0"]
                  [environ "1.2.0"]
                  [camel-snake-kebab "0.4.2"]
                  [inflections "0.13.2"]

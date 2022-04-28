@@ -4,15 +4,15 @@
             [environ.core :refer [env]]
             [phrag.core :as core]
             [phrag.context :as ctx]
-            [phrag.core-test :refer [create-db postgres-db]]))
+            [phrag.core-test :refer [sqlite-conn postgres-conn]]))
 
 ;; create-db: in-memory SQLite
 ;; postgres-db: real PostgreSQL
 
 (deftest graphql-queries
   (let [db (if (env :test-on-postgres)
-             (postgres-db)
-             (create-db))
+                 (postgres-conn)
+                 (sqlite-conn))
         opt {:db db
              :scan-schema true
              :use-aggregation true}
@@ -480,7 +480,7 @@
   {:result true})
 
 (deftest graphql-signals
-  (let [db (doto (create-db)
+  (let [db (doto (sqlite-conn)
              (jdbc/insert! :members {:email "jim@test.com"
                                      :first_name "jim"
                                      :last_name "smith"}))

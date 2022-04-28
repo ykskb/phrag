@@ -3,7 +3,7 @@
             [clojure.set :as st]
             [clojure.java.jdbc :as jdbc]
             [com.walmartlabs.lacinia :as lcn]
-            [phrag.core-test :refer [create-db postgres-db]]
+            [phrag.core-test :refer [sqlite-conn]]
             [phrag.table :as tbl]))
 
 (defn- subset-maps? [expected subject id-key]
@@ -85,7 +85,7 @@
          {:name "member_id" :type "int"}]})
 
 (deftest db-schema-with-fks
-  (let [db (create-db)]
+  (let [db (sqlite-conn)]
     (testing "scan DB with fk: no config table data"
       (schema-as-expected?
        [members
