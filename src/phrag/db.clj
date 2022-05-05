@@ -126,7 +126,6 @@
         q (if (not-empty whr) (apply h/where q whr) q)
         q (if (not-empty sorts) (apply h/order-by q sorts) q)]
     ;; (println (sql/format q))
-    ;; (prn db)
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
            (jdbc/query conn)))))
@@ -161,7 +160,7 @@
             (:limit params) (h/limit (:limit params))
             (:offset params) (h/offset (:offset params)))
         q (if (not-empty whr) (apply h/where q whr) q)]
-    ;;(println (sql/format q))
+    ;; (println (sql/format q))
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
            (jdbc/query conn)))))
@@ -175,7 +174,7 @@
               (h/from table)
               (h/group-by grp-by))
         q (if (not-empty whr) (apply h/where q whr) q)]
-    ;;(println (sql/format q))
+    ;; (println (sql/format q))
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
            (jdbc/query conn)))))
