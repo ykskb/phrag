@@ -141,11 +141,10 @@
                   (h/from table))
         sub-q (if (not-empty whr) (apply h/where sub-q whr) sub-q)
         pid-gt (:offset params 0)
-        pid-lte (+ pid-gt (:limit params 100))
         q (cond-> (apply h/select selects)
               true (h/from [sub-q :sub])
               (:offset params) (h/where [:> :p_id pid-gt])
-              (:limit params) (h/where [:<= :p_id pid-lte]))]
+              (:limit params) (h/where [:<= :p_id (+ pid-gt (:limit params))]))]
     ;; (println (sql/format q))
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)

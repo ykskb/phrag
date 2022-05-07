@@ -78,11 +78,6 @@
           {:fields {} :columns {} :nest-fks {}}
           tables))
 
-(defn- relation-name-set [rel-ctx]
-  (reduce-kv (fn [s _table rels]
-               (into s rels))
-             #{} (:fields rel-ctx)))
-
 ;;; Schema Context
 
 (defn- rsc-names [table-name sgl-or-plr]
@@ -187,18 +182,6 @@
                            :objects fld/result-object
                            :queries {}})
 
-(defn- sl-config
-  "Creates a bucket config for Superlifter.
-  It needs to include all the nested object keys for relationships."
-  [rel-ctx db]
-  (let [buckets (reduce (fn [m bucket-name]
-                          (assoc m (keyword bucket-name)
-                                 {:triggers {:elastic {:threshold 0}}}))
-                        {:default {:triggers {:elastic {:threshold 0}}}}
-                        (relation-name-set rel-ctx))]
-    {:buckets buckets
-     :urania-opts {:env {:db db}}}))
-
 (defn options->config [options]
   (let [signals (:signals options)
         config {:router (:router options)
@@ -216,6 +199,5 @@
         rel-ctx (relation-context db-scm)]
     (-> config
         (assoc :relation-ctx rel-ctx)
-        (assoc :tables (schema-context db-scm rel-ctx signals))
-        (assoc :sl-config (sl-config rel-ctx (:db options))))))
+        (assoc :tables (schema-context db-scm rel-ctx signals)))))
 

@@ -6,45 +6,7 @@
             [phrag.field :as fld]
             [phrag.db :as db]))
 
-;; Aggregates
-
-(defn- aggr-fields [selections]
-  (reduce (fn [m selected]
-            (let [aggr (:field-name selected)]
-              (if (= :count aggr)
-                (assoc m :count nil)
-                (assoc m aggr (map :field-name (:selections selected))))))
-          {} selections))
-
-(defn- aggr-key [aggr-type col]
-  (keyword (str (name aggr-type) "_" (name col))))
-
-(defn- aggr-selects [fields]
-  (reduce (fn [v [aggr cols]]
-            (if (= :count aggr)
-              (conj v [[:count :*] :count])
-              (concat v (map (fn [c] [[aggr c] (aggr-key aggr c)]) cols))))
-          [] fields))
-
-(defn- aggr-result [fields sql-res & [id-key id]]
-  (reduce (fn [m [aggr cols]]
-            (if (= :count aggr)
-              (assoc m aggr (:count sql-res))
-              (assoc m aggr (reduce (fn [m col]
-                                      (assoc m col ((aggr-key aggr col) sql-res)))
-                             {} cols))))
-          (or sql-res {id-key id})
-          fields))
-
-(defn- aggr-many-result [fields sql-multi-res id-key ids]
-  (let [multi-res-map (zipmap (map #(id-key %) sql-multi-res) sql-multi-res)]
-    (map #(aggr-result fields (get multi-res-map %) id-key %) ids)))
-
 ;; GraphQL args to SQL params
-
-(defn- parse-selects [col-keys selection]
-  (let [q-fields (set (map :field-name selection))]
-    (clj-set/intersection q-fields col-keys)))
 
 (def ^:private where-ops
   {:eq  :=
@@ -55,6 +17,10 @@
    :ne  :!=
    :in :in
    :like :like})
+
+(defn- parse-selects [col-keys selection]
+  (let [q-fields (set (map :field-name selection))]
+    (clj-set/intersection q-fields col-keys)))
 
 (defn- parse-rsc-where [rsc-where]
   (map (fn [[k v]]
@@ -91,6 +57,40 @@
             (integer? default-limit) (assoc :limit default-limit))
           args))
 
+;; Aggregates
+
+(defn- aggr-fields [selections]
+  (reduce (fn [m selected]
+            (let [aggr (:field-name selected)]
+              (if (= :count aggr)
+                (assoc m :count nil)
+                (assoc m aggr (map :field-name (:selections selected))))))
+          {} selections))
+
+(defn- aggr-key [aggr-type col]
+  (keyword (str (name aggr-type) "_" (name col))))
+
+(defn- aggr-selects [fields]
+  (reduce (fn [v [aggr cols]]
+            (if (= :count aggr)
+              (conj v [[:count :*] :count])
+              (concat v (map (fn [c] [[aggr c] (aggr-key aggr c)]) cols))))
+          [] fields))
+
+(defn- aggr-result [fields sql-res & [id-key id]]
+  (reduce (fn [m [aggr cols]]
+            (if (= :count aggr)
+              (assoc m aggr (:count sql-res))
+              (assoc m aggr (reduce (fn [m col]
+                                      (assoc m col ((aggr-key aggr col) sql-res)))
+                             {} cols))))
+          (or sql-res {id-key id})
+          fields))
+
+(defn- aggr-many-result [fields sql-multi-res id-key ids]
+  (let [multi-res-map (zipmap (map #(id-key %) sql-multi-res) sql-multi-res)]
+    (map #(aggr-result fields (get multi-res-map %) id-key %) ids)))
+
 ;; Interceptor Signal
 
 (defn signal [args sgnl-fns ctx]
@@ -98,7 +98,7 @@
             (sgnl-fn args ctx))
           args sgnl-fns))
 
-;;; Resolver handlers
+;;; Resolve handlers
 
 ;; Query
 
@@ -116,11 +116,12 @@
                        (signal (:pre query-signals) ctx)
                        (update :select into rel-cols)
                        (update :where conj [:in from p-ids]))]
-    (-> (if (or (> (:limit sql-params 0) 0)
-                (> (:offset sql-params 0) 0))
-          (list-partitioned-query (:db ctx) from-table from pk-keys
-                                  sql-params)
-          (db/list-up (:db ctx) from-table sql-params))
+    (-> (cond
+          (< (count p-ids) 1) nil
+          (or (> (:limit sql-params 0) 0)
+              (> (:offset sql-params 0) 0))
+          (list-partitioned-query (:db ctx) from-table from pk-keys sql-params)
+          :else (db/list-up (:db ctx) from-table sql-params))
         (signal (:post query-signals) ctx))))
 
 (defn- query-has-many-aggr [parents nest-fk table ctx args selection]

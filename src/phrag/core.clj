@@ -6,8 +6,7 @@
             [com.walmartlabs.lacinia :as lcn]
             [com.walmartlabs.lacinia.tracing :as trc]
             [com.walmartlabs.lacinia.schema :as schema]
-            [clojure.pprint :as pp]
-            [superlifter.core :as sl-core]))
+            [clojure.pprint :as pp]))
 
 ;;; Queries
 
@@ -153,24 +152,13 @@
 
 ;;; Execution
 
-(defn- sl-start! [config]
-  (sl-core/start! config))
-
-(defn- sl-stop! [sl-ctx]
-  (sl-core/stop! sl-ctx))
-
 (defn exec
   "Executes Phrag's GraphQL."
   [config schema query vars req]
-  (let [sl-ctx (sl-start! (:sl-config config))
-        ctx (-> (:signal-ctx config {})
+  (let [ctx (-> (:signal-ctx config {})
                 (assoc :req req)
-                (assoc :sl-ctx sl-ctx)
                 (assoc :db (:db config))
                 (assoc :default-limit (:default-limit config))
                 (assoc :relation-ctx (:relation-ctx config))
-                (assoc :tables (:tables config)))
-        res (lcn/execute schema query vars ctx)]
-        ;; res (lcn/execute schema query vars (trc/enable-tracing ctx))]
-    (let [_ctx (sl-stop! sl-ctx)]
-      res)))
+                (assoc :tables (:tables config)))]
+    (lcn/execute schema query vars ctx)))
