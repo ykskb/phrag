@@ -1,6 +1,6 @@
 # Phrag
 
-**RDBMS Connection to GraphQL with Interceptors**
+**GraphQL from a RDBMS Connection**
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
@@ -16,7 +16,7 @@ In addition, Phrag comes with an interceptor capability to control behaviors of 
 
 - `One-to-one`, `one-to-many` and `many-to-many` relationships supported as nested query objects.
 
-- Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
+- Query batching to avoid N+1 problem for nested queries, recursively executing a query per nest level and mapping results to parent objects.
 
 - [Aggregation queries](#aggregation) for root entity and has-many relationships.
 
@@ -51,17 +51,17 @@ Though there are multiple options for customization, the only config parameter r
 
 ##### Parameters
 
-| Key                  | description                                                                                                               | Required | Default Value |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
-| `:db`                | Database connection object.                                                                                               | Yes      |               |
-| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                                      | No       |               |
-| `:signals`           | Map of singal functions per resources. Plz check [Interceptor Signals](#interceptor-signals) for details.                 | No       |               |
-| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Interceptor Signals](#interceptor-signals) for details. | No       |               |
-| `:default-limit`     | Default number for SQL `LIMIT` value to be applied when there's no `:limit` argument is specified in a query.             | No       | `nil`         |
-| `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                                       | No       | `true`        |
-| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                             | No       | `true`        |
-| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.              | No       | `false`       |
-| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.               | No       | `true`        |
+| Key                  | description                                                                                                                                                                 | Required | Default Value |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
+| `:db`                | Database connection or data source object. [Hikari-CP datasource](https://github.com/tomekw/hikari-cp) is much more performant than a JDBC connection especially for loads. | Yes      |               |
+| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                                                                                        | No       |               |
+| `:signals`           | Map of singal functions per resources. Plz check [Interceptor Signals](#interceptor-signals) for details.                                                                   | No       |               |
+| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Interceptor Signals](#interceptor-signals) for details.                                                   | No       |               |
+| `:default-limit`     | Default number for SQL `LIMIT` value to be applied when there's no `:limit` argument is specified in a query.                                                               | No       | `nil`         |
+| `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                                                                                         | No       | `true`        |
+| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                                                                               | No       | `true`        |
+| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.                                                                | No       | `false`       |
+| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.                                                                 | No       | `true`        |
 
 ##### Schema Data
 

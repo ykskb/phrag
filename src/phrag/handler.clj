@@ -147,7 +147,8 @@
                        (signal (:pre query-signals) ctx)
                        (update :select into rel-cols)
                        (assoc :where [[:in to p-ids]]))]
-    (-> (db/list-up (:db ctx) (:table nest-fk) sql-params)
+    (-> (if (< (count p-ids) 1) nil
+            (db/list-up (:db ctx) (:table nest-fk) sql-params))
         (signal (:post query-signals) ctx))))
 
 (defn- query-nest [parents table-key selection nest-fk ctx]
