@@ -182,7 +182,9 @@
                            :objects fld/result-object
                            :queries {}})
 
-(defn options->config [options]
+(defn options->config
+  "Creates a config map from user-provided options."
+  [options]
   (let [signals (:signals options)
         config {:router (:router options)
                 :db (:db options)
