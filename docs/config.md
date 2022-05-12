@@ -2,7 +2,7 @@
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
 
-##### Parameters
+### Parameters
 
 | Key                  | description                                                                                                                                                                   | Required | Default Value |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
@@ -16,7 +16,7 @@ Though there are multiple options for customization, the only config parameter r
 | `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.                                                                  | No       | `false`       |
 | `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.                                                                   | No       | `true`        |
 
-##### Schema Data
+#### Schema Data
 
 By default, Phrag retrieves DB schema data from a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain tables, columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
 
@@ -39,7 +39,7 @@ By default, Phrag retrieves DB schema data from a DB connection and it is suffic
     ]}
 ```
 
-##### Table Data Details:
+#### Table Data Details:
 
 | Key        | Description                                                                                      |
 | ---------- | ------------------------------------------------------------------------------------------------ |

@@ -1,12 +1,15 @@
 ## Database Requirements for Phrag
 
-Here's a quick view of database constructs which are important for Phrag. Mechanism is explained [below](#mechanism-of-phrag) for details.
+Here's a quick view of database constructs which are important for Phrag. Mechanism is explained [below](#mechanism-of-phrag).
 
-- **Foreign keys**: Phrag translates foreign keys to nested properties in GraphQL objects.
+- **Foreign keys**:
+  Phrag translates foreign keys to nested properties in GraphQL objects.
 
-- **Primary keys**: Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
+- **Primary keys**:
+  Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
 
-- **Indices on foreign key columns**: Phrag queries a database by both origin and destination columns of foreign keys for nested objects. (Please note simply creating a foreign key DOES NOT index those columns.)
+- **Indices on foreign key columns**:
+  Phrag queries a database by both origin and destination columns of foreign keys for nested objects. (Please note simply creating a foreign key DOES NOT index those columns.)
 
 > #### Notes
 >

@@ -2,7 +2,7 @@
 
 Phrag can signal configured functions per resource queries/mutations at pre/post-operation time. This is where things like access controls or custom business logics can be configured. Signal functions are called with different parameters as below:
 
-##### Pre-operation Interceptor Function
+### Pre-operation Interceptor Function
 
 | Type   | Signal function receives (as first parameter):                             | Returned value will be:                |
 | ------ | -------------------------------------------------------------------------- | -------------------------------------- |
@@ -16,7 +16,7 @@ Phrag can signal configured functions per resource queries/mutations at pre/post
 > - `query` signal functions for matching table will be called in nested queries (relations) as well.
 > - `:where` and `:limit` parameter for `query` operation are in [HoneySQL](https://github.com/seancorfield/honeysql) format.
 
-##### Post-operation Interceptor Function
+#### Post-operation Interceptor Function
 
 | Type   | Signal function receives (as a first parameter):   | Returned value will be:  |
 | ------ | -------------------------------------------------- | ------------------------ |
@@ -25,11 +25,11 @@ Phrag can signal configured functions per resource queries/mutations at pre/post
 | update | Result object: `{:result true}`                    | Passed to response body. |
 | delete | Result object: `{:result true}`                    | Passed to response body. |
 
-##### All Interceptor Functions
+#### All Interceptor Functions
 
 All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config (`:signal-ctx`) together with a DB connection (`:db`) and an incoming HTTP request (`:req`).
 
-##### Examples
+### Examples
 
 ```clojure
 (defn- end-user-access
@@ -69,4 +69,3 @@ All receiver functions will have a context map as its second argument. It'd cont
 > Notes:
 >
 > - `:all` can be used at each level of signal map to run signal functions across all tables, all operations for a table, or both timing for a specific operation.
-

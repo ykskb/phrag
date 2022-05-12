@@ -1,10 +1,10 @@
 # Performance of Phrag
 
-### Load Test
+## Load Test
 
 Tests are performed with [k6](https://k6.io).
 
-#### Objectives
+### Objectives
 
 Load tests were performed to:
 
@@ -15,7 +15,7 @@ Load tests were performed to:
 
 - Compare performance of resolver models between bucket queue model vs recursion model.
 
-#### Measurement
+### Measurement
 
 How many users can be served under request duration of `500ms` while each user is constantly sending a request every `2s`?
 
@@ -25,7 +25,7 @@ How many users can be served under request duration of `500ms` while each user i
 - Metrics used is `http_req_duration` for `p95`.
 - HTTP error & response error rate must be less than `1%`.
 
-##### Tests
+### Tests
 
 - 3 queries with different nest levels were tested to see performance difference of additional queries and serialization (1 nest = 1 SQL).
 
@@ -80,13 +80,13 @@ query queryMeetupsWithMembers($limit: Int!, $offset: Int!, $id_gt: Int!) {
 }
 ```
 
-#### Results
+### Results
 
 - Platform: AWS ECS Single Task Container
 - Database: AWS RDS PostgreSQL
   2vCPU + 1GB RAM (Free-tier `db.t3.micro`)
 
-##### 1vCPU + 4GB RAM
+#### 1vCPU + 4GB RAM
 
 Limit: `50`
 
@@ -104,7 +104,7 @@ Limit: `100`
 | 1 nest  | 400     | 257ms | 10ms | 703ms | 8872  | 143    |
 | 2 nests | 300     | 274ms | 10ms | 599ms | 6602  | 106    |
 
-##### 2vCPU + 8GB RAM
+#### 2vCPU + 8GB RAM
 
 Limit: `50`
 
@@ -122,10 +122,13 @@ Limit: `100`
 | 1 nest  | 900     | 291ms | 10ms | 663ms | 19695 | 316    |
 | 2 nests | 700     | 294ms | 9ms  | 774ms | 15312 | 246    |
 
-#### Observations
+### Observations
 
-- **Resource allocation**: performance seems to have increased linear with the resource allocation overall and improvement was even more significant for nested queries.
+- **Resource allocation**:
+  Performance seems to have increased linear with the resource allocation overall and improvement was even more significant for nested queries.
 
-- **Nest levels**: considering additional SQL queries and serialization required per nest level, `20%` to `50%` less performance per nest levels seems reasonable. However, with increased resources, performance drop with nested queries seems to be smaller. It was also observed that querying nested objects for `has-many` relationship affects performance more than `has-one` relationship, which indicates serialization and validation of retrieved records as per GraphQL schema is possibly the factor for larger latency and resource consumption.
+- **Nest levels**:
+  Considering additional SQL queries and serialization required per nest level, `20%` to `50%` less performance per nest levels seems reasonable. However, with increased resources, performance drop with nested queries seems to be smaller. It was also observed that querying nested objects for `has-many` relationship affects performance more than `has-one` relationship, which indicates serialization and validation of retrieved records as per GraphQL schema is possibly the factor for larger latency and resource consumption.
 
-- **Resolver model**: bucket queue model with [Superlifter](https://github.com/oliyh/superlifter) vs recursion model were compared for more performant resolver implementation. Though results are not included in this page, recursion model was more performant in a case of Phrag which has simple resolution requirements. The overhead of adding queue and resolving them through Promise (CompletableFuture) seemed to affect performance.
+- **Resolver model**:
+  Bucket queue model with [Superlifter](https://github.com/oliyh/superlifter) vs recursion model were compared for more performant resolver implementation. Though results are not included in this page, recursion model was more performant in a case of Phrag which has simple resolution requirements. The overhead of adding queue and resolving them through Promise (CompletableFuture) seemed to affect performance.

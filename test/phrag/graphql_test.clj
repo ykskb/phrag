@@ -530,4 +530,3 @@
         (is (= (get-in res [:data :updateMember :result]) nil))
         (is (= (:message (first (:errors res)))
                "These SQL clauses are unknown or have nil values: :set"))))))
-
