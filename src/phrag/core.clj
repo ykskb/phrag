@@ -159,6 +159,7 @@
                 (assoc :req req)
                 (assoc :db (:db config))
                 (assoc :default-limit (:default-limit config))
+                (assoc :max-nest-level (:max-nest-level config))
                 (assoc :relation-ctx (:relation-ctx config))
                 (assoc :tables (:tables config)))]
     (lcn/execute schema query vars ctx)))

@@ -1,24 +1,3 @@
-## Database Requirements for Phrag
-
-Here's a quick view of database constructs which are important for Phrag. Mechanism is explained [below](#mechanism-of-phrag).
-
-- **Foreign keys**:
-  Phrag translates foreign keys to nested properties in GraphQL objects.
-
-- **Primary keys**:
-  Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
-
-- **Indices on foreign key columns**:
-  Phrag queries a database by both origin and destination columns of foreign keys for nested objects. (Please note simply creating a foreign key DOES NOT index those columns.)
-
-> #### Notes
->
-> - Supported databases are SQLite and PostgreSQL.
->
-> - In a use case with PostgreSQL, Phrag queries tables such as `key_column_usage` and `constraint_column_usage` to retrieve full FK / PK info. Therefore the database user provided to Phrag needs to be identical to the one that created those keys.
->
-> - Not all database column types are mapped to Phrag's GraphQL fields yet. Any help would be appreciated through issues and PRs.
-
 ## Mechanism of Phrag
 
 ### Queries
@@ -34,6 +13,8 @@ Phrag transforms a foreign key constraint into nested query objects of GraphQL a
 ### SQL Queries
 
 N+1 problem is an anti-pattern where a relationship query is executed for every one of retrieved records. Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem.
+
+It should also be noted that Phrag does not use `JOIN` for relationship queries to allow `LIMIT` on nested objects.
 
 ## Mutations
 

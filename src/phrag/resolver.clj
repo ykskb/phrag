@@ -192,21 +192,26 @@
 (def ^:private aggr-keys
   #{:avg :count :max :min :sum})
 
-(defn- resolve-nests [table-key res selection ctx]
-  (let [nest-fks (get-in ctx [:relation-ctx :nest-fks table-key])]
-    (reduce (fn [r slct]
-              (let [field-key (get-in slct [:field-definition :field-name])]
-                (if (or (:leaf? slct) (contains? aggr-keys field-key))
-                  r
-                  (let [nest-fk (field-key nest-fks)
-                        nest-table-key (if (= :has-one (:type nest-fk))
-                                         (:table nest-fk)
-                                         (:from-table nest-fk))
-                        query-res (query-nest r nest-table-key slct nest-fk ctx)
-                        nested (resolve-nests nest-table-key query-res slct ctx)]
-                    (map-nest r field-key nest-fk nested)))))
-            res
-            (:selections selection))))
+(defn- resolve-nests [nest-level table-key res selection ctx]
+  (let [nest-fks (get-in ctx [:relation-ctx :nest-fks table-key])
+        max-nest (:max-nest-level ctx)]
+    (reduce
+     (fn [r slct]
+       (let [field-key (get-in slct [:field-definition :field-name])]
+         (if (or (:leaf? slct) (contains? aggr-keys field-key))
+           r
+           (if (and (number? max-nest) (> nest-level max-nest))
+             (throw (Exception. "Exceeded maximum nest level."))
+             (let [nest-fk (field-key nest-fks)
+                   nest-table-key (if (= :has-one (:type nest-fk))
+                                    (:table nest-fk)
+                                    (:from-table nest-fk))
+                   query-res (query-nest r nest-table-key slct nest-fk ctx)
+                   nested (resolve-nests (+ nest-level 1) nest-table-key
+                                         query-res slct ctx)]
+               (map-nest r field-key nest-fk nested))))))
+     res
+     (:selections selection))))
 
 ;;; Resolvers
 
@@ -230,7 +235,7 @@
                         (update :select into rel-cols))
          res (-> (db/list-up (:db ctx) table-key sql-params)
                  (signal (:post query-signals) ctx))]
-     (resolve-nests table-key res selection ctx))))
+     (resolve-nests 1 table-key res selection ctx))))
 
 ;; Aggregates
 
