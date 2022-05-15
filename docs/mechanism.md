@@ -1,6 +1,6 @@
 ## Mechanism of Phrag
 
-### Queries
+## Queries
 
 All tables become queryable as root objects of GraphQL in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at root level or as a nested object together with parent objects through relationships.
 
@@ -25,3 +25,9 @@ It should also be noted that Phrag does not use `JOIN` for relationship queries 
 2. `Create` mutation returns a PK object with generated values as a successful response.
 
 3. `Update` or `delete` mutation requires the PK object as a parameter to identify the record for the operations.
+
+## Security
+
+- **Infinite nests**: nested objects created for both origin and destination columns of foreign keys actually mean possible infinite nests, and it is possibly an attack surface when a user queries millions of nests. Phrag has a [config](config.md) value, `max-nest-level` for this, and an error response will be returned when a query exceed the nest level specified.
+
+- **Default limit**: querying millions of records can be resource-intensive and we don't want it to happen accidentally. [Config](config.md) value of `default-limit` can be used to apply default limit value when there's no `limit` parameter specified in a query.

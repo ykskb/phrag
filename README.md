@@ -6,21 +6,13 @@
 
 ### Overview
 
-**Instantly Operational**
+**Instantly Operational**: Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. All needed is a [database](#requirements).
 
-Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. All needed is a [database](#requirements).
+**CRUD / SQL Features**: all tables become queryable as root objects containing nested objects of [relationships](docs/mechanism.md#relationships). [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per tables. Additionally, [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) are supported for query operations.
 
-**CRUD / SQL Features**
+**Customization**: Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per tables and operation types, which can make GraphQL more practical with access control, event firing and more.
 
-All tables become queryable as root objects containing nested objects of [relationships](docs/mechanism.md#relationships). [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per tables. Additionally, [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) are supported for query operations.
-
-**Customization**
-
-Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per tables and operation types, which can make GraphQL more practical with access control, event firing and more.
-
-**Performance in Mind**
-
-Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
+**Performance in Mind**: Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
 ### Documentation
 
@@ -38,23 +30,17 @@ Phrag's query resolver implements a batched SQL query per nest level to avoid N+
 
 Example projects:
 
-- [SNS](https://github.com/ykskb/situated-sns-backend): a situated project for Phrag to verify its concept and practicality. It has authentication, access control and custom logics through Phrag's interceptors.
+- [SNS](https://github.com/ykskb/situated-sns-backend): a situated project to verify Phrag's concept and practicality. It has authentication, access control and custom logics through Phrag's interceptors.
 
 ### Requirements
 
 Here's a quick view of database constructs which are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
 
-- **Primary keys**
+- **Primary keys**: Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
 
-  Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
+- **Foreign keys**: Phrag translates foreign keys to nested properties in GraphQL objects.
 
-- **Foreign keys**
-
-  Phrag translates foreign keys to nested properties in GraphQL objects.
-
-- **Indices on foreign key columns**
-
-  Phrag queries a database by origin and destination columns of foreign keys for nested objects. It should be noted that creating a foreign key does not index those columns.
+- **Indices on foreign key columns**: Phrag queries a database by origin and destination columns of foreign keys for nested objects. It should be noted that creating a foreign key does not index those columns.
 
 > #### Notes
 >
