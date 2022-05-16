@@ -1,6 +1,6 @@
 (ns phrag.resolver
-  "Resolvers for Phrag's GraphQL schema. Queries are executed with Superlifter
-  and Urania to batch nested queries and avoid N+1 problem.."
+  "Resolvers for Phrag's GraphQL schema. Queries are executed at each nest level
+  to batch nested queries and avoid N+1 problem while allowing use of `limit`."
   (:require [clojure.pprint :as pp]
             [clojure.walk :as w]
             [clojure.set :as clj-set]
@@ -48,7 +48,7 @@
                               (conj vec [k v]))
                             [] v)))
 
-(defn args->sql-params [col-keys args selections default-limit]
+(defn- args->sql-params [col-keys args selections default-limit]
   (reduce (fn [m [k v]]
             (cond
               (= k :sort) (update-sort m v)
@@ -96,14 +96,14 @@
 
 ;; Interceptor signals
 
-(defn signal [args sgnl-fns ctx]
+(defn- signal [args sgnl-fns ctx]
   (reduce (fn [args sgnl-fn]
             (sgnl-fn args ctx))
           args sgnl-fns))
 
 ;; Nest resolution
 
-(defn list-partitioned-query [db table p-col-key pk-keys params]
+(defn- list-partitioned-query [db table p-col-key pk-keys params]
   (let [sort-params (:sort params [[(first pk-keys) :asc]])]
     (db/list-partitioned db table p-col-key
                          (assoc params :sort sort-params))))

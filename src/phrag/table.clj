@@ -1,4 +1,5 @@
 (ns phrag.table
+  "Table data handling for Phrag's GraphQL."
   (:require [clojure.string :as s]
             [clojure.pprint :as pp]
             [phrag.db :as db]

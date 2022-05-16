@@ -1,4 +1,5 @@
 (ns phrag.route
+  "Routes + handlders for reitit and bidi."
   (:require [clojure.walk :as w]
             [integrant.core :as ig]
             [ring.util.response :as ring-res]
@@ -22,7 +23,9 @@
   ["/graphql" {:post {:handler (rtt-gql-handler config)}
                :middleware (:middleware config)}])
 
-(defn reitit [options]
+(defn reitit
+  "Returns a route setup for reitit at: `/graphql`."
+  [options]
   (graphql-route (ctx/options->config (assoc options :router :reitit))))
 
 (defmethod ig/init-key ::reitit [_ options]
@@ -41,7 +44,9 @@
 (defmethod graphql-route :bidi [config]
   ["/" {"graphql" {:post (bd-gql-handler config)}}])
 
-(defn bidi [options]
+(defn bidi
+  "Returns a route setup for Bidi at: `/graphql`."
+  [options]
   (graphql-route (ctx/options->config (assoc options :router :bidi))))
 
 (defmethod ig/init-key ::bidi [_ options]
