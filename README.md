@@ -1,264 +1,70 @@
 # Phrag
 
-**RDBMS Connection to GraphQL with Interceptors**
+**GraphQL from a RDBMS Connection**
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg)
 
-Phrag creates a GraphQL handler of CRUD operations from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys.
+### Overview
 
-All tables become queryable as root objects containing nested objects of `has-one` / `has-many` relationships. Mutations (`create`, `update` and `delete`) are also created per tables with primary keys as their identifiers.
+**Instantly Operational**: Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. All needed is a [database](#requirements).
 
-In addition, Phrag comes with an interceptor capability to control behaviors of GraphQL. Custom functions can be configured before & after DB accesses per GraphQL operations, which can make GraphQL more practical with things like access control and event firing per resource queries/mutations.
+**CRUD / SQL Features**: all tables become queryable as root objects containing nested objects of [relationships](docs/mechanism.md#relationships). [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per tables. Additionally, [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) are supported for query operations.
 
-### Features:
+**Customization**: Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per tables and operation types, which can make GraphQL more practical with access control, event firing and more.
 
-- CRUD operations (`query` and `create`/`update`/`delete` mutations) created per resource with [Lacinia](https://github.com/walmartlabs/lacinia).
+**Performance in Mind**: Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
-- `One-to-one`, `one-to-many` and `many-to-many` relationships supported as nested query objects.
+### Documentation
 
-- Data loader (query batching) to avoid N+1 problem for nested queries, leveraging [superlifter](https://github.com/seancorfield/honeysql) and [Urania](https://github.com/funcool/urania)
+- [Mechanism](docs/mechanism.md)
 
-- [Aggregation queries](#aggregation) for root entity and has-many relationships.
+- [Configuration](docs/config.md)
 
-- [Filtering](#filtering), [sorting](#sorting) and [pagination](#pagination) as arguments in query operations.
+- [Interceptors](docs/interceptor.md)
 
-- [Interceptor signals](#interceptor-signals) to inject custom logics before/after DB accesses per resource operations.
+- [SQL Features](docs/sql_feature.md)
 
-- Automatic route wiring for [reitit](https://github.com/metosin/reitit) and [bidi](https://github.com/juxt/bidi).
+- [Performance](docs/performance.md)
 
-- GraphQL IDE (like GraphiQL) connectable through introspection.
+- [Development](docs/development.md)
+
+Example projects:
+
+- [SNS](https://github.com/ykskb/situated-sns-backend): a situated project to verify Phrag's concept and practicality. It has authentication, access control and custom logics through Phrag's interceptors.
+
+### Requirements
+
+Here's a quick view of database constructs which are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
+
+- **Primary keys**: Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
+
+- **Foreign keys**: Phrag translates foreign keys to nested properties in GraphQL objects.
+
+- **Indices on foreign key columns**: Phrag queries a database by origin and destination columns of foreign keys for nested objects. It should be noted that creating a foreign key does not index those columns.
+
+> #### Notes
+>
+> - Supported databases are SQLite and PostgreSQL.
+>
+> - If PostgreSQL is used, Phrag queries tables such as `key_column_usage` and `constraint_column_usage` to retrieve PK / FK info, therefore the database user provided to Phrag needs to be identical to the one that created those keys.
+>
+> - Not all database column types are mapped to Phrag's GraphQL fields yet. Any help would be appreciated through issues and PRs.
 
 ### Usage
 
-Create a ring app with reitit using Integrant
+Phrag's GraphQL can be invoked as a function, [reitit](https://github.com/metosin/reitit) route or [Bidi](https://github.com/juxt/bidi) route. Database (`:db`) is the only required parameter in `config`, but there are many more configurable options. Please refer to [config doc](docs/config.md) for details.
+
+Function:
 
 ```clojure
-{:phrag.route/reitit {:db (ig/ref :my-db/connection)}
- ::app {:routes (ig/ref :phrag.core/reitit)}}
+(let [schema (phrag/schema config)]
+  (phrag/exec config schema query vars req))
 ```
 
-### Notes:
-
-- Supported databases are SQLite and PostgreSQL.
-
-- This project is currently in POC/brush-up stage for a real project usage, so it's not been published to Clojars yet.
-
-- Not all database column types are mapped to GraphQL fields yet. Any help would be appreciated through issues and PRs.
-
-### Config
-
-Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
-
-##### Parameters
-
-| Key                  | description                                                                                                               | Required | Default Value |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
-| `:db`                | Database connection object.                                                                                               | Yes      |               |
-| `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                                      | No       |               |
-| `:signals`           | Map of singal functions per resources. Plz check [Interceptor Signals](#interceptor-signals) for details.                 | No       |               |
-| `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Interceptor Signals](#interceptor-signals) for details. | No       |               |
-| `:default-limit`     | Default number for SQL `LIMIT` value to be applied when there's no `:limit` argument is specified in a query.             | No       | `nil`         |
-| `:use-aggregation`   | `true` if aggregation is desired on root entity queries and has-many relationships.                                       | No       | `true`        |
-| `:scan-schema`       | `true` if DB schema scan is desired for resources in GraphQL.                                                             | No       | `true`        |
-| `:no-fk-on-db`       | `true` if there's no foreign key is set on DB and relationship detection is desired from column/table names.              | No       | `false`       |
-| `:table-name-plural` | `true` if tables uses plural naming like `users` instead of `user`. Required when `:no-fk-on-db` is `true`.               | No       | `true`        |
-
-##### Schema Data
-
-By default, Phrag retrieves DB schema data from a DB connection and it is sufficient to construct GraphQL. Yet it is also possible to provide custom schema data, which can be useful to exclude certain tables, columns and/or relationships from specific tables. Custom schema data can be specified as a list of tables under `:tables` key in the config map.
-
-```edn
-{:tables [
-   {:name "users"
-    :columns [{:name "id"
-       	       :type "int"
-               :notnull 0
-               :dflt_value nil}
-              {:name "image_id"
-               :type "int"
-               :notnull 1
-               :dflt_value 1}
-	           ;; ... more columns
-	           ]
-    :fks [{:table "images" :from "image_id" :to "id"}]
-    :pks [{:name "id" :type "int"}]}
-    ;; ... more tables
-    ]}
-```
-
-##### Table Data Details:
-
-| Key        | Description                                                                                      |
-| ---------- | ------------------------------------------------------------------------------------------------ |
-| `:name`    | Table name.                                                                                      |
-| `:columns` | List of columns. A column can contain `:name`, `:type`, `:notnull` and `:dflt_value` parameters. |
-| `:fks`     | List of foreign keys. A foreign key can contain `:table`, `:from` and `:to` parameters.          |
-| `:pks`     | List of primary keys. A primary key can contain `:name` and `:type` parameters.                  |
-
-> Notes:
->
-> - When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
-> - When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
-
-### Interceptor Signals
-
-Phrag can signal configured functions per resource queries/mutations at pre/post-operation time. This is where things like access controls or custom business logics can be configured. Signal functions are called with different parameters as below:
-
-##### Pre-operation Interceptor Function
-
-| Type   | Signal function receives (as first parameter):                             | Returned value will be:                |
-| ------ | -------------------------------------------------------------------------- | -------------------------------------- |
-| query  | SQL parameter map: `{:select #{} :where [] :sort [] :offset 0 :limit 100}` | Passed to subsequent query operation.  |
-| create | Submitted mutation parameters                                              | Passed to subsequent create operation. |
-| update | Submitted mutation parameters                                              | Passed to subsequent update operation. |
-| delete | Submitted mutation parameters                                              | Passed to subsequent delete operation. |
-
-> Notes:
->
-> - `query` signal functions for matching table will be called in nested queries (relations) as well.
-> - `:where` and `:limit` parameter for `query` operation are in [HoneySQL](https://github.com/seancorfield/honeysql) format.
-
-##### Post-operation Interceptor Function
-
-| Type   | Signal function receives (as a first parameter):   | Returned value will be:  |
-| ------ | -------------------------------------------------- | ------------------------ |
-| query  | Result value(s) returned from query operation.     | Passed to response body. |
-| create | Primary key object of created item: e.g. `{:id 3}` | Passed to response body. |
-| update | Result object: `{:result true}`                    | Passed to response body. |
-| delete | Result object: `{:result true}`                    | Passed to response body. |
-
-##### All Interceptor Functions
-
-All receiver functions will have a context map as its second argument. It'd contain a signal context specified in a Phrag config (`:signal-ctx`) together with a DB connection (`:db`) and an incoming HTTP request (`:req`).
-
-##### Examples
+Reitit route in an Integrant config map:
 
 ```clojure
-(defn- end-user-access
-  "Users can query only his/her own user info"
-  [sql-args ctx]
-  (let [user (user-info (:req ctx))]
-    (if (admin-user? user))
-      sql-args
-      (update sql-args :where conj [:= :user_id (:id user)])))
-
-(defn- hide-internal-id
-  "Removes internal-id for non-admin users"
-  [result ctx]
-  (let [user (user-info (:req ctx))]
-    (if (admin-user? user))
-      result
-      (update result :internal-id nil)))
-
-(defn- update-owner
-  "Updates created_by with accessing user's id"
-  [args ctx]
-  (let [user (user-info (:req ctx))]
-    (if (end-user? user)
-      (assoc args :created_by (:id user))
-      args)))
-
-;; Multiple signal function can be specified as a vector.
-
-(def example-config
-  {:signals {:all [check-user-auth check-user-role]
-             :users {:query {:pre end-user-access
-                             :post hide-internal-id}
-                     :create {:pre update-owner}
-                     :update {:pre update-owner}}}})
+{:phrag.route/reitit {:db (ig/ref :sql/datasource)} }
 ```
-
-> Notes:
->
-> - `:all` can be used at each level of signal map to run signal functions across all tables, all operations for a table, or both timing for a specific operation.
-
-### Filtering
-
-Format of `where: {column-a: {operator: value} column-b: {operator: value}}` is used in arguments for filtering. `AND` / `OR` group can be created as clause lists in `and` / `or` parameter under `where`. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
-
-> - Supported operators are `eq`, `ne`, `gt`, `lt`, `gte`, `lte`, `in` and `like`.
-> - Multiple filters are applied with `AND` operator.
-
-##### Example:
-
-`{users (where: {name: {like: "%ken%"} or: [{age: {eq: 20}}, {age: {eq: 21}}]})}` (`users` where `name` is `like` `ken` `AND` `age` is `20` `OR` `21`)
-
-### Sorting
-
-Format of `sort: {[column]: [asc or desc]}` is used in query arguments for sorting. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
-
-##### Example:
-
-`sort: {id: asc}` (sort by `id` column in ascending order)
-
-### Pagination
-
-Formats of `limit: [count]` and `offset: [count]` are used in query arguments for pagination. Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
-
-> - `limit` and `offset` can be used independently.
-> - Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
-
-##### Example
-
-`(where: {id: {gt: 20}} limit: 25)` (25 items after/greater than `id`:`20`).
-
-### Aggregation
-
-`avg`, `count`, `max`, `min` and `sum` are supported and it can also be [filtered](#resource-filtering). Actual formats can be checked through the introspection on UI such as GraphiQL once you run Phrag.
-
-##### Example
-
-`cart_items_aggregate (where: {cart_id: {eq: 1}}) {count max {price} min {price} avg {price} sum {price}}` (queries `count` of `cart_items` together with `max`, `min` `sum` and `avg` of `price` where `cart_id` is `1`).
-
-### Environment
-
-To begin developing, start with a REPL.
-
-```sh
-lein repl
-```
-
-Then load the development environment with reitit example.
-
-```clojure
-user=> (dev-reitit)
-:loaded
-```
-
-Run `go` to prep and initiate the system.
-
-```clojure
-dev=> (go)
-:initiated
-```
-
-By default this creates a web server at <http://localhost:3000>.
-
-When you make changes to your source files, use `reset` to reload any
-modified files and reset the server.
-
-```clojure
-dev=> (reset)
-:reloading (...)
-:resumed
-```
-
-### Testing
-
-Testing is fastest through the REPL, as you avoid environment startup
-time.
-
-```clojure
-dev=> (test)
-...
-```
-
-But you can also run tests through Leiningen.
-
-```sh
-lein eftest
-```
-
-## Legal
 
 Copyright © 2021 Yohei Kusakabe

@@ -30,38 +30,53 @@
       (s/replace from #"_id" "")
       (str from "_" (inf/singular (:table fk))))))
 
+(defn- nest-fk [rel-type table-key fk]
+  (-> (reduce-kv (fn [m k v] (assoc m k (keyword v))) {} fk)
+      (assoc :from-table table-key)
+      (assoc :type rel-type)))
+
 (defn- relation-context-per-table [table]
   (let [fks (:fks table)
         ;; assoc has-one on FK origin table
-        origin-fields (set (map #(keyword (has-one-field %)) fks))
-        origin-columns (set (map #(keyword (:from %)) fks))
-        has-one-mapped {:fields {(:name table) origin-fields}
-                        :columns {(:name table) origin-columns}}]
+        tbl-key (keyword (:name table))
+        has-one (reduce (fn [m fk]
+                          (let [has-1-fld (keyword (has-one-field fk))]
+                               (-> m
+                                   (update-in [:fields tbl-key] conj has-1-fld)
+                                   (update-in [:columns tbl-key] conj
+                                              (keyword (:from fk)))
+                                   (assoc-in [:nest-fks tbl-key has-1-fld]
+                                             (nest-fk :has-one tbl-key fk)))))
+                        {:fields {tbl-key #{}}
+                         :columns {tbl-key #{}}
+                         :nest-fks {tbl-key {}}}
+                        fks)]
     ;; assoc has-many inverse relation on FK destination tables
     (reduce
      (fn [m fk]
        (let [has-many-key (keyword (has-many-field table fk))
              has-many-aggr-key (keyword (str (name has-many-key) "_aggregate"))
-             to-col-key #{(keyword (:to fk))}]
+             to-col-key #{(keyword (:to fk))}
+             to-tbl-key (keyword (:table fk))
+             n-fk (nest-fk :has-many tbl-key fk)
+             n-aggr-fk (nest-fk :has-many-aggr tbl-key fk)]
          {:fields (merge-with into (:fields m)
-                              {(:table fk) #{has-many-key has-many-aggr-key}})
-          :columns (merge-with into (:columns m) {(:table fk) to-col-key})}))
-     has-one-mapped
+                              {to-tbl-key #{has-many-key has-many-aggr-key}})
+          :columns (merge-with into (:columns m) {to-tbl-key to-col-key})
+          :nest-fks (-> (:nest-fks m)
+                        (assoc-in [to-tbl-key has-many-key] n-fk)
+                        (assoc-in [to-tbl-key has-many-aggr-key] n-aggr-fk))}))
+     has-one
      fks)))
 
 (defn- relation-context [tables]
   (reduce (fn [m table]
             (let [rel-ctx (relation-context-per-table table)]
               {:fields (merge-with into (:fields m) (:fields rel-ctx))
-               :columns (merge-with into (:columns m) (:columns rel-ctx))}))
-          {:fields {} :columns {}}
+               :columns (merge-with into (:columns m) (:columns rel-ctx))
+               :nest-fks (merge-with merge (:nest-fks m) (:nest-fks rel-ctx))}))
+          {:fields {} :columns {} :nest-fks {}}
           tables))
-
-(defn- relation-name-set [tables]
-  (let [rel-ctx (relation-context tables)]
-    (reduce-kv (fn [s _table rels]
-                 (into s rels))
-               #{} (:fields rel-ctx))))
 
 ;;; Schema Context
 
@@ -105,9 +120,31 @@
                  (assoc m k (fk-context k v table table-map rel-ctx)))
                {} fk-map)))
 
+;;; Signal functions
+
+(defn- conj-items [v]
+  (reduce (fn [v fns]
+            (if (coll? fns)
+              (into v fns)
+              (conj v fns)))
+          [] v))
+
+(defn- signal-per-table
+  "Signal functions per resource and operation."
+  [signal-map table-key op]
+  (let [all-tbl-fns (:all signal-map)
+        all-op-fns (get-in signal-map [table-key :all])
+        all-timing-fns (get-in signal-map [table-key op :all])
+        pre-fns (get-in signal-map [table-key op :pre])
+        post-fns (get-in signal-map [table-key op :post])]
+    {:pre (filter fn? (conj-items [all-tbl-fns all-op-fns
+                                   all-timing-fns pre-fns]))
+     :post (filter fn? (conj-items [all-tbl-fns all-op-fns
+                                    all-timing-fns post-fns]))}))
+
 ;;; Lacinia Schema Context from Table Data
 
-(defn- update-tables [table-map rel-ctx]
+(defn- update-tables [table-map rel-ctx signals]
   (reduce-kv
    (fn [m k table]
      (let [table-name (:name table)
@@ -125,48 +162,45 @@
                   (assoc :lcn-mut-keys (fld/lcn-mut-keys table-name))
                   (assoc :lcn-descs (fld/lcn-descs table-name))
                   (assoc :lcn-fields (fld/lcn-fields table obj-keys pk-keys))
-                  (assoc :rel-flds (get-in rel-ctx [:fields table-name]))
-                  (assoc :rel-cols (get-in rel-ctx [:columns table-name]))))))
+                  (assoc :rel-flds (get-in rel-ctx [:fields k]))
+                  (assoc :rel-cols (get-in rel-ctx [:columns k]))
+                  (assoc :rels (get-in rel-ctx [:rels k]))
+                  (assoc :query-signals (signal-per-table signals k :query))
+                  (assoc :create-signals (signal-per-table signals k :create))
+                  (assoc :delete-signals (signal-per-table signals k :delete))
+                  (assoc :update-signals (signal-per-table signals k :update))))))
    {} table-map))
 
 (defn- schema-context
   "Compiles resource names, Lacinia fields and relationships from table data."
-  [tables]
-  (let [table-map (zipmap (map #(keyword (:name %)) tables) tables)
-        rel-ctx (relation-context tables)]
-    (update-tables table-map rel-ctx)))
+  [tables rel-ctx signals]
+  (let [table-map (zipmap (map #(keyword (:name %)) tables) tables)]
+    (update-tables table-map rel-ctx signals)))
 
 (def ^:no-doc init-schema {:enums fld/sort-op-enum
                            :input-objects fld/filter-input-objects
                            :objects fld/result-object
                            :queries {}})
 
-(defn- sl-config
-  "Creates a bucket config for Superlifter.
-  It needs to include all the nested object keys for relationships."
-  [tables db]
-  (let [buckets (reduce (fn [m bucket-name]
-                          (assoc m (keyword bucket-name)
-                                 {:triggers {:elastic {:threshold 0}}}))
-                        {:default {:triggers {:elastic {:threshold 0}}}}
-                        (relation-name-set tables))]
-    {:buckets buckets
-     :urania-opts {:env {:db db}}}))
-
-(defn options->config [options]
-  (let [config {:router (:router options)
+(defn options->config
+  "Creates a config map from user-provided options."
+  [options]
+  (let [signals (:signals options)
+        config {:router (:router options)
                 :db (:db options)
                 :tables (:tables options)
-                :signals (:signals options)
+                :signals signals
                 :signal-ctx (:signal-ctx options)
                 :middleware (:middleware options)
                 :scan-schema (:scan-schema options true)
                 :default-limit (:default-limit options)
+                :max-nest-level (:max-nest-level options)
                 :no-fk-on-db (:no-fk-on-db options false)
                 :plural-table-name (:plural-table-name options true)
                 :use-aggregation (:use-aggregation options true)}
-        db-scm (tbl/db-schema config)]
+        db-scm (tbl/db-schema config)
+        rel-ctx (relation-context db-scm)]
     (-> config
-        (assoc :tables (schema-context db-scm))
-        (assoc :sl-config (sl-config db-scm (:db options))))))
+        (assoc :relation-ctx rel-ctx)
+        (assoc :tables (schema-context db-scm rel-ctx signals)))))
 

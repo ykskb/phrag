@@ -297,7 +297,8 @@
       (test-gql (str  "{ members { first_name member_follows_on_created_by "
                       "{ member { first_name }}"
                       "member_follows_on_created_by_aggregate { count "
-                      "max { member_id created_by } min { member_id created_by }}}}")
+                      "max { member_id created_by } "
+                      "min { member_id created_by }}}}")
                 [:data :members]
                 [{:first_name "jim"
                   :member_follows_on_created_by
@@ -339,9 +340,6 @@
                 {:member_id 1 :created_by 2}))
 
     (testing "list both entities of circular many-to-many relationship"
-      (prn (str "{ members { first_name member_follows_on_created_by "
-                "{ member { first_name }} "
-                "member_follow_on_member_id { member { first_name }}}}"))
       (test-gql (str "{ members { first_name "
                      "member_follows_on_created_by { member { first_name }} "
                      "member_follows_on_member_id { created_by_member "
@@ -531,3 +529,83 @@
         (is (= (:message (first (:errors res)))
                "These SQL clauses are unknown or have nil values: :set"))))))
 
+(deftest graphql-config
+  (let [db (if (env :test-on-postgres)
+             (postgres-conn)
+             (sqlite-conn))
+        opt {:db db
+             :default-limit 2
+             :max-nest-level 2}
+        conf (ctx/options->config opt)
+        schema (core/schema conf)
+        test-gql (fn [q res-keys expected]
+                   (let [res (core/exec conf schema q nil {})]
+                     (prn res)
+                     (is (= expected (get-in res res-keys)))))]
+
+    (testing "create 1st venue"
+      (test-gql (str "mutation {createVenue (name: \"office one\" "
+                     "postal_code: \"123456\") { vid }}")
+                [:data :createVenue :vid] 1))
+
+    (testing "create 2nd venue"
+      (test-gql (str "mutation {createVenue (name: \"city hall\" "
+                     "postal_code: \"234567\") { vid }}")
+                [:data :createVenue :vid] 2))
+
+    (testing "create 3rd venue"
+      (test-gql (str "mutation {createVenue (name: \"city square\" "
+                     "postal_code: \"34567\") { vid }}")
+                [:data :createVenue :vid] 3))
+
+    (testing "create 1st meetup under venue 3"
+      (test-gql (str "mutation {createMeetup (title: \"rust meetup\" "
+                     "start_at: \"2021-01-01 18:00:00\" venue_id: 3) { id }}")
+                [:data :createMeetup :id] 1))
+
+    (testing "create 2nd meetup under venue 3"
+      (test-gql (str "mutation {createMeetup (title: \"cpp meetup\" "
+                     "start_at: \"2021-01-12 18:00:00\" venue_id: 3) { id }}")
+                [:data :createMeetup :id] 2))
+
+    (testing "create 3nd meetup under venue 3"
+      (test-gql (str "mutation {createMeetup (title: \"erlang meetup\" "
+                     "start_at: \"2021-09-29 18:00:00\" venue_id: 3) { id }}")
+                [:data :createMeetup :id] 3))
+
+    (testing "default limit of 2 is applied for root entities"
+      (test-gql  (str "{ meetups { id title start_at venue_id "
+                      "venue { vid name }}}")
+                 [:data :meetups]
+                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}
+                  {:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}]))
+
+    (testing "override limit of 3 is applied for root entities"
+      (test-gql  (str "{ meetups (limit: 3) { id title start_at venue_id "
+                      "venue { vid name }}}")
+                 [:data :meetups]
+                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}
+                  {:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}
+                  {:id 3 :title "erlang meetup" :start_at "2021-09-29 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}]))
+
+    (testing "nest level of 1 works while max nest level is 2"
+      (test-gql  (str "{ meetups { id title start_at venue_id "
+                      "venue { vid name }}}")
+                 [:data :meetups]
+                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}
+                  {:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
+                   :venue_id 3 :venue {:vid 3 :name "city square"}}]))
+
+    (testing "max nest level of 2 throws an exception"
+      (let [q (str "{ meetups { id title start_at venue_id "
+                   "venue { vid name meetups { id title venue { vid }}}}}")
+            res (core/exec conf schema q nil {})]
+        (is (= (get-in res [:data :meetups]) nil))
+        (is (= (:message (first (:errors res)))
+               "Exceeded maximum nest level."))))))

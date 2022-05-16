@@ -126,7 +126,6 @@
         q (if (not-empty whr) (apply h/where q whr) q)
         q (if (not-empty sorts) (apply h/order-by q sorts) q)]
     ;; (println (sql/format q))
-    ;; (prn db)
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
            (jdbc/query conn)))))
@@ -142,11 +141,10 @@
                   (h/from table))
         sub-q (if (not-empty whr) (apply h/where sub-q whr) sub-q)
         pid-gt (:offset params 0)
-        pid-lte (+ pid-gt (:limit params 100))
         q (cond-> (apply h/select selects)
               true (h/from [sub-q :sub])
               (:offset params) (h/where [:> :p_id pid-gt])
-              (:limit params) (h/where [:<= :p_id pid-lte]))]
+              (:limit params) (h/where [:<= :p_id (+ pid-gt (:limit params))]))]
     ;; (println (sql/format q))
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
@@ -161,7 +159,7 @@
             (:limit params) (h/limit (:limit params))
             (:offset params) (h/offset (:offset params)))
         q (if (not-empty whr) (apply h/where q whr) q)]
-    ;;(println (sql/format q))
+    ;; (println (sql/format q))
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
            (jdbc/query conn)))))
@@ -175,7 +173,7 @@
               (h/from table)
               (h/group-by grp-by))
         q (if (not-empty whr) (apply h/where q whr) q)]
-    ;;(println (sql/format q))
+    ;; (println (sql/format q))
     (jdbc/with-db-connection [conn db]
       (->> (sql/format q)
            (jdbc/query conn)))))

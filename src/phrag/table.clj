@@ -68,6 +68,15 @@
                              cfg-tables)]
     (concat merged cfg-tbl-diff)))
 
+(defn- validate-tables [tables]
+  (reduce (fn [v table]
+            (if (or (< (count (:columns table)) 1)
+                    (< (count (:pks table)) 1))
+              (do (log :warn "No column or primary key for table:" (:name table))
+                  v)
+              (conj v table)))
+          [] tables))
+
 (defn db-schema
   "Conditionally retrieves DB schema data from a DB connection and merge table
   data provided into config if there's any."
@@ -80,4 +89,4 @@
                 (:no-fk-on-db config) (update-fks-by-names config)))]
     (log :debug "Origin DB schema:\n"
          (with-out-str (pp/pprint scm)))
-    scm))
+    (validate-tables scm)))

@@ -100,7 +100,8 @@
 
     (testing "scan DB with fk: additional config table data"
       (let [extra-table {:name "extra"
-                         :columns [{:name "extra-column" :type "extra-type"}]}]
+                         :columns [{:name "extra-column" :type "extra-type"}]
+                         :pks [{:name "extra-column" :type "extra-type"}]}]
         (schema-as-expected?
          [members
           groups
@@ -192,7 +193,7 @@
         meetups-fk-detection
         meetups-members]
        (tbl/db-schema {:db db
-                            :scan-schema true
-                            :no-fk-on-db true
-                            :plural-table-name true
-                            :tables []})))))
+                       :scan-schema true
+                       :no-fk-on-db true
+                       :plural-table-name true
+                       :tables []})))))
