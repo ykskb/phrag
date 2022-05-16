@@ -5,6 +5,8 @@
   :dependencies [[org.clojure/clojure "1.10.3"]
                  [org.clojure/java.jdbc "0.7.12"]
                  [org.clojure/tools.logging "0.3.1"]
+                 [org.postgresql/postgresql "42.3.0"]
+                 [org.xerial/sqlite-jdbc "3.34.0"]
                  [com.github.seancorfield/honeysql "2.0.0-rc3"]
                  [com.walmartlabs/lacinia "0.39-alpha-9"]
                  [ring/ring-core "1.9.3"]
