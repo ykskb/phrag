@@ -12,6 +12,7 @@
                  [environ "1.2.0"]
                  [camel-snake-kebab "0.4.2"]
                  [inflections "0.13.2"]
+                 [integrant "0.8.0"]
                  [superlifter "0.1.3"]]
   :plugins [[lein-eftest "0.5.9"]
             [lein-cloverage "1.2.2"]]
