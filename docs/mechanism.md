@@ -1,4 +1,4 @@
-## Mechanism of Phrag
+## Mechanism
 
 ## Queries
 

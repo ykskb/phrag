@@ -1,4 +1,4 @@
-# SQL Features in Phrag
+# SQL Features
 
 ### Filtering
 

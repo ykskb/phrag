@@ -1,4 +1,4 @@
-# Config for Phrag
+# Configuration
 
 Though there are multiple options for customization, the only config parameter required for Phrag is a database connection.
 
