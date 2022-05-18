@@ -16,24 +16,6 @@
 
 ### Usage
 
-There are two ways to use Phrag:
-
-#### Stand-alone Version
-
-Instantly-runnable and suitable if a GraphQL is desired on your RDBMS without any authentication or custom logic. Also suitable for quickly running and playing around with Phrag's GraphQL.
-
-```sh
-docker run -it -p 3000:3000 \
--e JDBC_URL=jdbc:sqlite:path/to/db.sqlite \
-ykskb/phrag-standalone:latest
-```
-
-Phrag's docker image is ready to connect to your database with a single command. Here's the [repository](https://github.com/ykskb/phrag-standalone) for more options.
-
-#### Library Use Case
-
-Suitable if authentication, access control or any other custom logic is desired per GraphQL operations.
-
 Phrag's GraphQL can be invoked as a function, [reitit](https://github.com/metosin/reitit) route or [Bidi](https://github.com/juxt/bidi) route. Database (`:db`) is the only required parameter in `config`, but there are many more configurable options. Please refer to [configuration doc](docs/config.md) for details.
 
 Function:
@@ -47,6 +29,18 @@ Reitit route in an Integrant config map:
 
 ```clojure
 {:phrag.route/reitit {:db (ig/ref :sql/datasource)} }
+```
+
+#### Stand-alone Version
+
+There is also a stand-alone version of Phrag which is instantly-runnable. It's suitable if a GraphQL is desired on your RDBMS without any custom logic or if one wants to play around with Phrag's GraphQL.
+
+Phrag's docker image is ready to connect to your database with a single command as below. Here's the [repository](https://github.com/ykskb/phrag-standalone) for more options.
+
+```sh
+docker run -it -p 3000:3000 \
+-e JDBC_URL=jdbc:sqlite:path/to/db.sqlite \
+ykskb/phrag-standalone:latest
 ```
 
 ### Requirements
