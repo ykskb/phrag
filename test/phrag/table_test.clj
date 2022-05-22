@@ -6,6 +6,8 @@
             [phrag.core-test :refer [sqlite-conn]]
             [phrag.table :as tbl]))
 
+;; Schema data validation
+
 (defn- subset-maps? [expected subject id-key]
   (let [exp-map (zipmap (map id-key expected) expected)
         sbj-map (zipmap (map id-key subject) subject)]
@@ -16,6 +18,7 @@
 (defn- schema-as-expected? [expected subject]
   (let [exp-map (zipmap (map :name expected) expected)
         sbj-map (zipmap (map :name subject) subject)]
+    (is (not (or (nil? subject) (empty? subject))))
     (every? (fn [[sbj-tbl-name sbj-tbl]]
               (let [exp-tbl (get exp-map sbj-tbl-name)]
                 (every? (fn [k]
@@ -40,7 +43,6 @@
              {:name "first_name" :type "text"}
              {:name "last_name" :type "text"}
              {:name "email" :type "text"}]
-   :table-type :root
    :fks []
    :pks [{:name "id" :type "integer"}]})
 
@@ -49,7 +51,6 @@
    :columns [{:name "id" :type "integer"}
              {:name "name" :type "text"}
              {:name "created_at" :type "timestamp"}]
-   :table-type :root
    :fks []
    :pks [{:name "id" :type "integer"}]})
 
@@ -58,7 +59,6 @@
    :columns [{:name "vid" :type "integer"}
              {:name "name" :type "text"}
              {:name "postal_code" :type "text"}]
-   :table-type :root
    :fks []
    :pks [{:name "vid" :type "integer"}]})
 
@@ -69,7 +69,6 @@
              {:name "start_at" :type "timestamp"}
              {:name "venue_id" :type "int"}
              {:name "group_id" :type "int"}]
-   :table-type :root
    :fks [{:table "venues" :from "venue_id" :to "vid"}
          {:table "groups" :from "group_id" :to "id"}]
    :pks [{:name "id" :type "integer"}]})
@@ -78,7 +77,6 @@
   {:name "meetups_members"
    :columns [{:name "meetup_id" :type "int"}
              {:name "member_id" :type "int"}]
-   :table-type :pivot
    :fks [{:table "meetups" :from "meetup_id" :to "id"}
          {:table "members" :from "member_id" :to "id"}]
    :pks [{:name "meetup_id" :type "int"}
@@ -93,10 +91,11 @@
         venues
         meetups
         meetups-members]
-       (tbl/db-schema {:db db
-                            :scan-schema true
-                            :no-fk-on-db false
-                            :tables []})))
+       (-> (tbl/db-schema {:db db
+                           :scan-tables true
+                           :no-fk-on-db false
+                           :tables []})
+           :tables)))
 
     (testing "scan DB with fk: additional config table data"
       (let [extra-table {:name "extra"
@@ -109,10 +108,11 @@
           meetups
           meetups-members
           extra-table]
-         (tbl/db-schema {:db db
-                              :scan-schema true
-                              :no-fk-on-db false
-                              :tables [extra-table]}))))
+         (-> (tbl/db-schema {:db db
+                             :scan-tables true
+                             :no-fk-on-db false
+                             :tables [extra-table]})
+             :tables))))
 
     (testing "scan DB with fk: config table data to override"
       (let [venues-columns [{:name "id" :type "integer"}]
@@ -123,13 +123,42 @@
           (assoc venues :columns venues-columns)
           (assoc meetups :fks meetups-fks)
           meetups-members]
-         (tbl/db-schema {:db db
-                              :scan-schema true
-                              :no-fk-on-db false
-                              :tables [{:name "venues"
-                                        :columns venues-columns}
-                                       {:name "meetups"
-                                        :fks meetups-fks}]}))))))
+         (-> (tbl/db-schema {:db db
+                             :scan-tables true
+                             :no-fk-on-db false
+                             :tables [{:name "venues"
+                                       :columns venues-columns}
+                                      {:name "meetups"
+                                       :fks meetups-fks}]})
+             :tables))))))
+
+(def ^:private meetups-with-venues
+  {:name "meetup_with_venue"
+   :columns [{:name "id" :type "integer"}
+             {:name "title" :type "text"}
+             {:name "venue_id" :type "integer"}
+             {:name "venue_name" :type "text"}]
+   :fks []
+   :pks []})
+
+(deftest db-view-schema
+  (let [db (sqlite-conn)]
+    (testing "scan DB for view schema"
+      (schema-as-expected?
+       [meetups-with-venues]
+       (-> (tbl/db-schema {:db db
+                           :scan-tables true
+                           :scan-views true
+                           :no-fk-on-db false
+                           :tables []})
+           :views)))
+
+    (testing "views not scanned for config false"
+      (let [scm (tbl/db-schema {:db db
+                                :scan-tables true
+                                :scan-views false})]
+        (is (empty? (:views scm)))
+        (is (not-empty (:tables scm)))))))
 
 (defn db-without-fk []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
@@ -192,8 +221,9 @@
         venues-fk-detection
         meetups-fk-detection
         meetups-members]
-       (tbl/db-schema {:db db
-                       :scan-schema true
-                       :no-fk-on-db true
-                       :plural-table-name true
-                       :tables []})))))
+       (-> (tbl/db-schema {:db db
+                           :scan-tables true
+                           :no-fk-on-db true
+                           :plural-table-name true
+                           :tables []})
+           :tables)))))

@@ -2,7 +2,9 @@
 
 ## Queries
 
-All tables become queryable as root objects of GraphQL in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at root level or as a nested object together with parent objects through relationships.
+All tables and/or views become queryable as root objects of GraphQL in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at root level or as a nested object together with parent objects through relationships.
+
+In terms of query format, Phrag does not use [cursor connection](https://relay.dev/graphql/connections.htm). It is an intentional design decision since Phrag features universal argument interfaces for filtering and pagination across root queries and nested objects.
 
 ### Relationships
 

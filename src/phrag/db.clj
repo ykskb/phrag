@@ -33,6 +33,7 @@
     :else nil))
 
 (defmulti table-names (fn [db & _] (db-type db)))
+(defmulti view-names (fn [db & _] (db-type db)))
 (defmulti column-info (fn [db & _] (db-type db)))
 (defmulti foreign-keys (fn [db & _] (db-type db)))
 (defmulti primary-keys (fn [db & _] (db-type db)))
@@ -43,6 +44,11 @@
                           "WHERE type = 'table' "
                           "AND name NOT LIKE 'sqlite%' "
                           "AND name NOT LIKE '%migration%';"))))
+
+(defmethod view-names :sqlite [db]
+  (jdbc/with-db-connection [conn db]
+    (jdbc/query conn (str "SELECT name FROM sqlite_master "
+                          "WHERE type = 'view';"))))
 
 (defmethod column-info :sqlite [db table]
   (jdbc/with-db-connection [conn db]
@@ -57,13 +63,31 @@
             (if (> (:pk col) 0) (conj v col) v))
           [] (column-info db table)))
 
+;;; PostgreSQL
+
+(defn- current-schema [db]
+  (cond
+    (:connection db) (.getSchema (:connection db))
+    (:datasource db) (-> (.getDataSourceProperties (:datasource db))
+                         (.getProperty "currentSchema"))
+    :else "public"))
+
 (defmethod table-names :postgres [db]
-  (jdbc/with-db-connection [conn db]
-    (jdbc/query conn (str "SELECT table_name AS name "
-                          "FROM information_schema.tables "
-                          "WHERE table_schema='public' "
-                          "AND table_type='BASE TABLE' "
-                          "AND table_name not like '%migration%';"))))
+  (let [schema-name (current-schema db)]
+    (jdbc/with-db-connection [conn db]
+      (jdbc/query conn (str "SELECT table_name AS name "
+                            "FROM information_schema.tables "
+                            "WHERE table_schema='" schema-name "' "
+                            "AND table_type='BASE TABLE' "
+                            "AND table_name not like '%migration%';")))))
+
+(defmethod view-names :postgres [db]
+  (let [schema-name (current-schema db)]
+    (jdbc/with-db-connection [conn db]
+      (jdbc/query conn (str "SELECT table_name AS name "
+                            "FROM information_schema.tables "
+                            "WHERE table_schema='" schema-name "' "
+                            "AND table_type='VIEW';")))))
 
 (defmethod column-info :postgres [db table]
   (jdbc/with-db-connection [conn db]
@@ -101,8 +125,8 @@
                           "WHERE constraint_type = 'PRIMARY KEY' "
                           "AND tc.table_name = '" table "';"))))
 
-(defn schema
-  "Queries DB schema including primary keys and foreign keys."
+(defn table-schema
+  "Queries table schema including primary keys and foreign keys."
   [db]
   (map (fn [table-name]
          {:name table-name
@@ -110,6 +134,14 @@
           :fks (foreign-keys db table-name)
           :pks (primary-keys db table-name)})
        (map :name (table-names db))))
+
+(defn view-schema
+  "Queries views with columns."
+  [db]
+  (map (fn [view-name]
+         {:name view-name
+          :columns (column-info db view-name)})
+       (map :name (view-names db))))
 
 ;; Resource queries
 

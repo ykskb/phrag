@@ -82,6 +82,14 @@ query queryMeetupsWithMembers($limit: Int!, $offset: Int!, $id_gt: Int!) {
 
 ### Results
 
+Application setup:
+
+- Server: Jetty (Ring)
+
+- Router: reitit
+
+Computation / storage resources:
+
 - Platform: AWS ECS Single Task Container
 - Database: AWS RDS PostgreSQL
   2vCPU + 1GB RAM (Free-tier of `db.t3.micro`)
@@ -124,7 +132,7 @@ Limit: `100`
 
 ### Observations
 
-- **Resource allocation**: performance roughly seems to have increased linear with the resource allocation overall and improvement was even more significant for nested queries.
+- **Resource allocation**: performance seems to have improved roughly linear with the resource allocation overall and improvement was even more significant for nested queries.
 
 - **Nest levels**: considering additional SQL queries and serialization required per nest level, `20%` to `50%` less performance per nest levels seems reasonable. However, with increased resources, performance drop with nested queries seems to be smaller. It was also observed that querying nested objects for `has-many` relationship affects performance more than `has-one` relationship, which indicates serialization and validation of retrieved records as per GraphQL schema is possibly the factor for larger latency and resource consumption.
 

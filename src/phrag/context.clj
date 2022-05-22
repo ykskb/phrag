@@ -144,43 +144,54 @@
 
 ;;; Lacinia Schema Context from Table Data
 
-(defn- update-tables [table-map rel-ctx signals]
-  (reduce-kv
-   (fn [m k table]
-     (let [table-name (:name table)
-           obj-keys (fld/lcn-obj-keys table-name)
-           pk-keys (tbl/pk-keys table)]
-       (assoc m k
-              (-> m
-                  (assoc :sgl-names (rsc-names table-name :singular))
-                  (assoc :plr-names (rsc-names table-name :plural))
-                  (assoc :col-keys (tbl/col-key-set table))
-                  (assoc :fks (fk-ctx-map table table-map rel-ctx))
-                  (assoc :pk-keys pk-keys)
-                  (assoc :lcn-obj-keys obj-keys)
-                  (assoc :lcn-qry-keys (fld/lcn-qry-keys table-name))
-                  (assoc :lcn-mut-keys (fld/lcn-mut-keys table-name))
-                  (assoc :lcn-descs (fld/lcn-descs table-name))
-                  (assoc :lcn-fields (fld/lcn-fields table obj-keys pk-keys))
-                  (assoc :rel-flds (get-in rel-ctx [:fields k]))
-                  (assoc :rel-cols (get-in rel-ctx [:columns k]))
-                  (assoc :rels (get-in rel-ctx [:rels k]))
-                  (assoc :query-signals (signal-per-table signals k :query))
-                  (assoc :create-signals (signal-per-table signals k :create))
-                  (assoc :delete-signals (signal-per-table signals k :delete))
-                  (assoc :update-signals (signal-per-table signals k :update))))))
-   {} table-map))
-
-(defn- schema-context
+(defn- table-schema-context
   "Compiles resource names, Lacinia fields and relationships from table data."
   [tables rel-ctx signals]
   (let [table-map (zipmap (map #(keyword (:name %)) tables) tables)]
-    (update-tables table-map rel-ctx signals)))
+    (reduce-kv
+     (fn [m k table]
+       (let [table-name (:name table)
+             obj-keys (fld/lcn-obj-keys table-name)
+             pk-keys (tbl/pk-keys table)]
+         (assoc
+          m k
+          (-> m
+              (assoc :sgl-names (rsc-names table-name :singular))
+              (assoc :plr-names (rsc-names table-name :plural))
+              (assoc :col-keys (tbl/col-key-set table))
+              (assoc :fks (fk-ctx-map table table-map rel-ctx))
+              (assoc :pk-keys pk-keys)
+              (assoc :lcn-obj-keys obj-keys)
+              (assoc :lcn-qry-keys (fld/lcn-qry-keys table-name))
+              (assoc :lcn-mut-keys (fld/lcn-mut-keys table-name))
+              (assoc :lcn-descs (fld/lcn-descs table-name))
+              (assoc :lcn-fields (fld/lcn-fields table obj-keys pk-keys))
+              (assoc :rel-flds (get-in rel-ctx [:fields k]))
+              (assoc :rel-cols (get-in rel-ctx [:columns k]))
+              (assoc :rels (get-in rel-ctx [:rels k]))
+              (assoc :query-signals (signal-per-table signals k :query))
+              (assoc :create-signals (signal-per-table signals k :create))
+              (assoc :delete-signals (signal-per-table signals k :delete))
+              (assoc :update-signals (signal-per-table signals k :update))))))
+     {} table-map)))
 
-(def ^:no-doc init-schema {:enums fld/sort-op-enum
-                           :input-objects fld/filter-input-objects
-                           :objects fld/result-object
-                           :queries {}})
+(defn- view-schema-context [views signals]
+  (let [view-map (zipmap (map #(keyword (:name %)) views) views)]
+    (reduce-kv
+     (fn [m k view]
+       (let [view-name (:name view)
+             obj-keys (fld/lcn-obj-keys view-name)]
+         (assoc m k
+                (-> m
+                    (assoc :sgl-names (rsc-names view-name :singular))
+                    (assoc :plr-names (rsc-names view-name :plural))
+                    (assoc :col-keys (tbl/col-key-set view))
+                    (assoc :lcn-obj-keys obj-keys)
+                    (assoc :lcn-qry-keys (fld/lcn-qry-keys view-name))
+                    (assoc :lcn-descs (fld/lcn-descs view-name))
+                    (assoc :lcn-fields (fld/lcn-fields view obj-keys nil))
+                    (assoc :query-signals (signal-per-table signals k :query))))))
+     {} view-map)))
 
 (defn options->config
   "Creates a config map from user-provided options."
@@ -192,15 +203,22 @@
                 :signals signals
                 :signal-ctx (:signal-ctx options)
                 :middleware (:middleware options)
-                :scan-schema (:scan-schema options true)
+                :scan-tables (:scan-tables options true)
+                :scan-views (:scan-views options true)
                 :default-limit (:default-limit options)
                 :max-nest-level (:max-nest-level options)
                 :no-fk-on-db (:no-fk-on-db options false)
                 :plural-table-name (:plural-table-name options true)
                 :use-aggregation (:use-aggregation options true)}
         db-scm (tbl/db-schema config)
-        rel-ctx (relation-context db-scm)]
+        rel-ctx (relation-context (:tables db-scm))]
     (-> config
         (assoc :relation-ctx rel-ctx)
-        (assoc :tables (schema-context db-scm rel-ctx signals)))))
+        (assoc :tables (table-schema-context (:tables db-scm) rel-ctx signals))
+        (assoc :views (view-schema-context (:views db-scm) signals)))))
+
+(def ^:no-doc init-schema {:enums fld/sort-op-enum
+                           :input-objects fld/filter-input-objects
+                           :objects fld/result-object
+                           :queries {}})
 

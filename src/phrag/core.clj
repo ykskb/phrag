@@ -141,11 +141,18 @@
              schema
              (:tables config)))
 
+(defn- update-views [schema config]
+  (reduce-kv (fn [m view-key view]
+               (assoc-query-objects m view-key view config))
+             schema
+             (:views config)))
+
 (defn schema
   "Creates Phrag's GraphQL schema in Lacinia format."
   [config]
   (let [scm-map (-> (root-schema config)
-                    (update-relationships config))]
+                    (update-relationships config)
+                    (update-views config))]
     (log :info "Generated queries: " (sort (keys (:queries scm-map))))
     (log :info "Generated mutations: " (sort (keys (:mutations scm-map))))
     (schema/compile scm-map)))

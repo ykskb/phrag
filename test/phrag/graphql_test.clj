@@ -13,9 +13,7 @@
   (let [db (if (env :test-on-postgres)
                  (postgres-conn)
                  (sqlite-conn))
-        opt {:db db
-             :scan-schema true
-             :use-aggregation true}
+        opt {:db db}
         conf (ctx/options->config opt)
         schema (core/schema conf)
         test-gql (fn [q res-keys expected]
@@ -446,7 +444,39 @@
       (test-gql  "{ members { id first_name }}"
                  [:data :members]
                  [{:id 2 :first_name "yoshi"}]))
-    ))
+
+    ;; View query
+    (testing "list meetups from view"
+      (test-gql (str "{ meetup_with_venues "
+                     "{ id title venue_id venue_name }}")
+                [:data :meetup_with_venues]
+                [{:id 1, :title "rust meetup" :venue_id 2
+                  :venue_name "city hall"}
+                 {:id 2, :title "cpp meetup" :venue_id 1
+                  :venue_name "office one"}])
+      (test-gql (str "{ meetup_with_venues "
+                     "(where: { venue_name: {eq: \"office one\"}}) "
+                     "{ id title venue_id venue_name }}")
+                [:data :meetup_with_venues]
+                [{:id 2, :title "cpp meetup" :venue_id 1
+                  :venue_name "office one"}])
+      (test-gql (str "{ meetup_with_venues "
+                     "(limit: 1, sort: {venue_id: asc}) "
+                     "{ id title venue_id venue_name }}")
+                [:data :meetup_with_venues]
+                [{:id 2, :title "cpp meetup" :venue_id 1
+                  :venue_name "office one"}]))
+
+    (testing "aggregate meetups from view"
+      (test-gql (str "{ meetup_with_venues_aggregate { count }}")
+                [:data :meetup_with_venues_aggregate]
+                {:count 2})
+      (test-gql (str "{ meetup_with_venues_aggregate { max { venue_id }}}")
+                [:data :meetup_with_venues_aggregate]
+                {:max {:venue_id 2}})
+      (test-gql (str "{ meetup_with_venues_aggregate { min { venue_id }}}")
+                [:data :meetup_with_venues_aggregate]
+                {:min {:venue_id 1}}))))
 
 ;;; Testing signals
 
@@ -491,7 +521,7 @@
                        :table-type :root
                        :fks []
                        :pks [{:name "id" :type "integer"}]}]
-             :scan-schema false
+             :scan-tables false
              :use-aggregation true
              :signal-ctx {:email "yoshi@test.com"
                           :first-name "changed-first-name"}

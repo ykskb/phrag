@@ -82,12 +82,18 @@
   "Conditionally retrieves DB schema data from a DB connection and merge table
   data provided into config if there's any."
   [config]
-  (let [scm (if (:scan-schema config)
-              (cond-> (db/schema (:db config))
-                true (merge-config-tables config)
-                (:no-fk-on-db config) (update-fks-by-names config))
-              (cond-> (:tables config)
-                (:no-fk-on-db config) (update-fks-by-names config)))]
-    (log :debug "Origin DB schema:\n"
-         (with-out-str (pp/pprint scm)))
-    (validate-tables scm)))
+  (let [tables (cond-> (if (:scan-tables config)
+                         (db/table-schema (:db config))
+                         (:tables config))
+                 (:scan-tables config) (merge-config-tables config)
+                 (:no-fk-on-db config) (update-fks-by-names config)
+                 true (validate-tables))
+        views (if (:scan-views config)
+                (db/view-schema (:db config))
+                nil)]
+    (log :debug "Origin DB table schema:\n"
+         (with-out-str (pp/pprint tables)))
+    (log :debug "Origin DB view schema:\n"
+         (with-out-str (pp/pprint views)))
+    {:tables tables
+     :views views}))

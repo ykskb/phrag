@@ -145,6 +145,15 @@
        "foreign key(member_id) references members(id), "
        "primary key (group_id, member_id));"))
 
+(def ^:private sqlite-meetups-with-venue-name
+  (str "create view meetup_with_venue as "
+       "select m.id, "
+       "m.title, "
+       "v.vid as venue_id, "
+       "v.name as venue_name "
+       "from meetups as m "
+       "join venues as v on m.venue_id = v.vid;"))
+
 (defn sqlite-conn []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
     (jdbc/execute! sqlite-members-table)
@@ -153,7 +162,8 @@
     (jdbc/execute! sqlite-meetups-table)
     (jdbc/execute! sqlite-member-follow-table)
     (jdbc/execute! sqlite-meetups-members-table)
-    (jdbc/execute! sqlite-groups-members-table)))
+    (jdbc/execute! sqlite-groups-members-table)
+    (jdbc/execute! sqlite-meetups-with-venue-name)))
 
 (defn sqlite-data-src []
   (let [data-src (delay (hkr/make-datasource
@@ -166,5 +176,6 @@
       (jdbc/execute! sqlite-meetups-table)
       (jdbc/execute! sqlite-member-follow-table)
       (jdbc/execute! sqlite-meetups-members-table)
-      (jdbc/execute! sqlite-groups-members-table))))
+      (jdbc/execute! sqlite-groups-members-table)
+      (jdbc/execute! sqlite-meetups-with-venue-name))))
 
