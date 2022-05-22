@@ -1,6 +1,6 @@
 # Interceptor Signals
 
-Phrag can signal configured functions per resource queries/mutations at pre/post-operation time. This is where things like access controls or custom business logics can be configured. Signal functions are called with different parameters as below:
+Phrag can signal configured functions per resource query/mutation at pre/post-operation time. This is where things like access controls or custom business logics can be configured. Signal functions are called with different parameters as below:
 
 ### Pre-operation Interceptor Function
 

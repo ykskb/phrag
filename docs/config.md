@@ -8,7 +8,7 @@ Though there are multiple options for customization, the only config parameter r
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------------- |
 | `:db`                | Database connection (`{:connection object}`) or data source object (`{:datasource object}`). [Hikari-CP datasource](https://github.com/tomekw/hikari-cp) is much more performant than a JDBC connection especially under loads. | Yes      |               |
 | `:tables`            | List of custom table definitions. Plz check [Schema Data](#schema-data) for details.                                                                                                                                            | No       |               |
-| `:signals`           | Map of singal functions per resources. Plz check [Interceptor Signals](interceptor.md) for details.                                                                                                                             | No       |               |
+| `:signals`           | Map of singal functions per table, operation and timing. Plz check [Interceptor Signals](interceptor.md) for details.                                                                                                           | No       |               |
 | `:signal-ctx`        | Additional context to be passed into signal functions. Plz check [Interceptor Signals](interceptor.md) for details.                                                                                                             | No       |               |
 | `:default-limit`     | Default number for SQL `LIMIT` value to be applied when there's no `:limit` argument is specified in a query.                                                                                                                   | No       | `nil`         |
 | `:max-nest-level`    | Maximum nest level allowed. This is to avoid infinite nesting. Errors will be returned when nests in requests exceed the value.                                                                                                 | No       | `nil`         |
@@ -53,4 +53,4 @@ By default, Phrag retrieves DB schema data from a DB connection and it is suffic
 > Notes:
 >
 > - When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
-> - When `:scan-schema` is `true`, provided table data will override scanned table data per table properties: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
+> - When `:scan-schema` is `true`, provided table data will override scanned table data per table property: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.

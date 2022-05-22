@@ -2,17 +2,17 @@
 
 **GraphQL from a RDBMS Connection**
 
-An approach of GraphQL on RDBMS for an instant and flexible data access with customization possibilities.
+Phrag implements an approach of GraphQL on RDBMS for an instant and flexible data access with customization options.
 
-![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag)
+![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
 ### Overview
 
-- **Instantly Operational**: Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. All needed is a [database](#requirements).
+- **Instantly Operational**: Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone version](#stand-alone-version).
 
-- **CRUD / SQL Features**: tables and/or views become queryable as root objects containing nested objects of [relationships](docs/mechanism.md#relationships). [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per tables. Additionally, [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) are supported for query operations.
+- **CRUD / SQL Features**: tables and/or views become queryable as root objects containing [relationships](docs/mechanism.md#relationships) as nested objects with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
-- **Customization**: Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per tables and operation types, which can make GraphQL more practical with access controls, event firing and more.
+- **Customization**: Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured in Clojure before & after database accesses per table and operation type, which can make GraphQL more practical with access controls, event firing and more.
 
 - **Performance in Mind**: Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
@@ -30,7 +30,7 @@ All needed is an RDBMS. Here's a quick view of database constructs which are imp
 >
 > - Supported databases are SQLite and PostgreSQL.
 >
-> - If PostgreSQL is used, Phrag queries tables such as `key_column_usage` and `constraint_column_usage` to retrieve PK / FK info, therefore the database user provided to Phrag needs to be identical to the one that created those keys.
+> - If PostgreSQL is used, Phrag queries usage tables such as `key_column_usage` and `constraint_column_usage` to retrieve PK / FK info, therefore the database user provided to Phrag needs to be identical to the one that created those keys.
 >
 > - Not all database column types are mapped to Phrag's GraphQL fields yet. Any help would be appreciated through issues and PRs.
 
@@ -56,7 +56,7 @@ Reitit route in an Integrant config map:
 
 There is a stand-alone version of Phrag which is instantly runnable. It's suitable if a Phrag's GraphQL is desired without any custom logic or if one wants to play around with it.
 
-Phrag's docker image is ready to connect to your database with a single command as below. Here's its [repository](https://github.com/ykskb/phrag-standalone) for more options.
+Phrag's docker image is ready to connect to your database with a single command as below. Its repository is [here](https://github.com/ykskb/phrag-standalone) for more options.
 
 ```sh
 docker run -it -p 3000:3000 \
