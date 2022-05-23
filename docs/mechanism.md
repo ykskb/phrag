@@ -2,7 +2,7 @@
 
 ## Queries
 
-All tables and/or views become queryable as root objects of GraphQL in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at root level or as a nested object together with parent objects through relationships.
+Tables and/or views become queryable as root objects of GraphQL in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at a root level or as a nested object together with parent objects through relationships.
 
 In terms of query format, Phrag does not use [cursor connection](https://relay.dev/graphql/connections.htm). It is an intentional design decision since Phrag features universal argument interfaces for filtering and pagination across root queries and nested objects.
 
@@ -22,7 +22,7 @@ It should also be noted that Phrag does not use `JOIN` for relationship queries 
 
 `Create`, `update` and `delete` mutations are created for each table. Primary keys work as an identitier of each record for mutations:
 
-1. Phrag registers PK as a GraphQL object.
+1. Phrag registers PK(s) of a table as a GraphQL object.
 
 2. `Create` mutation returns a PK object with generated values as a successful response.
 
@@ -30,6 +30,6 @@ It should also be noted that Phrag does not use `JOIN` for relationship queries 
 
 ## Security
 
-- **Infinite nests**: nested objects created for both origin and destination columns of foreign keys actually mean possible infinite nests, and it is possibly an attack surface when a user queries millions of nests. Phrag has a [config](config.md) value, `max-nest-level` for this, and an error response will be returned when a query exceed the nest level specified.
+- **Infinite nests:** nested objects created for both origin and destination columns of foreign keys actually mean possible infinite nests, and it is possibly an attack surface when a user queries millions of nests. Phrag has a [config](config.md) value, `max-nest-level` for this, and an error response will be returned when a query exceed the nest level specified.
 
-- **Default limit**: querying millions of records can be resource-intensive and we don't want it to happen accidentally. [Config](config.md) value of `default-limit` can be used to apply default limit value when there's no `limit` parameter specified in a query.
+- **Default limit:** querying millions of records can be resource-intensive and we don't want it to happen accidentally. [Config](config.md) value of `default-limit` can be used to apply default limit value when there's no `limit` parameter specified in a query.

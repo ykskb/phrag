@@ -6,8 +6,6 @@
             [phrag.core :as core]
             [phrag.context :as ctx]))
 
-(defmulti graphql-route (fn [config & _] (:router config)))
-
 ;;; Reitit
 
 (defn- rtt-gql-handler [config]
@@ -19,14 +17,13 @@
         {:status 200
          :body (core/exec config schema query vars req)}))))
 
-(defmethod graphql-route :reitit [config]
-  ["/graphql" {:post {:handler (rtt-gql-handler config)}
-               :middleware (:middleware config)}])
-
 (defn reitit
-  "Returns a route setup for reitit at: `/graphql`."
+  "Returns a route setup for reitit at specified path or `/graphql`.
+  Format: `[\"path\" {:post handler}]"
   [options]
-  (graphql-route (ctx/options->config (assoc options :router :reitit))))
+  (let [config (ctx/options->config options)]
+    [(:graphql-path config "/graphql") {:post {:handler (rtt-gql-handler config)}
+                                        :middleware (:middleware config)}]))
 
 (defmethod ig/init-key ::reitit [_ options]
   (reitit options))
@@ -41,13 +38,12 @@
             vars (w/keywordize-keys (get params "variables"))]
         (ring-res/response (core/exec config schema query vars))))))
 
-(defmethod graphql-route :bidi [config]
-  ["/" {"graphql" {:post (bd-gql-handler config)}}])
-
 (defn bidi
-  "Returns a route setup for Bidi at: `/graphql`."
+  "Returns a route setup for Bidi at specified path or `/graphql`.
+  Format: `[\"/\" {\"path\" {:post handler}}]"
   [options]
-  (graphql-route (ctx/options->config (assoc options :router :bidi))))
+  (let [config (ctx/options->config options)]
+    ["/" {(:graphql-path config "graphql") {:post (bd-gql-handler config)}}]))
 
 (defmethod ig/init-key ::bidi [_ options]
   (bidi options))

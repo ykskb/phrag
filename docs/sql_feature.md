@@ -49,7 +49,7 @@ offset: [count]
 > - `limit` and `offset` can be used independently.
 > - Using `offset` can return different results when new entries are created while items are sorted by newest first. So using `limit` with `id` filter or `created_at` filter is often considered more consistent.
 
-##### Example
+##### Example:
 
 _25 items after/greater than `id`:`20`_
 
@@ -61,7 +61,7 @@ _25 items after/greater than `id`:`20`_
 
 `avg`, `count`, `max`, `min` and `sum` are supported and it can also be [filtered](#filtering).
 
-##### Example
+##### Example:
 
 _Select `count` of `cart_items` together with `max`, `min` `sum` and `avg` of `price` where `cart_id` is `1`._
 
