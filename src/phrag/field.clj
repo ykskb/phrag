@@ -62,11 +62,27 @@
 (def ^:private field-types
   {"int" 'Int
    "integer" 'Int
+   "smallint" 'Int
    "bigint" 'Int
+   "smallserial" 'Int
+   "serial" 'Int
+   "bigserial" 'Int
+   "decimal" 'Float
+   "numeric" 'Float
+   "real" 'Float
+   "double precision" 'Float
    "text" 'String
    "timestamp" 'String
    "character varying" 'String
+   "varchar" 'String
+   "character" 'String
+   "char" 'String
    "timestamp without time zone" 'String
+   "timestamp with time zone" 'String
+   "interval" 'String
+   "date" 'String
+   "time without time zone" 'String
+   "time with time zone" 'String
    "boolean" 'Boolean})
 
 (defn- needs-non-null? [col]
@@ -97,11 +113,27 @@
 (def ^:private flt-input-types
   {"int" :IntWhere
    "integer" :IntWhere
+   "smallint" :IntWhere
    "bigint" :IntWhere
    "text" :StrWhere
+   "smallserial" :IntWhere
+   "serial" :IntWhere
+   "bigserial" :IntWhere
+   "decimal" :FloatWhere
+   "numeric" :FloatWhere
+   "real" :FloatWhere
+   "double precision" :FloatWhere
    "timestamp" :StrWhere
    "character varying" :StrWhere
+   "varchar" :StrWhere
+   "character" :StrWhere
+   "char" :StrWhere
    "timestamp without time zone" :StrWhere
+   "timestamp with time zone" :StrWhere
+   "interval" :StrWhere
+   "date" :StrWhere
+   "time without time zone" :StrWhere
+   "time with time zone" :StrWhere
    "boolean" :BoolWhere})
 
 (defn- clause-fields [table]

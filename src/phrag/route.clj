@@ -19,7 +19,7 @@
 
 (defn reitit
   "Returns a route setup for reitit at specified path or `/graphql`.
-  Format: `[\"path\" {:post handler}]"
+  Format: `[\"path\" {:post handler}]`"
   [options]
   (let [config (ctx/options->config options)]
     [(:graphql-path config "/graphql") {:post {:handler (rtt-gql-handler config)}
@@ -40,7 +40,7 @@
 
 (defn bidi
   "Returns a route setup for Bidi at specified path or `/graphql`.
-  Format: `[\"/\" {\"path\" {:post handler}}]"
+  Format: `[\"/\" {\"path\" {:post handler}}]`"
   [options]
   (let [config (ctx/options->config options)]
     ["/" {(:graphql-path config "graphql") {:post (bd-gql-handler config)}}]))

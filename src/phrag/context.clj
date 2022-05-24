@@ -200,7 +200,6 @@
         config {:router (:router options)
                 :db (:db options)
                 :tables (:tables options)
-                :signals signals
                 :signal-ctx (:signal-ctx options)
                 :middleware (:middleware options)
                 :scan-tables (:scan-tables options true)

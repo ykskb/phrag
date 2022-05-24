@@ -58,8 +58,7 @@
          {:keys [rsc]} :lcn-fields} table]
     (assoc-in schema [:mutations create]
               {:type pks
-               ;; Assumption: `id` column is auto-generated on DB side
-               :args (dissoc rsc :id)
+               :args rsc
                :resolve (partial rslv/create-root table-key table)})))
 
 (defn- assoc-update-mutation [schema table-key table]
