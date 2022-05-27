@@ -2,7 +2,7 @@
 
 **GraphQL from a RDBMS Connection**
 
-Phrag implements an approach of GraphQL on RDBMS for an instant and flexible data access with customization options.
+Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an instant and flexible data access with customization options.
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
@@ -10,7 +10,7 @@ Phrag implements an approach of GraphQL on RDBMS for an instant and flexible dat
 
 - **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone executable](#stand-alone-version).
 
-- **Relationship / CRUD Features:** tables and/or views become queryable as root objects containing [relationships](docs/mechanism.md#relationships) as nested objects with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
+- **Relationship / CRUD Features:** tables and/or views become queryable as root objects including nested objects of [relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
 - **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured in Clojure before & after database accesses per table and operation type, which can make GraphQL more practical with access controls, event firing and more.
 
@@ -18,7 +18,7 @@ Phrag implements an approach of GraphQL on RDBMS for an instant and flexible dat
 
 ## Requirements
 
-All needed is an RDBMS. Here's a quick view of database constructs which are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
+Though there are multiple ways to run, Phrag only requires an RDBMS to create GraphQL. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
 
 - **Primary keys:** Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
 
@@ -60,13 +60,14 @@ There is also a support for creating Phrag's GraphQL as a route for [reitit](htt
 
 ## Stand-alone Version
 
-There is a stand-alone version of Phrag which is runnable as a Docker container or a Java process with a single command. It's suitable if a Phrag's GraphQL is desired without any custom logic or if one wants to play around with it. The repository for these artifacts is [here](https://github.com/ykskb/phrag-standalone) for more options and information.
+There is a stand-alone version of Phrag which is runnable as a Docker container or Java process with a single command. It's suitable if Phrag's GraphQL is desired without any custom logic or if one wants to play around with it. [Here](https://github.com/ykskb/phrag-standalone) is the repository of those artifacts for more options and information.
 
 ```sh
 # example: Docker container with SQLite
 # visit http://localhost:3000/graphiql/index.html after running:
 docker run -it -p 3000:3000 \
--e JDBC_URL=jdbc:sqlite:path/to/db.sqlite \
+-v /host/db/dir:/database \
+-e JDBC_URL=jdbc:sqlite:/database/db.sqlite \
 ykskb/phrag-standalone:latest
 ```
 
