@@ -33,11 +33,8 @@
   (column-info [adpt table-name])
   (foreign-keys [adpt table-name])
   (primary-keys [adpt table-name])
-  (resolve-query [nest-level table-key selection ctx]))
-
-;; Query Handling
-
-(def aggr-keys #{:count :avg :max :min :sum})
+  (resolve-query [adpt table-key selection ctx])
+  (resolve-aggregation [adpt table-key selection ctx]))
 
 ;; Interceptor signals
 
@@ -47,11 +44,15 @@
           args
           (get-in ctx [:tables table-key :signals op pre-post])))
 
+;; Query Handling
+
 (defn exec-query [db q]
   (prn q)
   (jdbc/with-db-connection [conn db]
     (prn (jdbc/query conn q))
     (jdbc/query conn q)))
+
+(def aggr-keys #{:count :avg :max :min :sum})
 
 (def ^:private where-ops
   {:eq  :=
@@ -99,5 +100,3 @@
 
 (defn column-path-key [table-key column-key]
   (keyword (column-path table-key column-key)))
-
-

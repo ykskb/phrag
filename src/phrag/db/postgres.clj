@@ -78,6 +78,11 @@
          (core/apply-args (:arguments selection) ctx))
      (:selections selection))))
 
+(defn- compile-aggregation [table-key selection ctx]
+  (-> (h/select [[:raw (compile-aggr table-key selection)] :result])
+      (h/from table-key)
+      (core/apply-args (:arguments selection) ctx)))
+
 (defrecord PostgresAdapter [db]
   core/DbAdapter
 
@@ -134,5 +139,8 @@
 
   (resolve-query [adpt table-key selection ctx]
     (core/exec-query (:db adpt)
-                     (sql/format (compile-query 1 table-key selection ctx)))))
+                     (sql/format (compile-query 1 table-key selection ctx))))
 
+  (resolve-aggregation [adpt table-key selection ctx]
+    (let [query (compile-aggregation table-key selection ctx)]
+      (:result (first (core/exec-query (:db adpt) (sql/format query)))))))

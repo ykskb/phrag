@@ -10,89 +10,6 @@
             [phrag.query :as query]
             [com.walmartlabs.lacinia.resolve :as resolve]))
 
-;; GraphQL args to SQL params
-
-(def ^:private where-ops
-  {:eq  :=
-   :gt  :>
-   :lt  :<
-   :gte :>=
-   :lte :<=
-   :ne  :!=
-   :in :in
-   :like :like})
-
-(defn- parse-selects [col-keys selection]
-  (let [q-fields (set (map :field-name selection))]
-    (clj-set/intersection q-fields col-keys)))
-
-(defn- parse-rsc-where [rsc-where]
-  (map (fn [[k v]]
-         (let [entry (first v)
-               op ((key entry) where-ops)]
-           [op k (val entry)]))
-       rsc-where))
-
-(defn- parse-and-or [op rsc-where-list]
-  (concat [op] (reduce (fn [v rsc-where]
-                         (concat v (parse-rsc-where rsc-where)))
-                       [] rsc-where-list)))
-
-(defn- parse-where [args]
-  (let [whr (:where args)]
-    (cond-> (parse-rsc-where (dissoc whr :and :or))
-      (some? (:or whr)) (conj (parse-and-or :or (:or whr)))
-      (some? (:and whr)) (conj (parse-and-or :and (:and whr))))))
-
-(defn- update-sort [m v]
-  (assoc m :sort (reduce-kv (fn [vec k v]
-                              (conj vec [k v]))
-                            [] v)))
-
-(defn- args->sql-params [col-keys args selections default-limit]
-  (reduce (fn [m [k v]]
-            (cond
-              (= k :sort) (update-sort m v)
-              (= k :limit) (assoc m :limit v)
-              (= k :offset) (assoc m :offset v)
-              :else m))
-          (cond-> {:select (parse-selects col-keys selections)
-                   :where (parse-where args)}
-            (integer? default-limit) (assoc :limit default-limit))
-          args))
-
-;; Aggregation field to SQL
-
-(defn- aggr-fields [selections]
-  (reduce (fn [m selected]
-            (let [aggr (:field-name selected)]
-              (if (= :count aggr)
-                (assoc m :count nil)
-                (assoc m aggr (map :field-name (:selections selected))))))
-          {} selections))
-
-(defn- aggr-key [aggr-type col]
-  (keyword (str (name aggr-type) "_" (name col))))
-
-(defn- aggr-selects [fields]
-  (reduce (fn [v [aggr cols]]
-            (if (= :count aggr)
-              (conj v [[:count :*] :count])
-              (concat v (map (fn [c] [[aggr c] (aggr-key aggr c)]) cols))))
-          [] fields))
-
-(defn- aggr-result [fields sql-res & [id-key id]]
-  (reduce (fn [m [aggr cols]]
-            (if (= :count aggr)
-              (assoc m aggr (:count sql-res))
-              (assoc m aggr (reduce (fn [m col]
-                                      (assoc m col ((aggr-key aggr col) sql-res)))
-                             {} cols))))
-          (or sql-res {id-key id})
-          fields))
-
-;; Nest resolution
-
 ;;; Resolvers
 
 (defmacro resolve-error [body]
@@ -105,7 +22,7 @@
 
 (defn resolve-query
   "Resolves query recursively for nests if there's any."
-  [table-key table ctx args _val]
+  [table-key table ctx _args _val]
   (resolve-error
    (let [{:keys [col-keys rel-cols query-signals]} table
          selection (:com.walmartlabs.lacinia/selection ctx)]
@@ -116,14 +33,10 @@
 
 (defn aggregate-root
   "Resolves aggregation query at root level."
-  [table-key ctx args _val]
+  [table-key ctx _args _val]
   (resolve-error
-   (let [sql-args (args->sql-params nil args nil nil)
-         selections (get-in ctx [:com.walmartlabs.lacinia/selection :selections])
-         fields (aggr-fields selections)
-         selects (aggr-selects fields)
-         res (first (query/aggregate (:db ctx) table-key selects sql-args))]
-     (aggr-result fields res))))
+   (let [selection (:com.walmartlabs.lacinia/selection ctx)]
+     (db/resolve-aggregation (:db-adapter ctx) table-key selection ctx))))
 
 ;; Mutations
 
