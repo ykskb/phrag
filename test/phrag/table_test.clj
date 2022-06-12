@@ -4,6 +4,7 @@
             [clojure.java.jdbc :as jdbc]
             [com.walmartlabs.lacinia :as lcn]
             [phrag.core-test :refer [sqlite-conn]]
+            [phrag.db.adapter :as db-adapter]
             [phrag.table :as tbl]))
 
 ;; Schema data validation
@@ -92,6 +93,7 @@
         meetups
         meetups-members]
        (-> (tbl/db-schema {:db db
+                           :db-adapter (db-adapter/db->adapter db)
                            :scan-tables true
                            :no-fk-on-db false
                            :tables []})
@@ -109,6 +111,7 @@
           meetups-members
           extra-table]
          (-> (tbl/db-schema {:db db
+                             :db-adapter (db-adapter/db->adapter db)
                              :scan-tables true
                              :no-fk-on-db false
                              :tables [extra-table]})
@@ -124,6 +127,7 @@
           (assoc meetups :fks meetups-fks)
           meetups-members]
          (-> (tbl/db-schema {:db db
+                             :db-adapter (db-adapter/db->adapter db)
                              :scan-tables true
                              :no-fk-on-db false
                              :tables [{:name "venues"
@@ -147,6 +151,7 @@
       (schema-as-expected?
        [meetups-with-venues]
        (-> (tbl/db-schema {:db db
+                           :db-adapter (db-adapter/db->adapter db)
                            :scan-tables true
                            :scan-views true
                            :no-fk-on-db false
@@ -155,6 +160,7 @@
 
     (testing "views not scanned for config false"
       (let [scm (tbl/db-schema {:db db
+                                :db-adapter (db-adapter/db->adapter db)
                                 :scan-tables true
                                 :scan-views false})]
         (is (empty? (:views scm)))
@@ -222,6 +228,7 @@
         meetups-fk-detection
         meetups-members]
        (-> (tbl/db-schema {:db db
+                           :db-adapter (db-adapter/db->adapter db)
                            :scan-tables true
                            :no-fk-on-db true
                            :plural-table-name true

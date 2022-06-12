@@ -4,26 +4,26 @@
             [hikari-cp.core :as hkr]))
 
 (def ^:private pg-members-table
-  (str "create table members ("
+  (str "create table if not exists members ("
        "id               bigserial primary key,"
        "first_name       varchar(128),"
        "last_name        varchar(128),"
        "email            varchar(128));"))
 
 (def ^:private pg-groups-table
-  (str "create table groups ("
+  (str "create table if not exists groups ("
        "id            bigserial primary key,"
        "name          varchar(128),"
        "created_at    timestamp);"))
 
 (def ^:private pg-venues-table
-  (str "create table venues ("
+  (str "create table if not exists venues ("
        "vid              bigserial primary key,"
        "name             varchar(128),"
        "postal_code      varchar(128));"))
 
 (def ^:private pg-meetups-table
-  (str "create table meetups ("
+  (str "create table if not exists meetups ("
        "id              bigserial primary key,"
        "title           varchar(128) not null, "
        "start_at        timestamp,"
@@ -33,7 +33,7 @@
        "foreign key(group_id) references groups(id));"))
 
 (def ^:private pg-member-follow-table
-  (str "create table member_follow ("
+  (str "create table if not exists member_follow ("
        "created_by    integer, "
        "member_id     integer, "
        "foreign key(created_by) references members(id), "
@@ -41,7 +41,7 @@
        "primary key (created_by, member_id));"))
 
 (def ^:private pg-meetups-members-table
-  (str "create table meetups_members ("
+  (str "create table if not exists meetups_members ("
        "meetup_id     integer,"
        "member_id     integer,"
        "foreign key(meetup_id) references meetups(id), "
@@ -49,12 +49,34 @@
        "primary key (meetup_id, member_id));"))
 
 (def ^:private pg-groups-members-table
-  (str "create table groups_members ("
+  (str "create table if not exists groups_members ("
        "group_id    integer,"
        "member_id   integer,"
        "foreign key(group_id) references groups(id), "
        "foreign key(member_id) references members(id), "
        "primary key (group_id, member_id));"))
+
+(def ^:private pg-meetups-with-venue-name
+  (str "create or replace view meetup_with_venue as "
+       "select m.id, "
+       "m.title, "
+       "v.vid as venue_id, "
+       "v.name as venue_name "
+       "from meetups as m "
+       "join venues as v on m.venue_id = v.vid;"))
+
+(def ^:private pg-clean-up
+  (str "DELETE FROM meetups_members;"
+       "DELETE FROM groups_members;"
+       "DELETE FROM member_follow;"
+       "DELETE FROM meetups;"
+       "ALTER SEQUENCE meetups_id_seq RESTART WITH 1;"
+       "DELETE FROM venues;"
+       "ALTER SEQUENCE venues_vid_seq RESTART WITH 1;"
+       "DELETE FROM groups;"
+       "ALTER SEQUENCE groups_id_seq RESTART WITH 1;"
+       "DELETE FROM members;"
+       "ALTER SEQUENCE members_id_seq RESTART WITH 1;"))
 
 (defn postgres-conn []
   (doto {:connection (jdbc/get-connection {:dbtype "postgresql"
@@ -70,7 +92,9 @@
     (jdbc/execute! pg-meetups-table)
     (jdbc/execute! pg-member-follow-table)
     (jdbc/execute! pg-meetups-members-table)
-    (jdbc/execute! pg-groups-members-table)))
+    (jdbc/execute! pg-groups-members-table)
+    (jdbc/execute! pg-meetups-with-venue-name)
+    (jdbc/execute! pg-clean-up)))
 
 (defn postgres-data-src []
   (let [data-src (delay (hkr/make-datasource {:adapter "postgresql"

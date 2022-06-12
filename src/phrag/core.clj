@@ -164,6 +164,7 @@
   (let [ctx (-> (:signal-ctx config {})
                 (assoc :req req)
                 (assoc :db (:db config))
+                (assoc :db-adapter (:db-adapter config))
                 (assoc :default-limit (:default-limit config))
                 (assoc :max-nest-level (:max-nest-level config))
                 (assoc :relation-ctx (:relation-ctx config))

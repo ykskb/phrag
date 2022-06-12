@@ -4,6 +4,7 @@
             [clojure.string :as s]
             [clojure.pprint :as pp]
             [inflections.core :as inf]
+            [phrag.db.adapter :as db-adapter]
             [phrag.table :as tbl]
             [phrag.field :as fld]))
 
@@ -129,7 +130,7 @@
               (conj v fns)))
           [] v))
 
-(defn- signal-per-table
+(defn- signal-per-type
   "Signal functions per resource and operation."
   [signal-map table-key op]
   (let [all-tbl-fns (:all signal-map)
@@ -169,10 +170,10 @@
               (assoc :rel-flds (get-in rel-ctx [:fields k]))
               (assoc :rel-cols (get-in rel-ctx [:columns k]))
               (assoc :rels (get-in rel-ctx [:rels k]))
-              (assoc :query-signals (signal-per-table signals k :query))
-              (assoc :create-signals (signal-per-table signals k :create))
-              (assoc :delete-signals (signal-per-table signals k :delete))
-              (assoc :update-signals (signal-per-table signals k :update))))))
+              (assoc :signals {:query (signal-per-type signals k :query)
+                               :create (signal-per-type signals k :create)
+                               :delete (signal-per-type signals k :delete)
+                               :update (signal-per-type signals k :update)})))))
      {} table-map)))
 
 (defn- view-schema-context [views signals]
@@ -190,7 +191,8 @@
                     (assoc :lcn-qry-keys (fld/lcn-qry-keys view-name))
                     (assoc :lcn-descs (fld/lcn-descs view-name))
                     (assoc :lcn-fields (fld/lcn-fields view obj-keys nil))
-                    (assoc :query-signals (signal-per-table signals k :query))))))
+                    (assoc :signals
+                           {:query (signal-per-type signals k :query)})))))
      {} view-map)))
 
 (defn options->config
@@ -199,6 +201,7 @@
   (let [signals (:signals options)
         config {:router (:router options)
                 :db (:db options)
+                :db-adapter (db-adapter/db->adapter (:db options))
                 :tables (:tables options)
                 :signal-ctx (:signal-ctx options)
                 :middleware (:middleware options)
