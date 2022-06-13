@@ -27,27 +27,34 @@
 (defn- compile-aggr [table-key selection]
   (format "JSON_OBJECT(%s)" (s/join ", " (aggr-params table-key selection))))
 
-(defn- build-json-param
-  "TODO: extend honeysql for formatting JSON functions in SQLite.
-  Inline format for subquery is unsafe since parametarization is off."
-  [field-key select]
-  (let [fmt "'%s', %s"]
-    (cond
-      (string? select) (format fmt (name field-key) select)
-      (keyword? select) (format fmt (name field-key) (name select))
-      (map? select) (format "'%s', (%s)" (name field-key)
-                            (first (sql/format select {:inline true})))
-      :else nil)))
+(defn- json-params [args]
+  (reduce (fn [m [select field-key]]
+         (let [fmt "'%s', %s"]
+           (cond
+             (string? select)
+             (update m :sql conj (format fmt (name field-key) select))
+             (keyword? select)
+             (update m :sql conj (format fmt (name field-key) (name select)))
+             (map? select)
+             (let [[sql & params] (sql/format select)]
+               (-> m
+                   (update :sql conj (format "'%s', (%s)" (name field-key) sql))
+                   (update :params into params)))
+             :else m)))
+       {}
+       args))
 
-(defn- concat-json-param [current param]
-  (str (subs current 0 (- (.length current) 1)) ", " param ")"))
+(defn- format-json-select [_f args]
+  (let [params (json-params args)
+        sql (format "SELECT JSON_OBJECT(%s) as data" (s/join ", " (:sql params)))]
+    (into [sql] (:params params))))
+
+(sql/register-clause! :json-select format-json-select :from)
 
 (defn- json-select [query field-key select]
-  (if-let [param (build-json-param field-key select)]
-    (if-let [current (get-in query [:select 0 0 1])]
-      (assoc query :select [[[:raw (concat-json-param current param)] :data]])
-      (h/select query [[:raw (format "JSON_OBJECT(%s)" param)] :data]))
-    query))
+  (if (:json-select query)
+    (update query :json-select conj [select field-key])
+    (assoc query :json-select [[select field-key]])))
 
 (defn- compile-query [nest-level table-key selection ctx]
   (let [nest-fks (get-in ctx [:relation-ctx :nest-fks table-key])

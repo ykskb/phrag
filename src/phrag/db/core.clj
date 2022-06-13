@@ -47,6 +47,7 @@
 ;; Query Handling
 
 (defn exec-query [db q]
+  (prn q)
   (jdbc/with-db-connection [conn db]
     (jdbc/query conn q)))
 

@@ -55,7 +55,8 @@
                                   (core/column-path-key table to)]]
                    (-> q
                        (h/select [[:raw (format "ROW_TO_JSON(%s)" sym)] field-key])
-                       (h/left-join [[:lateral (h/where c on-clause)] (keyword sym)]
+                       (h/left-join [[:lateral (h/where c on-clause)]
+                                     (keyword sym)]
                                     true)))
                  :has-many
                  (let [sym (gensym)
