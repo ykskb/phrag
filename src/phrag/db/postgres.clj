@@ -20,7 +20,6 @@
 (defn- aggr-params [table-key selection]
   (reduce (fn [v slct]
             (let [field-key (get-in slct [:field-definition :field-name])]
-              (prn field-key)
               (cond
                 (= :count field-key) (conj v "'count', count(*)")
                 (contains? core/aggr-keys field-key)
@@ -50,20 +49,22 @@
                    {:keys [to from from-table table]} nest-fk]
                (case nest-type
                  :has-one
-                 (let [c (compile-query (+ nest-level 1) table slct ctx)
+                 (let [sym (gensym)
+                       c (compile-query (+ nest-level 1) table slct ctx)
                        on-clause [:= (core/column-path-key from-table from)
                                   (core/column-path-key table to)]]
                    (-> q
-                       (h/select [[:raw "ROW_TO_JSON(temp2)"] field-key])
-                       (h/left-join [[:lateral (h/where c on-clause)] :temp2]
+                       (h/select [[:raw (format "ROW_TO_JSON(%s)" sym)] field-key])
+                       (h/left-join [[:lateral (h/where c on-clause)] (keyword sym)]
                                     true)))
                  :has-many
-                 (let [c (compile-query (+ nest-level 1) from-table slct ctx)
+                 (let [sym (gensym)
+                       sub-select (format "COALESCE(JSON_AGG(%s.*), '[]')" sym)
+                       c (compile-query (+ nest-level 1) from-table slct ctx)
                        on-clause [:= (core/column-path-key from-table from)
                                   (core/column-path-key table to)]]
-                   (h/select q [(-> (h/select
-                                     [[:raw "COALESCE(JSON_AGG(temp.*), '[]')"]])
-                                    (h/from [(h/where c on-clause) :temp]))
+                   (h/select q [(-> (h/select [[:raw sub-select]])
+                                    (h/from [(h/where c on-clause) (keyword sym)]))
                                 field-key]))
                  :has-many-aggr
                  (let [on-clause [:= (core/column-path-key from-table from)

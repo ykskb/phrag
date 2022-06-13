@@ -47,9 +47,7 @@
 ;; Query Handling
 
 (defn exec-query [db q]
-  (prn q)
   (jdbc/with-db-connection [conn db]
-    (prn (jdbc/query conn q))
     (jdbc/query conn q)))
 
 (def aggr-keys #{:count :avg :max :min :sum})

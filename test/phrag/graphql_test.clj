@@ -22,6 +22,13 @@
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
 
+    ;; Empty Case
+
+    (testing "empty user"
+      (test-gql  "{ members { id email first_name }}"
+                 [:data :members]
+                 []))
+
     ;; Root entities
 
     (testing "create 1st user"

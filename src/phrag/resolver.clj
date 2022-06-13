@@ -22,10 +22,9 @@
 
 (defn resolve-query
   "Resolves query recursively for nests if there's any."
-  [table-key table ctx _args _val]
+  [table-key ctx _args _val]
   (resolve-error
-   (let [{:keys [col-keys rel-cols query-signals]} table
-         selection (:com.walmartlabs.lacinia/selection ctx)]
+   (let [selection (:com.walmartlabs.lacinia/selection ctx)]
      (-> (db/resolve-query (:db-adapter ctx) table-key selection ctx)
          (db/signal table-key :query :post ctx)))))
 
@@ -80,7 +79,7 @@
 
 (defn delete-root
   "Resolves delete mutation. Takes `pk_columns` parameter as a record identifier."
-  [table-key table ctx args _val]
+  [table-key ctx args _val]
   (resolve-error
    (let [sql-args (db/signal args table-key :delete :pre ctx)]
      (query/delete! (:db ctx) table-key (:pk_columns sql-args))

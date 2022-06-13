@@ -71,13 +71,15 @@
                                   (core/column-path-key table to)]]
                    (json-select q field-key (h/where c on-clause)))
                  :has-many
-                 (let [c (compile-query (+ nest-level 1) from-table slct ctx)
+                 (let [sym (gensym)
+                       sub-select (format "JSON_GROUP_ARRAY(JSON(%s.data))" sym)
+                       c (compile-query (+ nest-level 1) from-table slct ctx)
                        on-clause [:= (core/column-path-key from-table from)
                                   (core/column-path-key table to)]]
                    (json-select q field-key
-                                (-> (h/select
-                                     [[:raw "JSON_GROUP_ARRAY(JSON(temp.data))"]])
-                                    (h/from [(h/where c on-clause) :temp]))))
+                                (-> (h/select [[:raw sub-select]])
+                                    (h/from [(h/where c on-clause)
+                                             (keyword sym)]))))
                  :has-many-aggr
                  (let [on-clause [:= (core/column-path-key from-table from)
                                   (core/column-path-key table to)]]
@@ -86,7 +88,8 @@
                                      [[:raw (compile-aggr from-table slct)]])
                                     (h/from from-table)
                                     (h/where on-clause)
-                                    (core/apply-args (:arguments slct) ctx))))))))))
+                                    (core/apply-args (:arguments slct)
+                                                     ctx))))))))))
      (-> (h/from table-key)
          (core/apply-args (:arguments selection) ctx))
      (:selections selection))))
@@ -96,10 +99,10 @@
       (h/from [q :res])))
 
 (defn- compile-aggregation [table-key selection ctx]
-  (-> (h/select [[:raw "JSON(temp.data)"] :result])
+  (-> (h/select [[:raw "JSON(aggr.data)"] :result])
       (h/from [(->(h/select [[:raw (compile-aggr table-key selection)] :data])
                   (h/from table-key)
-                  (core/apply-args (:arguments selection) ctx)) :temp])))
+                  (core/apply-args (:arguments selection) ctx)) :aggr])))
 
 (defrecord SqliteAdapter [db]
   core/DbAdapter
@@ -129,11 +132,9 @@
   (resolve-query [adpt table-key selection ctx]
     (let [query (compile-query 1 table-key selection ctx)
           res (core/exec-query (:db adpt) (sql/format (json-array-cast query)))]
-      (prn (json/parse-string (:result (first res)) true))
       (json/parse-string (:result (first res)) true)))
 
   (resolve-aggregation [adpt table-key selection ctx]
     (let [query (compile-aggregation table-key selection ctx)
           res (core/exec-query (:db adpt) (sql/format query))]
-      (prn (json/parse-string (:result (first res)) true))
       (json/parse-string (:result (first res)) true))))

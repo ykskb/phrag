@@ -26,7 +26,7 @@
                       :sort {:type sort}
                       :limit {:type 'Int}
                       :offset {:type 'Int}}
-               :resolve (partial rslv/resolve-query table-key table)})))
+               :resolve (partial rslv/resolve-query table-key)})))
 
 (defn- assoc-aggregation [schema table-key table]
   (let [{{:keys [aggregate where]} :lcn-obj-keys} table]
@@ -75,7 +75,7 @@
     (assoc-in schema [:mutations delete]
               {:type :Result
                :args {:pk_columns {:type `(~'non-null ~pk-input)}}
-               :resolve (partial rslv/delete-root table-key table)})))
+               :resolve (partial rslv/delete-root table-key)})))
 
 (defn- assoc-mutation-objects [schema table-key table]
   (-> schema
