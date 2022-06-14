@@ -1,8 +1,11 @@
 (ns phrag.db.core
   (:require [cheshire.core :as json]
             [clojure.java.jdbc :as jdbc]
+            [honey.sql :as sql]
             [honey.sql.helpers :as h])
   (:import  [org.postgresql.util PGobject]))
+
+;; Postgres Object Handler
 
 (defmulti read-pgobject
   "Convert returned PGobject to Clojure value."
@@ -27,31 +30,17 @@
   (result-set-read-column [val _ _]
     (read-pgobject val)))
 
-(defprotocol DbAdapter
-  (table-names [adpt])
-  (view-names [adpt])
-  (column-info [adpt table-name])
-  (foreign-keys [adpt table-name])
-  (primary-keys [adpt table-name])
-  (resolve-query [adpt table-key selection ctx])
-  (resolve-aggregation [adpt table-key selection ctx]))
-
-;; Interceptor signals
-
-(defn signal [args table-key op pre-post ctx]
-  (reduce (fn [args sgnl-fn]
-            (sgnl-fn args ctx))
-          args
-          (get-in ctx [:tables table-key :signals op pre-post])))
-
-;; Query Handling
-
-(defn exec-query [db q]
-  (prn q)
-  (jdbc/with-db-connection [conn db]
-    (jdbc/query conn q)))
+;; Utilities
 
 (def aggr-keys #{:count :avg :max :min :sum})
+
+(defn column-path [table-key column-key]
+  (str (name table-key) "." (name column-key)))
+
+(defn column-path-key [table-key column-key]
+  (keyword (column-path table-key column-key)))
+
+;; Argument Handler
 
 (def ^:private where-ops
   {:eq  :=
@@ -94,8 +83,57 @@
       lmt (h/limit lmt)
       (integer? (:offset args)) (h/offset (:offset args)))))
 
-(defn column-path [table-key column-key]
-  (str (name table-key) "." (name column-key)))
+;; Interceptor signals
 
-(defn column-path-key [table-key column-key]
-  (keyword (column-path table-key column-key)))
+(defn signal [args table-key op pre-post ctx]
+  (reduce (fn [args sgnl-fn]
+            (sgnl-fn args ctx))
+          args
+          (get-in ctx [:tables table-key :signals op pre-post])))
+
+;; Query handling
+
+(defn exec-query [db q]
+  (prn q)
+  (jdbc/with-db-connection [conn db]
+    (jdbc/query conn q)))
+
+(defn create!
+  "Executes create statement with parameter map."
+  [db rsc raw-map opts]
+  ;; (prn rsc raw-map)
+  (jdbc/with-db-connection [conn db]
+    (jdbc/insert! conn rsc raw-map opts)))
+
+(defn update!
+  "Executes update statement with primary key map and parameter map."
+  [db table pk-map raw-map]
+  (let [whr (map (fn [[k v]] [:= k v]) pk-map)
+        q (-> (h/update table)
+              (h/set raw-map))]
+    ;; (prn (sql/format (apply h/where q whr)))
+    (jdbc/with-db-connection [conn db]
+      (->> (apply h/where q whr)
+           sql/format
+           (jdbc/execute! conn)))))
+
+(defn delete!
+  "Executes delete statement with primary key map."
+  [db table pk-map]
+  (let [whr (map (fn [[k v]] [:= k v]) pk-map)
+        q (apply h/where (h/delete-from table) whr)]
+    ;; (prn (sql/format q))
+    (jdbc/with-db-connection [conn db]
+      (->> (sql/format q)
+           (jdbc/execute! conn)))))
+
+;; DB adapter protocol
+
+(defprotocol DbAdapter
+  (table-names [adpt])
+  (view-names [adpt])
+  (column-info [adpt table-name])
+  (foreign-keys [adpt table-name])
+  (primary-keys [adpt table-name])
+  (resolve-query [adpt table-key selection ctx])
+  (resolve-aggregation [adpt table-key selection ctx]))

@@ -49,12 +49,12 @@
         sql (format "SELECT JSON_OBJECT(%s) as data" (s/join ", " (:sql params)))]
     (into [sql] (:params params))))
 
-(sql/register-clause! :json-select format-json-select :from)
+(sql/register-clause! :json-select-sqlite format-json-select :from)
 
 (defn- json-select [query field-key select]
-  (if (:json-select query)
-    (update query :json-select conj [select field-key])
-    (assoc query :json-select [[select field-key]])))
+  (if (:json-select-sqlite query)
+    (update query :json-select-sqlite conj [select field-key])
+    (assoc query :json-select-sqlite [[select field-key]])))
 
 (defn- compile-query [nest-level table-key selection ctx]
   (let [nest-fks (get-in ctx [:relation-ctx :nest-fks table-key])

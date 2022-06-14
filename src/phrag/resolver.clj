@@ -7,7 +7,6 @@
             [phrag.logging :refer [log]]
             [phrag.field :as fld]
             [phrag.db.core :as db]
-            [phrag.query :as query]
             [com.walmartlabs.lacinia.resolve :as resolve]))
 
 ;;; Resolvers
@@ -57,7 +56,7 @@
                     (db/signal table-key :create :pre ctx)
                     (w/stringify-keys))
          opts {:return-keys pk-keys}
-         sql-res (first (query/create! (:db ctx) table-key params opts))
+         sql-res (first (db/create! (:db ctx) table-key params opts))
          id-res (if (contains? sql-res sqlite-last-id)
                   (update-sqlite-pk sql-res pk-keys)
                   sql-res)
@@ -74,7 +73,7 @@
                       (db/signal table-key :update :pre ctx))
          params (-> (dissoc sql-args :pk_columns)
                     (w/stringify-keys))]
-     (query/update! (:db ctx) table-key (:pk_columns sql-args) params)
+     (db/update! (:db ctx) table-key (:pk_columns sql-args) params)
      (db/signal fld/result-true-object table-key :update :post ctx))))
 
 (defn delete-root
@@ -82,5 +81,5 @@
   [table-key ctx args _val]
   (resolve-error
    (let [sql-args (db/signal args table-key :delete :pre ctx)]
-     (query/delete! (:db ctx) table-key (:pk_columns sql-args))
+     (db/delete! (:db ctx) table-key (:pk_columns sql-args))
      (db/signal fld/result-true-object table-key :delete :post ctx))))
