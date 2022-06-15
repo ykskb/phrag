@@ -4,17 +4,10 @@
             [environ.core :refer [env]]
             [phrag.core :as core]
             [phrag.context :as ctx]
-            [phrag.core-test :refer [sqlite-conn postgres-conn]]))
+            [phrag.core-test :as test-core]))
 
-;; create-db: in-memory SQLite
-;; postgres-db: real PostgreSQL
-
-(deftest graphql-queries
-  (let [on-postgres (env :test-on-postgres)
-        db (if on-postgres
-             (postgres-conn)
-             (sqlite-conn))
-        opt {:db db}
+(defn- run-graphql-tests [db on-postgres]
+  (let [opt {:db db}
         conf (ctx/options->config opt)
         schema (core/schema conf)
         test-gql (fn [q res-keys expected]
@@ -497,6 +490,12 @@
                 [:data :meetup_with_venues_aggregate]
                 {:min {:venue_id 1}}))))
 
+(deftest graphql-queries []
+  (if (test-core/postgres-testable?)
+    (do (run-graphql-tests (test-core/postgres-conn) true)
+        (run-graphql-tests (test-core/sqlite-conn) false))
+    (run-graphql-tests (test-core/sqlite-conn) false)))
+
 ;;; Testing signals
 
 (defn- change-where-from-ctx [selection ctx]
@@ -526,8 +525,8 @@
 (defn- members-post-update [_args _ctx]
   {:result true})
 
-(deftest graphql-signals
-  (let [db (doto (sqlite-conn)
+(defn- run-graphql-signal-tests [db]
+  (let [db (doto db
              (jdbc/insert! :members {:email "jim@test.com"
                                      :first_name "jim"
                                      :last_name "smith"}))
@@ -578,11 +577,14 @@
         (is (= (:message (first (:errors res)))
                "These SQL clauses are unknown or have nil values: :set"))))))
 
-(deftest graphql-config
-  (let [db (if (env :test-on-postgres)
-             (postgres-conn)
-             (sqlite-conn))
-        opt {:db db
+(deftest graphql-signals
+  (if (test-core/postgres-testable?)
+    (do (run-graphql-signal-tests (test-core/postgres-conn))
+        (run-graphql-signal-tests (test-core/sqlite-conn)))
+    (run-graphql-signal-tests (test-core/sqlite-conn))))
+
+(defn- run-graphql-config-tests [db]
+  (let [opt {:db db
              :default-limit 2
              :max-nest-level 2}
         conf (ctx/options->config opt)
@@ -658,3 +660,9 @@
         (is (= (get-in res [:data :meetups]) nil))
         (is (= (:message (first (:errors res)))
                "Exceeded maximum nest level."))))))
+
+(deftest graphql-config
+  (if (test-core/postgres-testable?)
+    (do (run-graphql-config-tests (test-core/postgres-conn))
+        (run-graphql-config-tests (test-core/sqlite-conn)))
+    (run-graphql-config-tests (test-core/sqlite-conn))))

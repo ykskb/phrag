@@ -1,5 +1,6 @@
 (ns phrag.core-test
   (:require [clojure.java.jdbc :as jdbc]
+            [environ.core :refer [env]]
             [clojure.test :refer :all]
             [hikari-cp.core :as hkr]))
 
@@ -78,13 +79,19 @@
        "DELETE FROM members;"
        "ALTER SEQUENCE members_id_seq RESTART WITH 1;"))
 
+(defn postgres-testable? []
+  (and (env :db-name)
+       (env :db-host)
+       (env :db-user)
+       (env :db-pass)))
+
 (defn postgres-conn []
   (doto {:connection (jdbc/get-connection {:dbtype "postgresql"
-                                           :dbname "phrag_test"
-                                           :host "localhost"
-                                           :port 5432
-                                           :user "postgres"
-                                           :password "example"
+                                           :dbname (env :db-name)
+                                           :host (env :db-host)
+                                           :port (env :db-port 5432)
+                                           :user (env :db-user)
+                                           :password (env :db-pass)
                                            :stringtype "unspecified"})}
     (jdbc/execute! pg-members-table)
     (jdbc/execute! pg-groups-table)
@@ -98,11 +105,11 @@
 
 (defn postgres-data-src []
   (let [data-src (delay (hkr/make-datasource {:adapter "postgresql"
-                                              :username "postgres"
-                                              :password "example"
-                                              :database-name "phrag_test"
-                                              :server-name "localhost"
-                                              :port-number 5432
+                                              :username (env :db-user)
+                                              :password (env :db-pass)
+                                              :database-name (env :db-name)
+                                              :server-name (env :db-host)
+                                              :port-number (env :db-port 5432)
                                               ;; :stringtype "unspecified"
                                               :current-schema "public"}))
         db {:datasource @data-src}]
