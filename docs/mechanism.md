@@ -2,9 +2,9 @@
 
 ## Queries
 
-All or selected tables / views become queryable as root objects that include nested objects of relationships in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at the root level or as a nested object together with parent objects through relationships.
+All or selected tables / views become queryable as root objects including nested objects of relationships in Phrag. This is for flexible data accesses without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at the root level or as a nested object together with parent objects through relationships.
 
-In terms of query format, Phrag does not use [cursor connection](https://relay.dev/graphql/connections.htm). It is an intentional design decision since Phrag features universal argument formats for filtering, aggregation and pagination across root queries and nested objects of `has-many` relationships.
+In terms of query format, Phrag does not use a [cursor connection](https://relay.dev/graphql/connections.htm). This is an intentional design decision since Phrag features universal argument formats across root level and nested objects for filtering, aggregation and pagination.
 
 ### Relationships
 
@@ -14,9 +14,7 @@ Phrag transforms a foreign key constraint into nested query objects of GraphQL a
 
 ### SQL Queries
 
-N+1 problem is an anti-pattern where a relationship query is executed for every one of retrieved records. Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem.
-
-It should also be noted that Phrag does not use `JOIN` for relationship queries to allow `LIMIT` on nested objects.
+N+1 problem is an anti-pattern where a relationship query is executed for every one of retrieved records. Phrag's query resolver translates nested query objects into a single SQL query, leveraging lateral join / correlated subqueries with JSON functions.
 
 ## Mutations
 

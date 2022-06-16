@@ -5,26 +5,26 @@
             [hikari-cp.core :as hkr]))
 
 (def ^:private pg-members-table
-  (str "create table if not exists members ("
+  (str "CREATE TABLE IF NOT EXISTS members ("
        "id               bigserial primary key,"
        "first_name       varchar(128),"
        "last_name        varchar(128),"
        "email            varchar(128));"))
 
 (def ^:private pg-groups-table
-  (str "create table if not exists groups ("
+  (str "CREATE TABLE IF NOT EXISTS groups ("
        "id            bigserial primary key,"
        "name          varchar(128),"
        "created_at    timestamp);"))
 
 (def ^:private pg-venues-table
-  (str "create table if not exists venues ("
+  (str "CREATE TABLE IF NOT EXISTS venues ("
        "vid              bigserial primary key,"
        "name             varchar(128),"
        "postal_code      varchar(128));"))
 
 (def ^:private pg-meetups-table
-  (str "create table if not exists meetups ("
+  (str "CREATE TABLE IF NOT EXISTS meetups ("
        "id              bigserial primary key,"
        "title           varchar(128) not null, "
        "start_at        timestamp,"
@@ -34,7 +34,7 @@
        "foreign key(group_id) references groups(id));"))
 
 (def ^:private pg-member-follow-table
-  (str "create table if not exists member_follow ("
+  (str "CREATE TABLE IF NOT EXISTS member_follow ("
        "created_by    integer, "
        "member_id     integer, "
        "foreign key(created_by) references members(id), "
@@ -42,7 +42,7 @@
        "primary key (created_by, member_id));"))
 
 (def ^:private pg-meetups-members-table
-  (str "create table if not exists meetups_members ("
+  (str "CREATE TABLE IF NOT EXISTS meetups_members ("
        "meetup_id     integer,"
        "member_id     integer,"
        "foreign key(meetup_id) references meetups(id), "
@@ -50,7 +50,7 @@
        "primary key (meetup_id, member_id));"))
 
 (def ^:private pg-groups-members-table
-  (str "create table if not exists groups_members ("
+  (str "CREATE TABLE IF NOT EXISTS groups_members ("
        "group_id    integer,"
        "member_id   integer,"
        "foreign key(group_id) references groups(id), "
@@ -58,13 +58,13 @@
        "primary key (group_id, member_id));"))
 
 (def ^:private pg-meetups-with-venue-name
-  (str "create or replace view meetup_with_venue as "
-       "select m.id, "
+  (str "CREATE OR REPLACE VIEW meetup_with_venue AS "
+       "SELECT m.id, "
        "m.title, "
-       "v.vid as venue_id, "
-       "v.name as venue_name "
-       "from meetups as m "
-       "join venues as v on m.venue_id = v.vid;"))
+       "v.vid AS venue_id, "
+       "v.name AS venue_name "
+       "FROM meetups AS m "
+       "JOIN venues AS v ON m.venue_id = v.vid;"))
 
 (def ^:private pg-clean-up
   (str "DELETE FROM meetups_members;"
@@ -123,67 +123,67 @@
       (jdbc/execute! pg-groups-members-table))))
 
 (def ^:private sqlite-members-table
-  (str "create table members ("
+  (str "CREATE TABLE members ("
        "id               integer primary key, "
        "first_name       text, "
        "last_name        text, "
        "email            text);"))
 
 (def ^:private sqlite-groups-table
-  (str "create table groups ("
+  (str "CREATE TABLE groups ("
        "id            integer primary key, "
        "name          text, "
        "created_at    timestamp);"))
 
 (def ^:private sqlite-venues-table
-  (str "create table venues ("
+  (str "CREATE TABLE venues ("
        ;; testing non-"id" naming
        "vid              integer primary key, "
        "name             text, "
        "postal_code      text);"))
 
 (def ^:private sqlite-meetups-table
-  (str "create table meetups ("
+  (str "CREATE TABLE meetups ("
        "id              integer primary key, "
        "title           text not null, "
        "start_at        timestamp, "
        "venue_id        int, "
        "group_id        int, "
-       "foreign key(venue_id) references venues(vid), "
-       "foreign key(group_id) references groups(id));"))
+       "FOREIGN KEY(venue_id) REFERENCES venues(vid), "
+       "FOREIGN KEY(group_id) REFERENCES groups(id));"))
 
 (def ^:private sqlite-member-follow-table
-  (str "create table member_follow ("
+  (str "CREATE TABLE member_follow ("
        "created_by    int, "
        "member_id     int, "
-       "foreign key(created_by) references members(id), "
-       "foreign key(member_id) references members(id), "
-       "primary key (created_by, member_id));"))
+       "FOREIGN KEY(created_by) REFERENCES members(id), "
+       "FOREIGN KEY(member_id) REFERENCES members(id), "
+       "PRIMARY KEY (created_by, member_id));"))
 
 (def ^:private sqlite-meetups-members-table
-  (str "create table meetups_members ("
+  (str "CREATE TABLE meetups_members ("
        "meetup_id     int, "
        "member_id     int, "
-       "foreign key(meetup_id) references meetups(id), "
-       "foreign key(member_id) references members(id), "
-       "primary key (meetup_id, member_id));"))
+       "FOREIGN KEY(meetup_id) REFERENCES meetups(id), "
+       "FOREIGN KEY(member_id) REFERENCES members(id), "
+       "PRIMARY KEY (meetup_id, member_id));"))
 
 (def ^:private sqlite-groups-members-table
-  (str "create table groups_members ("
+  (str "CREATE TABLE groups_members ("
        "group_id    int, "
        "member_id   int, "
-       "foreign key(group_id) references groups(id), "
-       "foreign key(member_id) references members(id), "
-       "primary key (group_id, member_id));"))
+       "FOREIGN KEY(group_id) REFERENCES groups(id), "
+       "FOREIGN KEY(member_id) REFERENCES members(id), "
+       "PRIMARY KEY (group_id, member_id));"))
 
 (def ^:private sqlite-meetups-with-venue-name
-  (str "create view meetup_with_venue as "
-       "select m.id, "
+  (str "CREATE VIEW meetup_with_venue AS "
+       "SELECT m.id, "
        "m.title, "
-       "v.vid as venue_id, "
-       "v.name as venue_name "
-       "from meetups as m "
-       "join venues as v on m.venue_id = v.vid;"))
+       "v.vid AS venue_id, "
+       "v.name AS venue_name "
+       "FROM meetups AS m "
+       "JOIN venues AS v ON m.venue_id = v.vid;"))
 
 (defn sqlite-conn []
   (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}

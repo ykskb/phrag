@@ -2,7 +2,7 @@
 
 **GraphQL from a RDBMS Connection**
 
-Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an instant and flexible data access with customization options.
+Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an instant and flexible data accesses with customization options.
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
@@ -10,11 +10,11 @@ Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an in
 
 - **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone executable](#stand-alone-version).
 
-- **Relationship / CRUD Features:** tables and/or views become queryable as root objects including nested objects of [relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
+- **CRUD / Relationship Features:** tables and/or views become queryable as root objects including nested objects of [relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
-- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured in Clojure before & after database accesses per table and operation type, which can make GraphQL more practical with access controls, event firing and more.
+- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured in Clojure before & after database accesses per table & operation type, which can make GraphQL more practical with access controls, event firing and more.
 
-- **Performance in Mind:** Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
+- **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
 ## Requirements
 

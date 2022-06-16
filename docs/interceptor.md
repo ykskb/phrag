@@ -4,12 +4,12 @@ Phrag can signal configured functions per resource query/mutation at pre/post-op
 
 ### Pre-operation Interceptor Function
 
-| Type   | Signal function receives (as first parameter):                             | Returned value will be:                |
-| ------ | -------------------------------------------------------------------------- | -------------------------------------- |
-| query  | SQL parameter map: `{:select #{} :where [] :sort [] :offset 0 :limit 100}` | Passed to subsequent query operation.  |
-| create | Submitted mutation parameters                                              | Passed to subsequent create operation. |
-| update | Submitted mutation parameters                                              | Passed to subsequent update operation. |
-| delete | Submitted mutation parameters                                              | Passed to subsequent delete operation. |
+| Type   | Signal function receives (as first parameter):                                                                                                                           | Returned value will be:                |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| query  | Lacinia's [selection map](https://walmartlabs.github.io/apidocs/lacinia/com.walmartlabs.lacinia.selection.html) including fields such as `:arguments` and `:selections`. | Passed to subsequent query operation.  |
+| create | Submitted mutation parameters                                                                                                                                            | Passed to subsequent create operation. |
+| update | Submitted mutation parameters                                                                                                                                            | Passed to subsequent update operation. |
+| delete | Submitted mutation parameters                                                                                                                                            | Passed to subsequent delete operation. |
 
 > Notes:
 >
@@ -20,7 +20,7 @@ Phrag can signal configured functions per resource query/mutation at pre/post-op
 
 | Type   | Signal function receives (as a first parameter):   | Returned value will be:  |
 | ------ | -------------------------------------------------- | ------------------------ |
-| query  | Result value(s) returned from query operation.     | Passed to response body. |
+| query  | Result values returned from query operation.       | Passed to response body. |
 | create | Primary key object of created item: e.g. `{:id 3}` | Passed to response body. |
 | update | Result object: `{:result true}`                    | Passed to response body. |
 | delete | Result object: `{:result true}`                    | Passed to response body. |
@@ -34,11 +34,11 @@ All receiver functions will have a context map as its second argument. It'd cont
 ```clojure
 (defn- end-user-access
   "Users can query only his/her own user info"
-  [sql-args ctx]
+  [selection ctx]
   (let [user (user-info (:req ctx))]
     (if (admin-user? user))
-      sql-args
-      (update sql-args :where conj [:= :user_id (:id user)])))
+      selection
+      (update-in selection [:arguments :where :user_id] {:eq (:id user)})))
 
 (defn- hide-internal-id
   "Removes internal-id for non-admin users"
