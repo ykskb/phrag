@@ -1,5 +1,6 @@
 (ns phrag.db.postgres
-  (:require [clojure.string :as s]
+  (:require [cheshire.core :as json]
+            [clojure.string :as s]
             [phrag.db.core :as core]
             [honey.sql :as sql]
             [honey.sql.helpers :as h]))
@@ -80,6 +81,10 @@
          (core/apply-args (:arguments selection) ctx))
      (:selections selection))))
 
+(defn- json-array-cast [q]
+  (-> (h/select [[:raw "COALESCE(JSON_AGG(res), '[]')"] :result])
+      (h/from [q :res])))
+
 (defn- compile-aggregation [table-key selection ctx]
   (-> (h/select [[:raw (compile-aggr table-key selection)] :result])
       (h/from table-key)
@@ -140,9 +145,11 @@
                           "AND tc.table_name = '" table-name "';")))
 
   (resolve-query [adpt table-key selection ctx]
-    (core/exec-query (:db adpt)
-                     (sql/format (compile-query 1 table-key selection ctx))))
+    (let [query (json-array-cast (compile-query 1 table-key selection ctx))
+          res (core/exec-query (:db adpt) (sql/format query))]
+      (:result (first res))))
 
   (resolve-aggregation [adpt table-key selection ctx]
-    (let [query (compile-aggregation table-key selection ctx)]
-      (:result (first (core/exec-query (:db adpt) (sql/format query)))))))
+    (let [query (compile-aggregation table-key selection ctx)
+          res (core/exec-query (:db adpt) (sql/format query))]
+      (:result (first res)))))

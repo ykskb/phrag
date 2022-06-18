@@ -28,7 +28,6 @@
 
 (defn db->adapter [db]
   (let [type-key (db-type db)]
-    (prn "dm" db db-type)
     (case type-key
       :sqlite (sqlite/->SqliteAdapter db)
       :postgres (postgres/->PostgresAdapter db))))

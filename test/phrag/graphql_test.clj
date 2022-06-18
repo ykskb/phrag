@@ -76,10 +76,10 @@
                 [:data :createMeetup :id] 2))
 
     (let [exp-time-1 (if on-postgres
-                       "2021-01-01 18:00:00.0"
+                       "2021-01-01T18:00:00"
                        "2021-01-01 18:00:00")
           exp-time-2 (if on-postgres
-                       "2021-01-12 18:00:00.0"
+                       "2021-01-12T18:00:00"
                        "2021-01-12 18:00:00") ]
       (testing "list entities with has-one param"
         (test-gql  (str "{ meetups { id title start_at venue_id "
@@ -578,10 +578,7 @@
                "These SQL clauses are unknown or have nil values: :set"))))))
 
 (deftest graphql-signals
-  (if (test-core/postgres-testable?)
-    (do (run-graphql-signal-tests (test-core/postgres-conn))
-        (run-graphql-signal-tests (test-core/sqlite-conn)))
-    (run-graphql-signal-tests (test-core/sqlite-conn))))
+  (run-graphql-signal-tests (test-core/sqlite-conn)))
 
 (defn- run-graphql-config-tests [db]
   (let [opt {:db db
@@ -662,7 +659,4 @@
                "Exceeded maximum nest level."))))))
 
 (deftest graphql-config
-  (if (test-core/postgres-testable?)
-    (do (run-graphql-config-tests (test-core/postgres-conn))
-        (run-graphql-config-tests (test-core/sqlite-conn)))
-    (run-graphql-config-tests (test-core/sqlite-conn))))
+  (run-graphql-config-tests (test-core/sqlite-conn)))

@@ -94,7 +94,7 @@
 ;; Query handling
 
 (defn exec-query [db q]
-  (prn q)
+  ;(prn q)
   (jdbc/with-db-connection [conn db]
     (jdbc/query conn q)))
 
