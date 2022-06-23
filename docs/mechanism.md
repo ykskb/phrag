@@ -1,4 +1,10 @@
-## Mechanism
+# Mechanism
+
+There are several projects out there for GraphQL automation on RDBMS. Among them, Phrag focuses on keeping itself minimal and not-overly-complicated while providing decent CRUD capabilities.
+
+## Database
+
+Phrag creates its GraphQL engine from an existing RDBMS. It does not deal with DB management such as model definitions or migrations.
 
 ## Queries
 

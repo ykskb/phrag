@@ -8,11 +8,11 @@ Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an in
 
 ## Overview
 
-- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data such as tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone executable](#stand-alone-version).
+- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data of tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone executable](#stand-alone-version).
 
 - **CRUD / Relationship Features:** tables and/or views become queryable as root objects including nested objects of [relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
-- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured in Clojure before & after database accesses per table & operation type, which can make GraphQL more practical with access controls, event firing and more.
+- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per an operation type & table. It can make a GraphQL service more practical with access controls, event firing and more.
 
 - **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
@@ -24,13 +24,13 @@ Though there are multiple ways to run, Phrag only requires an RDBMS to create Gr
 
 - **Foreign keys:** Phrag translates foreign keys to nested properties in GraphQL objects.
 
-- **Indices on foreign key columns:** Phrag queries a database by origin and destination columns of foreign keys for nested objects. It should be noted that creating a foreign key does not index those columns.
+- **Indices on foreign key columns:** Phrag queries a database by both origin and destination columns of foreign keys for nested objects. It should be noted that creating a foreign key does not always index those columns (especially origin column).
 
 > **Notes:**
 >
 > - Supported databases are SQLite and PostgreSQL.
 >
-> - If PostgreSQL is used, Phrag queries usage tables such as `key_column_usage` and `constraint_column_usage` to retrieve PK / FK info, therefore the database user provided to Phrag needs to be identical to the one that created those keys.
+> - If PostgreSQL is used, Phrag queries usage tables such as `key_column_usage` and `constraint_column_usage` to retrieve PK / FK info, therefore a database user provided to Phrag needs to be identical to the one that created those keys.
 >
 > - Not all database column types are mapped to Phrag's GraphQL fields yet. Any help would be appreciated through issues and PRs.
 
@@ -60,7 +60,7 @@ There is also a support for creating Phrag's GraphQL as a route for [reitit](htt
 
 ## Stand-alone Version
 
-There is a stand-alone version of Phrag which is runnable as a Docker container or Java process with a single command. It's suitable if Phrag's GraphQL is desired without any custom logic or if one wants to play around with it. [Here](https://github.com/ykskb/phrag-standalone) is the repository of those artifacts for more options and information.
+There is a stand-alone version of Phrag which is runnable as a Docker container or Java process with a single command. It's suitable if Phrag's GraphQL is desired without any custom logic or if one wants to play around with it. [Here](https://github.com/ykskb/phrag-standalone) is the repository of those artifacts for more details.
 
 ```sh
 # example: Docker container with SQLite
