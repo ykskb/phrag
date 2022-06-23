@@ -1,6 +1,6 @@
 (ns phrag.db.core
-  (:require [cheshire.core :as json]
-            [clojure.java.jdbc :as jdbc]
+  (:require [clojure.java.jdbc :as jdbc]
+            [jsonista.core :as j]
             [honey.sql :as sql]
             [honey.sql.helpers :as h])
   (:import  [org.postgresql.util PGobject]))
@@ -14,12 +14,12 @@
 (defmethod read-pgobject :json
   [^PGobject x]
   (when-let [val (.getValue x)]
-    (json/parse-string val true)))
+    (j/read-value val j/keyword-keys-object-mapper)))
 
 (defmethod read-pgobject :jsonb
   [^PGobject x]
   (when-let [val (.getValue x)]
-    (json/parse-string val true)))
+    (j/read-value val j/keyword-keys-object-mapper)))
 
 (defmethod read-pgobject :default
   [^PGobject x]

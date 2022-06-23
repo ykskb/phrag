@@ -1,6 +1,5 @@
 (ns phrag.db.postgres
-  (:require [cheshire.core :as json]
-            [clojure.string :as s]
+  (:require [clojure.string :as s]
             [phrag.db.core :as core]
             [honey.sql :as sql]
             [honey.sql.helpers :as h]))

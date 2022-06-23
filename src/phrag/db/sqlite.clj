@@ -1,5 +1,5 @@
 (ns phrag.db.sqlite
-  (:require [cheshire.core :as json]
+  (:require [jsonista.core :as j]
             [clojure.string :as s]
             [honey.sql :as sql]
             [honey.sql.helpers :as h]
@@ -139,9 +139,13 @@
   (resolve-query [adpt table-key selection ctx]
     (let [query (compile-query 1 table-key selection ctx)
           res (core/exec-query (:db adpt) (sql/format (json-array-cast query)))]
-      (json/parse-string (:result (first res)) true)))
+      (-> (first res)
+          :result
+          (j/read-value j/keyword-keys-object-mapper))))
 
   (resolve-aggregation [adpt table-key selection ctx]
     (let [query (compile-aggregation table-key selection ctx)
           res (core/exec-query (:db adpt) (sql/format query))]
-      (json/parse-string (:result (first res)) true))))
+      (-> (first res)
+          :result
+          (j/read-value j/keyword-keys-object-mapper)))))
