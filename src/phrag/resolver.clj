@@ -1,6 +1,5 @@
 (ns phrag.resolver
-  "Resolvers for Phrag's GraphQL schema. Queries are executed at each nest level
-  to batch nested queries and avoid N+1 problem while allowing use of `limit`."
+  "Resolvers for Phrag's GraphQL schema."
   (:require [clojure.pprint :as pp]
             [clojure.walk :as w]
             [clojure.set :as clj-set]

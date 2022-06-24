@@ -1,4 +1,5 @@
 (ns phrag.db.core
+  "DB operations to create and resolve GraphQL."
   (:require [clojure.java.jdbc :as jdbc]
             [jsonista.core :as j]
             [honey.sql :as sql]
@@ -32,12 +33,12 @@
 
 ;; Utilities
 
-(def aggr-keys #{:count :avg :max :min :sum})
+(def ^:no-doc aggr-keys #{:count :avg :max :min :sum})
 
-(defn column-path [table-key column-key]
+(defn ^:no-doc column-path [table-key column-key]
   (str (name table-key) "." (name column-key)))
 
-(defn column-path-key [table-key column-key]
+(defn ^:no-doc column-path-key [table-key column-key]
   (keyword (column-path table-key column-key)))
 
 ;; Argument Handler
@@ -75,7 +76,9 @@
                                    (conj vec [col direc]))
                                  nil arg)))
 
-(defn apply-args [q args ctx]
+(defn apply-args
+  "Applies filter, sort and paginationarguments."
+  [q args ctx]
   (let [def-lmt (:default-limit ctx)
         lmt (or (:limit args) (and (integer? def-lmt) def-lmt))]
     (cond-> (apply-where q (:where args))
@@ -85,7 +88,9 @@
 
 ;; Interceptor signals
 
-(defn signal [args table-key op pre-post ctx]
+(defn signal
+  "Calls all interceptor functions applicable."
+  [args table-key op pre-post ctx]
   (reduce (fn [args sgnl-fn]
             (sgnl-fn args ctx))
           args
@@ -93,7 +98,7 @@
 
 ;; Query handling
 
-(defn exec-query [db q]
+(defn ^:no-doc exec-query [db q]
   ;(prn q)
   (jdbc/with-db-connection [conn db]
     (jdbc/query conn q)))
@@ -130,10 +135,13 @@
 ;; DB adapter protocol
 
 (defprotocol DbAdapter
-  (table-names [adpt])
-  (view-names [adpt])
-  (column-info [adpt table-name])
-  (foreign-keys [adpt table-name])
-  (primary-keys [adpt table-name])
-  (resolve-query [adpt table-key selection ctx])
-  (resolve-aggregation [adpt table-key selection ctx]))
+  "Protocol for executing DB-specific operations."
+  (table-names [adpt] "Retrieves a list of table names.")
+  (view-names [adpt] "Retrieves a list of view names.")
+  (column-info [adpt table-name] "Retrieves a list of column maps.")
+  (foreign-keys [adpt table-name] "Retrieves a list of foreign key maps.")
+  (primary-keys [adpt table-name] "Retrieves a list of primary key maps.")
+  (resolve-query [adpt table-key selection ctx]
+    "Resolves a GraphQL query which possibly has nested query objects.")
+  (resolve-aggregation [adpt table-key selection ctx]
+    "Resolves a root-level aggregation query."))

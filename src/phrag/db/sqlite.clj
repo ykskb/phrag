@@ -1,4 +1,5 @@
 (ns phrag.db.sqlite
+  "Implementation of DB adapter for SQLite."
   (:require [jsonista.core :as j]
             [clojure.string :as s]
             [honey.sql :as sql]

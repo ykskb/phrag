@@ -1,4 +1,5 @@
 (ns phrag.db.postgres
+  "Implementation of DB adapter for PostgreSQL."
   (:require [clojure.string :as s]
             [phrag.db.core :as core]
             [honey.sql :as sql]

@@ -19,7 +19,7 @@
   (let [pk-names (map :name (:pks table))]
     (map keyword pk-names)))
 
-(defn is-circular-m2m-fk?
+(defn circular-m2m-fk?
   "Bridge tables of circular many-to-many have 2 columns linked to the
   same table. Example: `user_follow` table where following and the followed
   are both linked to `users` table."

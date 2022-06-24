@@ -126,7 +126,7 @@
              ctx/init-schema
              (:tables config)))
 
-(defn- update-fk-schema [schema table config]
+(defn- assoc-fks [schema table config]
   (reduce-kv (fn [m _from-key fk]
                (cond-> m
                  true (assoc-has-one table fk)
@@ -136,7 +136,7 @@
 
 (defn- update-relationships [schema config]
   (reduce-kv (fn [m _table-key table]
-               (update-fk-schema m table config))
+               (assoc-fks m table config))
              schema
              (:tables config)))
 

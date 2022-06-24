@@ -1,5 +1,5 @@
 (ns phrag.context
-  "Context for constructing Phrag's GraphQL schema from DB schema data."
+  "Context from DB schema data to construct Phrag's GraphQL."
   (:require [camel-snake-kebab.core :as csk]
             [clojure.string :as s]
             [clojure.pprint :as pp]
@@ -17,7 +17,7 @@
   (let [tbl-name (:name table)
         rscs (inf/plural tbl-name)
         fk-from (:from fk)]
-    (if (tbl/is-circular-m2m-fk? table fk-from)
+    (if (tbl/circular-m2m-fk? table fk-from)
       (str rscs "_on_" fk-from)
       rscs)))
 
@@ -31,65 +31,51 @@
       (s/replace from #"_id" "")
       (str from "_" (inf/singular (:table fk))))))
 
-(defn- nest-fk [rel-type table-key fk]
+(defn- nest-fk-map
+  "Fk map of both directions for resolving nested queries."
+  [rel-type table-key fk]
   (-> (reduce-kv (fn [m k v] (assoc m k (keyword v))) {} fk)
       (assoc :from-table table-key)
       (assoc :type rel-type)))
 
-(defn- relation-context-per-table [table]
+(defn- assoc-has-one-maps
+  "assoc has-one on FK origin table"
+  [m table-key fks]
+  (reduce (fn [m fk]
+            (let [has-1-fld (keyword (has-one-field fk))]
+              (assoc-in m [:nest-fks table-key has-1-fld]
+                        (nest-fk-map :has-one table-key fk))))
+          m
+          fks))
+
+(defn- assoc-has-many-maps
+  "assoc has-many inverse relation on FK destination tables"
+  [m table-key table fks]
+  (reduce
+   (fn [m fk]
+     (let [has-many-key (keyword (has-many-field table fk))
+           has-many-aggr-key (keyword (str (name has-many-key) "_aggregate"))
+           to-tbl-key (keyword (:table fk))
+           n-fk (nest-fk-map :has-many table-key fk)
+           n-aggr-fk (nest-fk-map :has-many-aggr table-key fk)]
+       {:nest-fks (-> (:nest-fks m)
+                      (assoc-in [to-tbl-key has-many-key] n-fk)
+                      (assoc-in [to-tbl-key has-many-aggr-key] n-aggr-fk))}))
+   m
+   fks))
+
+(defn- relation-ctx-per-table [table]
   (let [fks (:fks table)
-        ;; assoc has-one on FK origin table
         tbl-key (keyword (:name table))
-        has-one (reduce (fn [m fk]
-                          (let [has-1-fld (keyword (has-one-field fk))]
-                               (-> m
-                                   (update-in [:fields tbl-key] conj has-1-fld)
-                                   (update-in [:columns tbl-key] conj
-                                              (keyword (:from fk)))
-                                   (assoc-in [:nest-fks tbl-key has-1-fld]
-                                             (nest-fk :has-one tbl-key fk)))))
-                        {:fields {tbl-key #{}}
-                         :columns {tbl-key #{}}
-                         :nest-fks {tbl-key {}}}
-                        fks)]
-    ;; assoc has-many inverse relation on FK destination tables
-    (reduce
-     (fn [m fk]
-       (let [has-many-key (keyword (has-many-field table fk))
-             has-many-aggr-key (keyword (str (name has-many-key) "_aggregate"))
-             to-col-key #{(keyword (:to fk))}
-             to-tbl-key (keyword (:table fk))
-             n-fk (nest-fk :has-many tbl-key fk)
-             n-aggr-fk (nest-fk :has-many-aggr tbl-key fk)]
-         {:fields (merge-with into (:fields m)
-                              {to-tbl-key #{has-many-key has-many-aggr-key}})
-          :columns (merge-with into (:columns m) {to-tbl-key to-col-key})
-          :nest-fks (-> (:nest-fks m)
-                        (assoc-in [to-tbl-key has-many-key] n-fk)
-                        (assoc-in [to-tbl-key has-many-aggr-key] n-aggr-fk))}))
-     has-one
-     fks)))
+        has-one-mapped (assoc-has-one-maps {:nest-fks {tbl-key {}}} tbl-key fks)]
+    (assoc-has-many-maps has-one-mapped tbl-key table fks)))
 
 (defn- relation-context [tables]
   (reduce (fn [m table]
-            (let [rel-ctx (relation-context-per-table table)]
-              {:fields (merge-with into (:fields m) (:fields rel-ctx))
-               :columns (merge-with into (:columns m) (:columns rel-ctx))
-               :nest-fks (merge-with merge (:nest-fks m) (:nest-fks rel-ctx))}))
+            (let [rel-ctx (relation-ctx-per-table table)]
+              {:nest-fks (merge-with merge (:nest-fks m) (:nest-fks rel-ctx))}))
           {:fields {} :columns {} :nest-fks {}}
           tables))
-
-;;; Schema Context
-
-(defn- rsc-names [table-name sgl-or-plr]
-  (let [bare (if (= :singular sgl-or-plr)
-               (inf/singular table-name)
-               (inf/plural table-name))
-        pascal (csk/->PascalCase bare)]
-    {:bare bare
-     :bare-key (keyword bare)
-     :pascal pascal
-     :pascal-key (keyword pascal)}))
 
 ;; FK Context
 
@@ -101,24 +87,12 @@
      :has-many-aggr (keyword (str has-many-fld "_aggregate"))
      :has-one (keyword (has-one-field fk))}))
 
-(defn- fk-context [from-key fk table table-map rel-ctx]
-  (let [to-table-name (:table fk)
-        to-table-key (keyword to-table-name)
-        fk-to-table (to-table-key table-map)]
-    {:from-key from-key
-     :to-key (keyword (:to fk))
-     :to-tbl-key to-table-key
-     :to-tbl-sgl-names (rsc-names to-table-name :singular)
-     :to-tbl-col-keys (tbl/col-key-set fk-to-table)
-     :field-keys (fk-field-keys fk table to-table-name)
-     :to-tbl-rel-cols (get-in rel-ctx [:columns to-table-name])
-     :to-tbl-rel-flds (get-in rel-ctx [:fields to-table-name])}))
-
-(defn- fk-ctx-map [table table-map rel-ctx]
+(defn- fk-context [table]
   (let [fks (:fks table)
         fk-map (zipmap (map #(keyword (:from %)) fks) fks)]
-    (reduce-kv (fn [m k v]
-                 (assoc m k (fk-context k v table table-map rel-ctx)))
+    (reduce-kv (fn [m from-key fk]
+                 (assoc m from-key
+                        {:field-keys (fk-field-keys fk table (:table fk))}))
                {} fk-map)))
 
 ;;; Signal functions
@@ -145,9 +119,9 @@
 
 ;;; Lacinia Schema Context from Table Data
 
-(defn- table-schema-context
+(defn- table-context
   "Compiles resource names, Lacinia fields and relationships from table data."
-  [tables rel-ctx signals]
+  [tables signals]
   (let [table-map (zipmap (map #(keyword (:name %)) tables) tables)]
     (reduce-kv
      (fn [m k table]
@@ -157,26 +131,21 @@
          (assoc
           m k
           (-> m
-              (assoc :sgl-names (rsc-names table-name :singular))
-              (assoc :plr-names (rsc-names table-name :plural))
               (assoc :col-keys (tbl/col-key-set table))
-              (assoc :fks (fk-ctx-map table table-map rel-ctx))
+              (assoc :fks (fk-context table))
               (assoc :pk-keys pk-keys)
               (assoc :lcn-obj-keys obj-keys)
               (assoc :lcn-qry-keys (fld/lcn-qry-keys table-name))
               (assoc :lcn-mut-keys (fld/lcn-mut-keys table-name))
               (assoc :lcn-descs (fld/lcn-descs table-name))
               (assoc :lcn-fields (fld/lcn-fields table obj-keys pk-keys))
-              (assoc :rel-flds (get-in rel-ctx [:fields k]))
-              (assoc :rel-cols (get-in rel-ctx [:columns k]))
-              (assoc :rels (get-in rel-ctx [:rels k]))
               (assoc :signals {:query (signal-per-type signals k :query)
                                :create (signal-per-type signals k :create)
                                :delete (signal-per-type signals k :delete)
                                :update (signal-per-type signals k :update)})))))
      {} table-map)))
 
-(defn- view-schema-context [views signals]
+(defn- view-context [views signals]
   (let [view-map (zipmap (map #(keyword (:name %)) views) views)]
     (reduce-kv
      (fn [m k view]
@@ -184,9 +153,6 @@
              obj-keys (fld/lcn-obj-keys view-name)]
          (assoc m k
                 (-> m
-                    (assoc :sgl-names (rsc-names view-name :singular))
-                    (assoc :plr-names (rsc-names view-name :plural))
-                    (assoc :col-keys (tbl/col-key-set view))
                     (assoc :lcn-obj-keys obj-keys)
                     (assoc :lcn-qry-keys (fld/lcn-qry-keys view-name))
                     (assoc :lcn-descs (fld/lcn-descs view-name))
@@ -212,12 +178,11 @@
                 :no-fk-on-db (:no-fk-on-db options false)
                 :plural-table-name (:plural-table-name options true)
                 :use-aggregation (:use-aggregation options true)}
-        db-scm (tbl/db-schema config)
-        rel-ctx (relation-context (:tables db-scm))]
+        db-scm (tbl/db-schema config)]
     (-> config
-        (assoc :relation-ctx rel-ctx)
-        (assoc :tables (table-schema-context (:tables db-scm) rel-ctx signals))
-        (assoc :views (view-schema-context (:views db-scm) signals)))))
+        (assoc :relation-ctx (relation-context (:tables db-scm)))
+        (assoc :tables (table-context (:tables db-scm) signals))
+        (assoc :views (view-context (:views db-scm) signals)))))
 
 (def ^:no-doc init-schema {:enums fld/sort-op-enum
                            :input-objects fld/filter-input-objects

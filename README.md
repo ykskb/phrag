@@ -10,19 +10,19 @@ Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an in
 
 - **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data of tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone executable](#stand-alone-version).
 
-- **CRUD / Relationship Features:** tables and/or views become queryable as root objects including nested objects of [relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
-
-- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per an operation type & table. It can make a GraphQL service more practical with access controls, event firing and more.
+- **CRUD / Relationship Features:** tables and/or views become queryable as root objects including nested objects of [n-ary relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
 - **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
+- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per an operation type & table. It can make a GraphQL service more practical with access controls, event firing and more.
+
 ## Requirements
 
-Though there are multiple ways to run, Phrag only requires an RDBMS to create GraphQL. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
+Though there are multiple ways to run, Phrag only requires an RDBMS to create its GraphQL. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
 
 - **Primary keys:** Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
 
-- **Foreign keys:** Phrag translates foreign keys to nested properties in GraphQL objects.
+- **Foreign keys:** Phrag translates foreign keys to nested properties in GraphQL query objects.
 
 - **Indices on foreign key columns:** Phrag queries a database by both origin and destination columns of foreign keys for nested objects. It should be noted that creating a foreign key does not always index those columns (especially origin column).
 
@@ -88,5 +88,9 @@ ykskb/phrag-standalone:latest
 ### Example projects:
 
 - [SNS](https://github.com/ykskb/situated-sns-backend): a situated project to verify Phrag's concept and practicality. It has authentication, access control and custom logics through Phrag's interceptors.
+
+## Contribution to Phrag
+
+Please feel free to open Github issues to send suggestions, report bugs or discuss features. PRs are also welcomed.
 
 Copyright © 2021 Yohei Kusakabe

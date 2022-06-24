@@ -1,4 +1,5 @@
 (ns phrag.db.adapter
+  "DB adapter initialization."
   (:require [clojure.string :as s]
             [phrag.db.sqlite :as sqlite]
             [phrag.db.postgres :as postgres]))
