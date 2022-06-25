@@ -1,5 +1,4 @@
 name: Unit Tests
-
 on: [push]
 
 jobs:
@@ -9,17 +8,39 @@ jobs:
         # os: [ubuntu-latest, macOS-latest, windows-latest]
         java: ['8', '11']
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Prepare java
         uses: actions/setup-java@v2
         with:
           distribution: 'zulu'
           java-version: ${{ matrix.java }}
+
       - name: Install clojure tools
         uses: DeLaGuardo/setup-clojure@3.5
         with:
           lein: 'latest'
+
       - name: Run tests
         run: lein cloverage -n 'phrag.*'
+        env:
+          DB_NAME: postgres
+          DB_HOST: postgres
+          DB_USER: postgres
+          DB_PASS: postgres
