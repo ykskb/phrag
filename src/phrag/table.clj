@@ -31,28 +31,6 @@
                               (:fks table))]
     (contains? (set (map :from cycl-link-fks)) fk-from)))
 
-;;; Optional foreign key detection from table/column names
-
-(defn- to-table-name [rsc config]
-  (if (:plural-table-name config) (inf/plural rsc) (inf/singular rsc)))
-
-(defn- fks-by-names [table config]
-  (reduce (fn [v column]
-            (let [col-name (:name column)]
-              (if (s/ends-with? (s/lower-case col-name) "_id")
-                (conj v
-                      {:table (to-table-name (s/replace col-name "_id" "")
-                                             config)
-                       :from col-name :to "id"})
-                v)))
-          []
-          (:columns table)))
-
-(defn- update-fks-by-names [tables config]
-  (map (fn [table]
-         (assoc table :fks (fks-by-names table config)))
-       tables))
-
 ;;; Table schema map from config
 
 (defn- table-schema
@@ -104,7 +82,6 @@
                          (table-schema (:db-adapter config))
                          (:tables config))
                  (:scan-tables config) (merge-config-tables config)
-                 (:no-fk-on-db config) (update-fks-by-names config)
                  true (validate-tables))
         views (if (:scan-views config)
                 (view-schema (:db-adapter config))

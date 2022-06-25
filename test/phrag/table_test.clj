@@ -95,7 +95,6 @@
        (-> (tbl/db-schema {:db db
                            :db-adapter (db-adapter/db->adapter db)
                            :scan-tables true
-                           :no-fk-on-db false
                            :tables []})
            :tables)))
 
@@ -113,7 +112,6 @@
          (-> (tbl/db-schema {:db db
                              :db-adapter (db-adapter/db->adapter db)
                              :scan-tables true
-                             :no-fk-on-db false
                              :tables [extra-table]})
              :tables))))
 
@@ -129,7 +127,6 @@
          (-> (tbl/db-schema {:db db
                              :db-adapter (db-adapter/db->adapter db)
                              :scan-tables true
-                             :no-fk-on-db false
                              :tables [{:name "venues"
                                        :columns venues-columns}
                                       {:name "meetups"
@@ -154,7 +151,6 @@
                            :db-adapter (db-adapter/db->adapter db)
                            :scan-tables true
                            :scan-views true
-                           :no-fk-on-db false
                            :tables []})
            :views)))
 
@@ -165,72 +161,3 @@
                                 :scan-views false})]
         (is (empty? (:views scm)))
         (is (not-empty (:tables scm)))))))
-
-(defn db-without-fk []
-  (doto {:connection (jdbc/get-connection {:connection-uri "jdbc:sqlite:"})}
-    (jdbc/execute! (str "create table members ("
-                        "id               integer primary key, "
-                        "first_name       text, "
-                        "last_name        text, "
-                        "email            text);"))
-    (jdbc/execute! (str "create table groups ("
-                        "id            integer primary key, "
-                        "name          text, "
-                        "created_at    timestamp);"))
-    (jdbc/execute! (str "create table venues ("
-                        "id               integer primary key, "
-                        "name             text, "
-                        "postal_code      text);"))
-    (jdbc/execute! (str "create table meetups ("
-                        "id              integer primary key, "
-                        "title           text not null, "
-                        "start_at        timestamp, "
-                        "venue_id        int, "
-                        "group_id        int);"))
-    (jdbc/execute! (str "create table meetups_members ("
-                        "meetup_id     int, "
-                        "member_id     int, "
-                        "primary key (meetup_id, member_id));"))
-    (jdbc/execute! (str "create table groups_members ("
-                        "group_id    int, "
-                        "member_id   int, "
-                        "primary key (group_id, member_id));"))))
-
-
-(def ^:private venues-fk-detection
-  {:name "venues"
-   :columns [{:name "id" :type "integer"}
-             {:name "name" :type "text"}
-             {:name "postal_code" :type "text"}]
-   :table-type :root
-   :fks []
-   :pks [{:name "id" :type "integer"}]})
-
-(def ^:private meetups-fk-detection
-  {:name "meetups"
-   :columns [{:name "id" :type "integer"}
-             {:name "title" :type "text"}
-             {:name "start_at" :type "timestamp"}
-             {:name "venue_id" :type "int"}
-             {:name "group_id" :type "int"}]
-   :table-type :root
-   :fks [{:table "venues" :from "venue_id" :to "id"}
-         {:table "groups" :from "group_id" :to "id"}]
-   :pks [{:name "id" :type "integer"}]})
-
-(deftest db-schema-without-fk
-  (let [db (db-without-fk)]
-    (testing  "scan DB without fk: no config table and plural table name"
-      (schema-as-expected?
-       [members
-        groups
-        venues-fk-detection
-        meetups-fk-detection
-        meetups-members]
-       (-> (tbl/db-schema {:db db
-                           :db-adapter (db-adapter/db->adapter db)
-                           :scan-tables true
-                           :no-fk-on-db true
-                           :plural-table-name true
-                           :tables []})
-           :tables)))))

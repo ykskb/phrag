@@ -175,8 +175,6 @@
                 :scan-views (:scan-views options true)
                 :default-limit (:default-limit options)
                 :max-nest-level (:max-nest-level options)
-                :no-fk-on-db (:no-fk-on-db options false)
-                :plural-table-name (:plural-table-name options true)
                 :use-aggregation (:use-aggregation options true)}
         db-scm (tbl/db-schema config)]
     (-> config
