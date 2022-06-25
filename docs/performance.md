@@ -5,14 +5,14 @@
 Load test repository: [phrag-perf](https://github.com/ykskb/phrag-perf)
 
 > Note:
-> This documentation page is mainly about Phrag's GraphQL `query` since there are several varying factors for measuring its performnace. On the other hand, Phrag's `mutations` are atomic operations and simpler to be estimated, so its result is put as a [reference data](#reference-data) below.
+> This documentation page is mainly about Phrag's GraphQL `query` since there are several varying factors for its performnace measurement. On the other hand, Phrag's `mutations` are atomic operations and simpler to be estimated, so its result is put as a [reference data](#reference-data) below.
 
 ### Objectives
 
 Load tests were performed to:
 
 - Get some benchmarks for simple resource setups.
-  (Stringent VM/GC/OS/DB tuning is not in the scope.)
+  (Stringent VM/GC/OS/DB tuning was not in the scope.)
 
 - Verify there's no obvious bottleneck and performance improves more or less linear with additional resources.
 
@@ -32,13 +32,15 @@ While each user is constantly sending a request every `2s`, how many users can P
 
 - 3 GraphQL queries with different nest levels were tested to see performance difference of additional data retrieval.
 
+- All tables had roughly `100,000` records created beforehand.
+
+- All queries had `limit`, `offset` and `where` (filter on `id`) for testing practical query planning.
+
 - Each test was performed with `limit: 50` and `limit: 100` to see performance difference of serialization workload.
 
-- All tables had roughly `100,000` records created through GraphQL mutation calls.
+- Parameters of `$offset` and `$id_gt` for pagination and filter were randomized between `0` to `100,000` for each request.
 
-- Parameters of `$offset` and `$id_gt` were randomized between `0` to `100,000` for each request.
-
-Query without nest: simple object listing
+Query with no nest:
 
 ```graphql
 query queryVenues($limit: Int!, $offset: Int!, $id_gt: Int!) {
@@ -50,7 +52,7 @@ query queryVenues($limit: Int!, $offset: Int!, $id_gt: Int!) {
 }
 ```
 
-Query with 1 nest: `has-many`
+Query with 1 nest of `has-many`:
 
 ```graphql
 query queryVenueMeetups($limit: Int!, $offset: Int!, $id_gt: Int!) {
@@ -66,7 +68,7 @@ query queryVenueMeetups($limit: Int!, $offset: Int!, $id_gt: Int!) {
 }
 ```
 
-Query with 2 nests: `has-many` and `has-one` (often referred as `many-to-many`)
+Query with 2 nests of `has-many` and `has-one` (often referred as `many-to-many` relationship):
 
 ```graphql
 query queryMeetupsWithMembers($limit: Int!, $offset: Int!, $id_gt: Int!) {
@@ -103,7 +105,7 @@ query queryMeetupsWithMembers($limit: Int!, $offset: Int!, $id_gt: Int!) {
 
 #### Request Client
 
-Home computer setup with Mac Studio was used to send requests from the same region as application servers.
+Home computer setup with Mac Studio was used to send requests from the same region as server setups.
 
 ### Results
 
@@ -147,7 +149,7 @@ Limit: `100`
 
 #### Resource allocation
 
-Performance seems to have improved roughly linear with the additional resource allocation overall. Improvement seems slightly more significant for nested queries.
+Performance seems to have improved roughly linear with the additional resource allocation overall.
 
 #### Nest levels
 
@@ -157,9 +159,9 @@ Considering additional subqueries and serialization required, `30%` to `40%` les
 
 As explained in [mechanism](./mechanism.md), Phrag translates nested GraphQL queries into a single SQL, leveraging correlated subqueries and JSON functions. This model was compared against other possible models as below:
 
-- **Bucket Queue Model**: bucket queue model with [Superlifter](https://github.com/oliyh/superlifter) in this [branch](https://github.com/ykskb/phrag/tree/superlifter-version) was tested for comparison. The idea is to use buckets for firing batched SQL queries per a nest level. Though results are not included in this page, a model of resolving nested data by directly going through a query graph was more performant. Adding queues and resolving them through Promise (CompletableFuture) seemed to have some overhead.
+- **SQL-per-nest Model**: a model of issueing a DB query per a nest level in this [branch](https://github.com/ykskb/phrag/tree/sql-per-nest-version) was actually an original idea for Phrag's resolver. Though this model fires DB queries more frequently, it was observed nearly as performant as subquery model with slightly less load on DB's CPU. Yet subquery model was chosen over this model since it performed slightly better and SQL-per-nest model is more suceptible to DB connection overhead, depending on environment setups. Performance measured for SQL-per-nest model can be found in [reference data](#sql-per-nest-model) below.
 
-- **SQL-per-nest Model**: a model of issueing a DB query per a nest level in this [branch](https://github.com/ykskb/phrag/tree/sql-per-nest-version) was actually the original idea for Phrag's resolver. Though this model fires DB queries more frequently, it was observed nearly as performant as the subquery model and it had less load on DB's CPU by `20%` to `30%`. However, subquery model was chosen over this model since the performance of SQL-per-nest model can be affected by DB connection overhead, depending on environment setups. Also, subquery model still performed slightly better even though it had higher load on DB's CPU. It's a trade-off of performing subqueries & JSON serialization on DB side instead of application side. Performance measured for SQL-per-nest model can be found in [reference data](#sql-per-nest-model) below.
+- **Bucket Queue Model**: bucket queue model with [Superlifter](https://github.com/oliyh/superlifter) in this [branch](https://github.com/ykskb/phrag/tree/superlifter-version) was tested for comparison. The idea is to use buckets for firing batched SQL queries per a nest level. Though results are not included in this page, a model of resolving nested data by directly going through a query graph was more performant. Adding queues and resolving them through Promise (CompletableFuture) seemed to have some overhead.
 
 ### Reference Data
 

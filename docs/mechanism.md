@@ -18,6 +18,8 @@ Phrag transforms a foreign key constraint into nested query objects of GraphQL a
 
 <img src="./images/fk-transform.png" width="400px" />
 
+Also Phrag does not treat `many-to-many` relationships specially by skipping bridge table or in any other way. This is to keep Phrag's GraphQL simple by following what a database represents.
+
 ### SQL Queries
 
 N+1 problem is an anti-pattern where a relationship query is executed for every one of retrieved records. Phrag's query resolver translates nested query objects into a single SQL query, leveraging lateral join / correlated subqueries with JSON functions.
