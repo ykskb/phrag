@@ -75,10 +75,11 @@
                                      [[:raw (compile-aggr from-table slct)]])
                                     (h/from from-table)
                                     (h/where on-clause)
-                                    (core/apply-args (:arguments slct) ctx))
+                                    (core/apply-args from-table (:arguments slct)
+                                                     ctx))
                                 field-key]))))))))
      (-> (h/from table-key)
-         (core/apply-args (:arguments selection) ctx))
+         (core/apply-args table-key (:arguments selection) ctx))
      (:selections selection))))
 
 (defn- json-array-cast [q]
@@ -88,7 +89,7 @@
 (defn- compile-aggregation [table-key selection ctx]
   (-> (h/select [[:raw (compile-aggr table-key selection)] :result])
       (h/from table-key)
-      (core/apply-args (:arguments selection) ctx)))
+      (core/apply-args table-key (:arguments selection) ctx)))
 
 (defrecord PostgresAdapter [db]
   core/DbAdapter

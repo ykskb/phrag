@@ -65,9 +65,14 @@
                      "postal_code: \"234567\") { vid }}")
                 [:data :createVenue :vid] 2))
 
-    (testing "create 1st meetup under venue 2"
+    (testing "create 1st group"
+      (test-gql (str "mutation {createGroup (name: \"kafka group\") { id }}")
+                [:data :createGroup :id] 1))
+
+    (testing "create 1st meetup under venue 2 and group 1"
       (test-gql (str "mutation {createMeetup (title: \"rust meetup\" "
-                     "start_at: \"2021-01-01 18:00:00\" venue_id: 2) { id }}")
+                     "start_at: \"2021-01-01 18:00:00\" venue_id: 2 group_id: 1) "
+                     "{ id }}")
                 [:data :createMeetup :id] 1))
 
     (testing "create 2nd meetup under venue 1"
@@ -409,6 +414,13 @@
                  [:data :venues]
                  [{:name "office one" :postal_code "123456"
                    :meetups []}]))
+
+    (testing "list entity with possibly ambiguous filter of id"
+      (test-gql (str "{ meetups (where: {id: {eq: 1}}) { id title group { "
+                     "id name }}}")
+                [:data :meetups]
+                [{:id 1 :title "rust meetup"
+                  :group {:id 1 :name "kafka group"}}]))
 
     ;; Pagination
     (testing "list entity with pagination"

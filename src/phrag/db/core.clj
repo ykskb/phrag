@@ -53,23 +53,24 @@
    :in :in
    :like :like})
 
-(defn- parse-rsc-where [rsc-where]
+(defn- parse-rsc-where [table-key rsc-where]
   (map (fn [[col v]]
          (let [entry (first v)
                op ((key entry) where-ops)]
-           [op col (val entry)]))
+           [op (column-path-key table-key col) (val entry)]))
        rsc-where))
 
-(defn- parse-and-or [op where-list]
+(defn- parse-and-or [table-key op where-list]
   (concat [op] (reduce (fn [v whr]
-                         (concat v (parse-rsc-where whr)))
+                         (concat v (parse-rsc-where table-key whr)))
                        []
                        where-list)))
 
-(defn- apply-where [q whr]
-  (apply h/where q (cond-> (parse-rsc-where (dissoc whr :and :or))
-                     (some? (:or whr)) (conj (parse-and-or :or (:or whr)))
-                     (some? (:and whr)) (conj (parse-and-or :and (:and whr))))))
+(defn- apply-where [q table-key whr]
+  (apply h/where q
+         (cond-> (parse-rsc-where table-key (dissoc whr :and :or))
+           (some? (:or whr)) (conj (parse-and-or table-key :or (:or whr)))
+           (some? (:and whr)) (conj (parse-and-or table-key :and (:and whr))))))
 
 (defn- apply-sort [q arg]
   (apply h/order-by q (reduce-kv (fn [vec col direc]
@@ -77,11 +78,11 @@
                                  nil arg)))
 
 (defn apply-args
-  "Applies filter, sort and paginationarguments."
-  [q args ctx]
+  "Applies filter, sort and pagination arguments."
+  [q table-key args ctx]
   (let [def-lmt (:default-limit ctx)
         lmt (or (:limit args) (and (integer? def-lmt) def-lmt))]
-    (cond-> (apply-where q (:where args))
+    (cond-> (apply-where q table-key (:where args))
       (:sort args) (apply-sort (:sort args))
       lmt (h/limit lmt)
       (integer? (:offset args)) (h/offset (:offset args)))))
@@ -99,7 +100,7 @@
 ;; Query handling
 
 (defn ^:no-doc exec-query [db q]
-  ;(prn q)
+  (prn q)
   (jdbc/with-db-connection [conn db]
     (jdbc/query conn q)))
 

@@ -96,10 +96,10 @@
                                      [[:raw (compile-aggr from-table slct)]])
                                     (h/from from-table)
                                     (h/where on-clause)
-                                    (core/apply-args (:arguments slct)
+                                    (core/apply-args from-table (:arguments slct)
                                                      ctx))))))))))
      (-> (h/from table-key)
-         (core/apply-args (:arguments selection) ctx))
+         (core/apply-args table-key (:arguments selection) ctx))
      (:selections selection))))
 
 (defn- json-array-cast [q]
@@ -110,7 +110,7 @@
   (-> (h/select [[:raw "JSON(aggr.data)"] :result])
       (h/from [(->(h/select [[:raw (compile-aggr table-key selection)] :data])
                   (h/from table-key)
-                  (core/apply-args (:arguments selection) ctx)) :aggr])))
+                  (core/apply-args table-key (:arguments selection) ctx)) :aggr])))
 
 (defrecord SqliteAdapter [db]
   core/DbAdapter
