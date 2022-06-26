@@ -8,7 +8,7 @@ Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an in
 
 ## Overview
 
-- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data of tables, columns, and primary / foreign keys. It can be run as a Clojure project or a [stand-alone executable](#stand-alone-version).
+- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, using schema data of tables, columns, and primary / foreign keys. It can be run as a Clojure project or [stand-alone releases](#stand-alone-version).
 
 - **CRUD / Relationship Features:** tables and/or views become queryable as root objects including nested objects of [n-ary relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
@@ -62,13 +62,21 @@ There is also a support for creating Phrag's GraphQL as a route for [reitit](htt
 
 There is a stand-alone version of Phrag which is runnable as a Docker container or Java process with a single command. It's suitable if Phrag's GraphQL is desired without any custom logic or if one wants to play around with it. [Here](https://github.com/ykskb/phrag-standalone) is the repository of those artifacts for more details.
 
+Try it out as a Docker container with a [self-contained DB](https://github.com/ykskb/phrag-standalone/blob/main/db/meetup_project.sql):
+
 ```sh
-# example: Docker container with SQLite
-# visit http://localhost:3000/graphiql/index.html after running:
+docker run -it -p 3000:3000 ykskb/phrag-standalone:latest
+# visit http://localhost:3000/graphiql/index.html
+```
+
+Run as a Docker container with your SQLite:
+
+```sh
 docker run -it -p 3000:3000 \
--v /host/db/dir:/database \
--e JDBC_URL=jdbc:sqlite:/database/db.sqlite \
+-v /host/db/dir:/database \ # mount a directory of your database
+-e JDBC_URL=jdbc:sqlite:/database/db.sqlite \ # specify DB URL
 ykskb/phrag-standalone:latest
+# visit http://localhost:3000/graphiql/index.html
 ```
 
 ## Documentation
