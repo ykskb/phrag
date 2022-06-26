@@ -26,7 +26,7 @@
                       :sort {:type sort}
                       :limit {:type 'Int}
                       :offset {:type 'Int}}
-               :resolve (partial rslv/resolve-query table-key table)})))
+               :resolve (partial rslv/resolve-query table-key)})))
 
 (defn- assoc-aggregation [schema table-key table]
   (let [{{:keys [aggregate where]} :lcn-obj-keys} table]
@@ -75,7 +75,7 @@
     (assoc-in schema [:mutations delete]
               {:type :Result
                :args {:pk_columns {:type `(~'non-null ~pk-input)}}
-               :resolve (partial rslv/delete-root table-key table)})))
+               :resolve (partial rslv/delete-root table-key)})))
 
 (defn- assoc-mutation-objects [schema table-key table]
   (-> schema
@@ -126,7 +126,7 @@
              ctx/init-schema
              (:tables config)))
 
-(defn- update-fk-schema [schema table config]
+(defn- assoc-fks [schema table config]
   (reduce-kv (fn [m _from-key fk]
                (cond-> m
                  true (assoc-has-one table fk)
@@ -136,7 +136,7 @@
 
 (defn- update-relationships [schema config]
   (reduce-kv (fn [m _table-key table]
-               (update-fk-schema m table config))
+               (assoc-fks m table config))
              schema
              (:tables config)))
 
@@ -164,6 +164,7 @@
   (let [ctx (-> (:signal-ctx config {})
                 (assoc :req req)
                 (assoc :db (:db config))
+                (assoc :db-adapter (:db-adapter config))
                 (assoc :default-limit (:default-limit config))
                 (assoc :max-nest-level (:max-nest-level config))
                 (assoc :relation-ctx (:relation-ctx config))

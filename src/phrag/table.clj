@@ -2,7 +2,7 @@
   "Table data handling for Phrag's GraphQL."
   (:require [clojure.string :as s]
             [clojure.pprint :as pp]
-            [phrag.db :as db]
+            [phrag.db.core :as db]
             [phrag.logging :refer [log]]
             [inflections.core :as inf]))
 
@@ -19,7 +19,7 @@
   (let [pk-names (map :name (:pks table))]
     (map keyword pk-names)))
 
-(defn is-circular-m2m-fk?
+(defn circular-m2m-fk?
   "Bridge tables of circular many-to-many have 2 columns linked to the
   same table. Example: `user_follow` table where following and the followed
   are both linked to `users` table."
@@ -31,29 +31,25 @@
                               (:fks table))]
     (contains? (set (map :from cycl-link-fks)) fk-from)))
 
-;;; Optional foreign key detection from table/column names
-
-(defn- to-table-name [rsc config]
-  (if (:plural-table-name config) (inf/plural rsc) (inf/singular rsc)))
-
-(defn- fks-by-names [table config]
-  (reduce (fn [v column]
-            (let [col-name (:name column)]
-              (if (s/ends-with? (s/lower-case col-name) "_id")
-                (conj v
-                      {:table (to-table-name (s/replace col-name "_id" "")
-                                             config)
-                       :from col-name :to "id"})
-                v)))
-          []
-          (:columns table)))
-
-(defn- update-fks-by-names [tables config]
-  (map (fn [table]
-         (assoc table :fks (fks-by-names table config)))
-       tables))
-
 ;;; Table schema map from config
+
+(defn- table-schema
+  "Queries table schema including primary keys and foreign keys."
+  [adapter]
+  (map (fn [table-name]
+         {:name table-name
+          :columns (db/column-info adapter table-name)
+          :fks (db/foreign-keys adapter table-name)
+          :pks (db/primary-keys adapter table-name)})
+       (map :name (db/table-names adapter))))
+
+(defn- view-schema
+  "Queries views with columns."
+  [adapter]
+  (map (fn [view-name]
+         {:name view-name
+          :columns (db/column-info adapter view-name)})
+       (map :name (db/view-names adapter))))
 
 (defn- merge-config-tables [tables config]
   (let [cfg-tables (:tables config)
@@ -83,13 +79,12 @@
   data provided into config if there's any."
   [config]
   (let [tables (cond-> (if (:scan-tables config)
-                         (db/table-schema (:db config))
+                         (table-schema (:db-adapter config))
                          (:tables config))
                  (:scan-tables config) (merge-config-tables config)
-                 (:no-fk-on-db config) (update-fks-by-names config)
                  true (validate-tables))
         views (if (:scan-views config)
-                (db/view-schema (:db config))
+                (view-schema (:db-adapter config))
                 nil)]
     (log :debug "Origin DB table schema:\n"
          (with-out-str (pp/pprint tables)))

@@ -1,22 +1,28 @@
-## Mechanism
+# Mechanism
+
+There are several projects out there for GraphQL automation on RDBMS. Among them, Phrag focuses on keeping itself minimal and not-overly-complicated while providing decent CRUD capabilities.
+
+## Database
+
+Phrag creates its GraphQL engine from an existing RDBMS. It does not deal with DB management such as model definitions or migrations.
 
 ## Queries
 
-All or selected tables / views become queryable as root objects that include nested objects of relationships in Phrag. This is for flexible data access without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at the root level or as a nested object together with parent objects through relationships.
+All or selected tables / views become queryable as root objects including nested objects of n-ary relationships in Phrag. This is for flexible data accesses without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at the root level or as a nested object together with parent objects through the relationships.
 
-In terms of query format, Phrag does not use [cursor connection](https://relay.dev/graphql/connections.htm). It is an intentional design decision since Phrag features universal argument formats for filtering, aggregation and pagination across root queries and nested objects of `has-many` relationships.
+In terms of query format, Phrag does not use a [cursor connection](https://relay.dev/graphql/connections.htm). This is an intentional design decision since Phrag features universal argument formats across root level and nested objects for filtering, aggregation and pagination.
 
 ### Relationships
 
-Phrag transforms a foreign key constraint into nested query objects of GraphQL as illustrated in the diagram below. This is a fundamental concept for Phrag to support multiple types of relationships:
+Phrag transforms a foreign key constraint into nested query objects of GraphQL as illustrated in the diagram below. This is a fundamental concept for Phrag to support multiple types of n-ary relationships:
 
 <img src="./images/fk-transform.png" width="400px" />
 
+Also Phrag does not treat `many-to-many` relationships specially by skipping bridge table or in any other way. This is to keep Phrag's GraphQL simple by following what a database represents.
+
 ### SQL Queries
 
-N+1 problem is an anti-pattern where a relationship query is executed for every one of retrieved records. Phrag's query resolver implements a batched SQL query per nest level to avoid N+1 problem.
-
-It should also be noted that Phrag does not use `JOIN` for relationship queries to allow `LIMIT` on nested objects.
+N+1 problem is an anti-pattern where a relationship query is executed for every one of retrieved records. Phrag's query resolver translates nested query objects into a single SQL query, leveraging lateral join / correlated subqueries with JSON functions.
 
 ## Mutations
 

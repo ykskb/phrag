@@ -4,22 +4,23 @@
             [environ.core :refer [env]]
             [phrag.core :as core]
             [phrag.context :as ctx]
-            [phrag.core-test :refer [sqlite-conn postgres-conn]]))
+            [phrag.core-test :as test-core]))
 
-;; create-db: in-memory SQLite
-;; postgres-db: real PostgreSQL
-
-(deftest graphql-queries
-  (let [db (if (env :test-on-postgres)
-                 (postgres-conn)
-                 (sqlite-conn))
-        opt {:db db}
+(defn- run-graphql-tests [db on-postgres]
+  (let [opt {:db db}
         conf (ctx/options->config opt)
         schema (core/schema conf)
         test-gql (fn [q res-keys expected]
                    (let [res (core/exec conf schema q nil {})]
                      (prn res)
                      (is (= expected (get-in res res-keys)))))]
+
+    ;; Empty Case
+
+    (testing "empty user"
+      (test-gql  "{ members { id email first_name }}"
+                 [:data :members]
+                 []))
 
     ;; Root entities
 
@@ -74,26 +75,32 @@
                      "start_at: \"2021-01-12 18:00:00\" venue_id: 1) { id }}")
                 [:data :createMeetup :id] 2))
 
-    (testing "list entities with has-one param"
-      (test-gql  (str "{ meetups { id title start_at venue_id "
-                      "venue { vid name }}}")
-                 [:data :meetups]
-                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
-                   :venue_id 2 :venue {:vid 2 :name "city hall"}}
-                  {:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
-                   :venue_id 1 :venue {:vid 1 :name "office one"}}]))
+    (let [exp-time-1 (if on-postgres
+                       "2021-01-01T18:00:00"
+                       "2021-01-01 18:00:00")
+          exp-time-2 (if on-postgres
+                       "2021-01-12T18:00:00"
+                       "2021-01-12 18:00:00") ]
+      (testing "list entities with has-one param"
+        (test-gql  (str "{ meetups { id title start_at venue_id "
+                        "venue { vid name }}}")
+                   [:data :meetups]
+                   [{:id 1 :title "rust meetup" :start_at exp-time-1
+                     :venue_id 2 :venue {:vid 2 :name "city hall"}}
+                    {:id 2 :title "cpp meetup" :start_at exp-time-2
+                     :venue_id 1 :venue {:vid 1 :name "office one"}}]))
 
-    (testing "fetch entity with has-one param"
-      (test-gql  (str "{ meetups (where: {id: {eq: 1}}) "
-                      "{ id title start_at venue_id venue { vid name }}}")
-                 [:data :meetups]
-                 [{:id 1 :title "rust meetup" :start_at "2021-01-01 18:00:00"
-                   :venue_id 2 :venue {:vid 2 :name "city hall"}}])
-      (test-gql (str  "{ meetups (where: {id: {eq: 2}}) "
-                      "{ id title start_at venue_id venue { vid name }}}")
-                 [:data :meetups]
-                 [{:id 2 :title "cpp meetup" :start_at "2021-01-12 18:00:00"
-                   :venue_id 1 :venue {:vid 1 :name "office one"}}]))
+      (testing "fetch entity with has-one param"
+        (test-gql  (str "{ meetups (where: {id: {eq: 1}}) "
+                        "{ id title start_at venue_id venue { vid name }}}")
+                   [:data :meetups]
+                   [{:id 1 :title "rust meetup" :start_at exp-time-1
+                     :venue_id 2 :venue {:vid 2 :name "city hall"}}])
+        (test-gql (str  "{ meetups (where: {id: {eq: 2}}) "
+                        "{ id title start_at venue_id venue { vid name }}}")
+                  [:data :meetups]
+                  [{:id 2 :title "cpp meetup" :start_at exp-time-2
+                    :venue_id 1 :venue {:vid 1 :name "office one"}}])))
 
     (testing "list entities with has-many param"
       (test-gql (str "{ venues { vid name postal_code meetups { id title }}}")
@@ -174,7 +181,7 @@
                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}
                  {:email "yoshi@test.com"
                   :meetups_members [{:meetup {:id 1 :title "rust meetup"}}]}])
-      (test-gql (str "{ members { email meetups_members (offset: 1) "
+      (test-gql (str "{ members { email meetups_members (limit: 1, offset: 1) "
                      "{ meetup { id title }}}}")
                 [:data :members]
                 [{:email "jim@test.com"
@@ -182,7 +189,7 @@
                  {:email "yoshi@test.com"
                   :meetups_members []}])
       (test-gql (str "{ members { email meetups_members "
-                     "(sort: {meetup_id: desc}, offset: 1) "
+                     "(sort: {meetup_id: desc}, limit:1, offset: 1) "
                      "{ meetup { id title }}}}")
                 [:data :members]
                 [{:email "jim@test.com"
@@ -308,7 +315,7 @@
                  {:first_name "yoshi"
                   :member_follows_on_created_by []
                   :member_follows_on_created_by_aggregate
-                  {:count nil
+                  {:count 0
                    :max {:member_id nil :created_by nil}
                    :min {:member_id nil :created_by nil}}}])
       (test-gql (str  "{ members { first_name member_follows_on_member_id "
@@ -320,7 +327,7 @@
                 [{:first_name "jim"
                   :member_follows_on_member_id []
                   :member_follows_on_member_id_aggregate
-                  {:count nil
+                  {:count 0
                    :max {:member_id nil :created_by nil}
                    :min {:member_id nil :created_by nil}}}
                  {:first_name "yoshi"
@@ -438,12 +445,17 @@
 
     ;; Delete mutation
     (testing "delete entity"
-      (test-gql  "mutation {deleteMember (pk_columns: {id: 1}) { result }}"
-                 [:data :deleteMember :result]
+      (test-gql  "{ member_follows { member_id created_by}}"
+                 [:data :member_follows]
+                 [{:member_id 2 :created_by 1}
+                  {:member_id 1 :created_by 2}])
+      (test-gql  (str "mutation {deleteMemberFollow ("
+                      "pk_columns: {created_by: 1, member_id: 2}) { result }}")
+                 [:data :deleteMemberFollow :result]
                  true)
-      (test-gql  "{ members { id first_name }}"
-                 [:data :members]
-                 [{:id 2 :first_name "yoshi"}]))
+      (test-gql  "{ member_follows { member_id created_by}}"
+                 [:data :member_follows]
+                 [{:member_id 1 :created_by 2}]))
 
     ;; View query
     (testing "list meetups from view"
@@ -478,15 +490,21 @@
                 [:data :meetup_with_venues_aggregate]
                 {:min {:venue_id 1}}))))
 
+(deftest graphql-queries []
+  (if (test-core/postgres-testable?)
+    (do (run-graphql-tests (test-core/postgres-conn) true)
+        (run-graphql-tests (test-core/sqlite-conn) false))
+    (run-graphql-tests (test-core/sqlite-conn) false)))
+
 ;;; Testing signals
 
-(defn- change-where-from-ctx [sql-args ctx]
+(defn- change-where-from-ctx [selection ctx]
   ;; Apply filter with email from ctx
-  (update sql-args :where conj [:= :email (:email ctx)]))
+  (assoc-in selection [:arguments :where :email] {:eq (:email ctx)}))
 
 (defn- change-res-from-ctx [res ctx]
   ;; Replace first_name with one from ctx
-  [(assoc (first res) :first_name (:first-name ctx))])
+  (map #(assoc % :first_name (:first-name ctx)) res))
 
 (defn- change-arg-from-ctx [args ctx]
   ;; Replace email with one from ctx
@@ -507,8 +525,8 @@
 (defn- members-post-update [_args _ctx]
   {:result true})
 
-(deftest graphql-signals
-  (let [db (doto (sqlite-conn)
+(defn- run-graphql-signal-tests [db]
+  (let [db (doto db
              (jdbc/insert! :members {:email "jim@test.com"
                                      :first_name "jim"
                                      :last_name "smith"}))
@@ -523,9 +541,9 @@
                        :pks [{:name "id" :type "integer"}]}]
              :scan-tables false
              :use-aggregation true
-             :signal-ctx {:email "yoshi@test.com"
-                          :first-name "changed-first-name"}
-             :signals {:members {:query {:pre change-where-from-ctx
+             :signal-ctx {:email "context@test.com"
+                          :first-name "context-first-name"}
+             :signals {:members {:query {:pre [change-where-from-ctx]
                                          :post [change-res-from-ctx]}
                                  :create {:pre change-arg-from-ctx
                                           :post [change-id-to-count
@@ -545,10 +563,10 @@
                 [:data :createMember :id] 8))
 
     (testing "pre-create / post-query signal"
-      (test-gql  "{ members { id email first_name }}"
+      (test-gql  "{ members (where: {email: {eq: \"a\"}}) { id email first_name }}"
                  [:data :members]
-                 [{:id 2 :email "yoshi@test.com"
-                   :first_name "changed-first-name"}]))
+                 [{:id 2 :email "context@test.com"
+                   :first_name "context-first-name"}]))
 
     (testing "pre-update signal"
       (let [q (str "mutation { updateMember (pk_columns: {id: 2}"
@@ -559,11 +577,11 @@
         (is (= (:message (first (:errors res)))
                "These SQL clauses are unknown or have nil values: :set"))))))
 
-(deftest graphql-config
-  (let [db (if (env :test-on-postgres)
-             (postgres-conn)
-             (sqlite-conn))
-        opt {:db db
+(deftest graphql-signals
+  (run-graphql-signal-tests (test-core/sqlite-conn)))
+
+(defn- run-graphql-config-tests [db]
+  (let [opt {:db db
              :default-limit 2
              :max-nest-level 2}
         conf (ctx/options->config opt)
@@ -639,3 +657,6 @@
         (is (= (get-in res [:data :meetups]) nil))
         (is (= (:message (first (:errors res)))
                "Exceeded maximum nest level."))))))
+
+(deftest graphql-config
+  (run-graphql-config-tests (test-core/sqlite-conn)))
