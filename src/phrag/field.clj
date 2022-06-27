@@ -136,21 +136,16 @@
    "time with time zone" :StrWhere
    "boolean" :BoolWhere})
 
-(defn- clause-fields [table]
+(defn- clause-fields [table clause-key]
   (reduce (fn [m col]
             (let [col-name (:name col)
                   col-key (keyword col-name)
                   input-type (get flt-input-types (:type col))
                   field {:type input-type}]
               (assoc m col-key field)))
-          {} (:columns table)))
-
-;; Where Fields
-
-(defn- where-fields [table rsc-cls-key]
-  (-> (clause-fields table)
-      (assoc :and {:type `(~'list ~rsc-cls-key)})
-      (assoc :or {:type `(~'list ~rsc-cls-key)})))
+          {:and {:type `(~'list ~clause-key)}
+           :or {:type `(~'list ~clause-key)}}
+          (:columns table)))
 
 ;; Sort Fields
 
@@ -182,8 +177,7 @@
   (let [rsc-fields (rsc-fields table)
         pk-fields (pk-fields pk-keys rsc-fields)]
     {:rsc rsc-fields
-     :clauses (clause-fields table)
-     :where (where-fields table (:clauses lcn-keys))
+     :clauses (clause-fields table (:clauses lcn-keys))
      :sort (sort-fields table)
      :fields rsc-fields
      :aggregate (aggr-fields (:fields lcn-keys))

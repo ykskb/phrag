@@ -53,24 +53,23 @@
    :in :in
    :like :like})
 
-(defn- parse-rsc-where [table-key rsc-where]
-  (map (fn [[col v]]
-         (let [entry (first v)
-               op ((key entry) where-ops)]
-           [op (column-path-key table-key col) (val entry)]))
-       rsc-where))
-
-(defn- parse-and-or [table-key op where-list]
-  (concat [op] (reduce (fn [v whr]
-                         (concat v (parse-rsc-where table-key whr)))
-                       []
-                       where-list)))
+(defn- format-where [table-key where-map]
+  (reduce (fn [v [col entry]]
+            (conj v (cond
+                      (= col :and)
+                      (into [:and] (map #(format-where table-key %) entry))
+                      (= col :or)
+                      (into [:or] (map #(format-where table-key %) entry))
+                      :else
+                      (let [entry (first entry) ;; to MapEntry
+                            op ((key entry) where-ops)
+                            col-path (column-path-key table-key col)]
+                        [op col-path (val entry)]))))
+          nil
+          where-map))
 
 (defn- apply-where [q table-key whr]
-  (apply h/where q
-         (cond-> (parse-rsc-where table-key (dissoc whr :and :or))
-           (some? (:or whr)) (conj (parse-and-or table-key :or (:or whr)))
-           (some? (:and whr)) (conj (parse-and-or table-key :and (:and whr))))))
+  (apply h/where q (format-where table-key whr)))
 
 (defn- apply-sort [q arg]
   (apply h/order-by q (reduce-kv (fn [vec col direc]
@@ -100,6 +99,7 @@
 ;; Query handling
 
 (defn ^:no-doc exec-query [db q]
+  (prn q)
   (jdbc/with-db-connection [conn db]
     (jdbc/query conn q)))
 

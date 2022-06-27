@@ -402,6 +402,22 @@
                 [:data :members]
                 [{:id 2 :last_name "tanabe"}]))
 
+    (testing "list entity with nested OR group"
+      (test-gql (str "{ members (where: "
+                     "{ or: ["
+                     "    {and: [{id: {eq: 1}}, {first_name: {eq: \"yoshi\"}}]}"
+                     "    {and: [{id: {eq: 2}}, {first_name: {eq: \"yoshi\"}}]}"
+                     "  ]}) { id last_name }}")
+                [:data :members]
+                [{:id 2 :last_name "tanabe"}])
+      (test-gql (str "{ members (where: "
+                     "{ or: ["
+                     "    {and: [{id: {eq: 1}}, {first_name: {eq: \"yoshi\"}}]}"
+                     "    {and: [{id: {eq: 2}}, {first_name: {eq: \"unknown\"}}]}"
+                     "  ]}) { id last_name }}")
+                [:data :members]
+                []))
+
     (testing "fetch entity with has-many param filtered with where"
       (test-gql (str "{ venues (where: {vid: {eq: 1}}) "
                      "{ name postal_code meetups { id title }}}")

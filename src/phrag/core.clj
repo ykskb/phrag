@@ -17,30 +17,29 @@
 
 (defn- assoc-queries [schema table-key table]
   (let [{{:keys [queries]} :lcn-qry-keys
-         {:keys [rsc where sort]} :lcn-obj-keys
+         {:keys [rsc clauses sort]} :lcn-obj-keys
          {:keys [query]} :lcn-descs} table]
     (assoc-in schema [:queries queries]
               {:type `(~'list ~rsc)
                :description query
-               :args {:where {:type where}
+               :args {:where {:type clauses}
                       :sort {:type sort}
                       :limit {:type 'Int}
                       :offset {:type 'Int}}
                :resolve (partial rslv/resolve-query table-key)})))
 
 (defn- assoc-aggregation [schema table-key table]
-  (let [{{:keys [aggregate where]} :lcn-obj-keys} table]
+  (let [{{:keys [aggregate clauses]} :lcn-obj-keys} table]
     (assoc-in schema [:queries (get-in table [:lcn-qry-keys :aggregate])]
               {:type aggregate
                :description (get-in table [:lcn-descs :aggregate])
-               :args {:where {:type where}}
+               :args {:where {:type clauses}}
                :resolve (partial rslv/aggregate-root table-key)})))
 
 (defn- assoc-query-objects [schema table-key table config]
   (let [entity-schema (-> schema
                           (assoc-object table :objects :rsc)
                           (assoc-object table :input-objects :clauses)
-                          (assoc-object table :input-objects :where)
                           (assoc-object table :input-objects :sort)
                           (assoc-queries table-key table))]
     (if (:use-aggregation config)
@@ -99,10 +98,10 @@
   "Updates fk-destination object with a has-many resource field."
   [schema table fk]
   (let [{{:keys [to has-many]} :field-keys} fk
-        {{:keys [rsc where sort]} :lcn-obj-keys} table]
+        {{:keys [rsc clauses sort]} :lcn-obj-keys} table]
     (assoc-in schema [:objects to :fields has-many]
               {:type `(~'list ~rsc)
-               :args {:where {:type where}
+               :args {:where {:type clauses}
                       :sort {:type sort}
                       :limit {:type 'Int}
                       :offset {:type 'Int}}})))
@@ -111,10 +110,10 @@
   "Updates fk-destination object with a has-many aggregation field."
   [schema table fk]
   (let [{{:keys [to has-many-aggr]} :field-keys} fk
-        {{:keys [aggregate where]} :lcn-obj-keys} table]
+        {{:keys [aggregate clauses]} :lcn-obj-keys} table]
     (assoc-in schema [:objects to :fields has-many-aggr]
               {:type aggregate
-               :args {:where {:type where}}})))
+               :args {:where {:type clauses}}})))
 
 ;;; GraphQL schema
 
