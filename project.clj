@@ -1,4 +1,4 @@
-(defproject com.github.ykskb/phrag "0.4.3"
+(defproject com.github.ykskb/phrag "0.4.4"
   :description "GraphQL from a DB connection"
   :url "https://github.com/ykskb/phrag"
   :min-lein-version "2.0.0"
