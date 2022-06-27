@@ -37,7 +37,8 @@
 
 (defn- compile-query [nest-level table-key selection ctx]
   (let [nest-fks (get-in ctx [:relation-ctx :nest-fks table-key])
-        max-nest (:max-nest-level ctx)]
+        max-nest (:max-nest-level ctx)
+        selection (core/signal selection table-key :query :pre ctx)]
     (reduce
      (fn [q slct]
        (let [field-key (get-in slct [:field-definition :field-name])]
