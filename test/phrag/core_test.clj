@@ -124,10 +124,11 @@
 
 (def ^:private sqlite-members-table
   (str "CREATE TABLE members ("
-       "id               integer primary key, "
-       "first_name       text, "
-       "last_name        text, "
-       "email            text);"))
+       ;; Column types in capital
+       "id               INTEGER PRIMARY KEY, "
+       "first_name       TEXT, "
+       "last_name        TEXT, "
+       "email            TEXT);"))
 
 (def ^:private sqlite-groups-table
   (str "CREATE TABLE groups ("

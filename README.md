@@ -2,7 +2,7 @@
 
 **GraphQL from a RDBMS Connection**
 
-Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an instant and flexible data accesses with customization options.
+Phrag implements its [approach](docs/mechanism.md) to GraphQL on RDBMS for an instant and flexible data accesses with customization options.
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
@@ -15,6 +15,8 @@ Phrag implements [its approach](docs/mechanism.md) to GraphQL on RDBMS for an in
 - **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
 - **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per an operation type & table. It can make a GraphQL service more practical with access controls, event firing and more.
+
+- **Practicality Checked:** Phrag was developed together with a [POC project](#poc-project) to verify its concept and practicality. The project leverages Phrag's full features and makes a decent example of usage.
 
 ## Requirements
 
@@ -35,6 +37,8 @@ Though there are multiple ways to run, Phrag only requires an RDBMS to create it
 > - Not all database column types are mapped to Phrag's GraphQL fields yet. Any help would be appreciated through issues and PRs.
 
 ## Usage
+
+### Clojure Project
 
 Phrag's GraphQL can be created with `phrag.core/schema` function and invoked through `phrag.core/exec` function:
 
@@ -58,7 +62,7 @@ There is also a support for creating Phrag's GraphQL as a route for [reitit](htt
 >
 > Database (`:db`) is the only required parameter in `config`, but there are many more configurable options. Please refer to [configuration doc](docs/config.md) for details.
 
-## Stand-alone Version
+### Stand-alone Releases
 
 There is a stand-alone version of Phrag which is runnable as a Docker container or Java process with a single command. It's suitable if Phrag's GraphQL is desired without any custom logic or if one wants to play around with it. [Here](https://github.com/ykskb/phrag-standalone) is the repository of those artifacts for more details.
 
@@ -93,9 +97,9 @@ ykskb/phrag-standalone:latest
 
 - [Development](docs/development.md)
 
-### Example projects:
+### POC Project:
 
-- [SNS](https://github.com/ykskb/situated-sns-backend): a situated project to verify Phrag's concept and practicality. It has authentication, access control and custom logics through Phrag's interceptors.
+- [SNS](https://github.com/ykskb/situated-sns-backend): a situated project of Twitter mock to verify Phrag's concept and practicality. It has authentication, access control and custom logics through Phrag's interceptors, leveraging Phrag's GraphQL for queries with many nests and conditions.
 
 ## Contribution to Phrag
 

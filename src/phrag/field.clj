@@ -1,6 +1,7 @@
 (ns phrag.field
   "Lacinia fields for a context of Phrag's schema."
-  (:require [camel-snake-kebab.core :as csk]
+  (:require [clojure.string :as s]
+            [camel-snake-kebab.core :as csk]
             [inflections.core :as inf]))
 
 ;;; Descriptions
@@ -92,7 +93,7 @@
   (reduce (fn [m col]
             (let [col-name (:name col)
                   col-key (keyword col-name)
-                  col-type (get field-types (:type col))
+                  col-type (get field-types (s/lower-case (:type col)))
                   field (if (needs-non-null? col)
                           {:type `(~'non-null ~col-type)}
                           {:type col-type})]
@@ -140,7 +141,7 @@
   (reduce (fn [m col]
             (let [col-name (:name col)
                   col-key (keyword col-name)
-                  input-type (get flt-input-types (:type col))
+                  input-type (get flt-input-types (s/lower-case (:type col)))
                   field {:type input-type}]
               (assoc m col-key field)))
           {:and {:type `(~'list ~clause-key)}

@@ -40,12 +40,13 @@
 
 (def ^:private members
   {:name "members"
-   :columns [{:name "id" :type "integer"}
-             {:name "first_name" :type "text"}
-             {:name "last_name" :type "text"}
-             {:name "email" :type "text"}]
+   ;; Column type info in capital.
+   :columns [{:name "id" :type "INTEGER"}
+             {:name "first_name" :type "TEXT"}
+             {:name "last_name" :type "TEXT"}
+             {:name "email" :type "TEXT"}]
    :fks []
-   :pks [{:name "id" :type "integer"}]})
+   :pks [{:name "id" :type "INTEGER"}]})
 
 (def ^:private groups
   {:name "groups"
