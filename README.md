@@ -1,16 +1,14 @@
 # Phrag
 
-**GraphQL from a RDBMS Connection**
+**GraphQL from an RDBMS Connection**
 
-Phrag implements its [approach](docs/mechanism.md) to GraphQL on RDBMS for an instant and flexible data accesses with customization options.
+Phrag implements its [approach](docs/mechanism.md) to creating GraphQL from an RDBMS connection for instant and flexible data accesses with customization options.
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
-**TLDR:** here's a [demo](https://phrag-standalone-lr6v6b2tza-uc.a.run.app/graphiql/index.html) of Phrag's GraphQL running on GCP Cloud Run. You can see and try what Phrag creates simply from a database of this [schema](https://github.com/ykskb/phrag-standalone/blob/main/db/meetup_project.sql).
-
 ## Overview
 
-- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, retrieving schema data of tables, columns, and primary / foreign keys. It can be run as a Clojure project or [stand-alone releases](#stand-alone-releases).
+- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, retrieving schema data of tables, columns, primary keys and foreign keys. It can be run as a Clojure project or [stand-alone releases](#stand-alone-releases).
 
 - **CRUD Features:** tables and/or views become queryable as root objects including nested objects of [n-ary relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
@@ -20,9 +18,13 @@ Phrag implements its [approach](docs/mechanism.md) to GraphQL on RDBMS for an in
 
 - **Practicality Tested:** Phrag was developed side by side with a [POC project](#poc-project) to verify its concept and validate the practicality.
 
+> **Demo:**
+>
+> [Here](https://phrag-standalone-lr6v6b2tza-uc.a.run.app/graphiql/index.html) is a live demo of Phrag's GraphQL connecting to a DB of this [schema](https://github.com/ykskb/phrag-standalone/blob/main/db/meetup_project.sql). You can see and try what Phrag creates merely from a database provided.
+
 ## Requirements
 
-Though there are multiple ways to run, Phrag only requires an RDBMS to create its GraphQL. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
+Phrag only requires an RDBMS to create its GraphQL. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
 
 - **Primary keys:** Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
 
