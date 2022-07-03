@@ -1,26 +1,26 @@
 # Phrag
 
-**GraphQL from an RDBMS Connection**
+**GraphQL API from an RDBMS Connection**
 
-Phrag implements its [approach](docs/mechanism.md) to creating GraphQL from an RDBMS connection for instant and flexible data accesses with customization options.
+Phrag implements its [approach](docs/mechanism.md) to creating GraphQL from an RDBMS connection for instant, flexible and customizable CRUD operations.
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
+> **TLDR:**
+>
+> [Here](https://phrag-standalone-lr6v6b2tza-uc.a.run.app/graphiql/index.html) is a live demo of Phrag's GraphQL connecting to a DB of this [schema](https://github.com/ykskb/phrag-standalone/blob/main/db/meetup_project.sql). You can try what Phrag creates just from a database provided.
+
 ## Overview
 
-- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, retrieving schema data of tables, columns, primary keys and foreign keys. It can be run as a Clojure project or [stand-alone releases](#stand-alone-releases).
+- **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, retrieving schema data of tables, columns, primary keys and foreign keys. It can run as part of a Clojure project or [stand-alone releases](#stand-alone-releases).
 
 - **CRUD Features:** tables and/or views become queryable as root objects including nested objects of [n-ary relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
-- **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
-
 - **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per an operation type & table. It can make a GraphQL service more practical with access controls, event firing and more.
 
-- **Practicality Tested:** Phrag was developed side by side with a [POC project](#poc-project) to verify its concept and validate the practicality.
+- **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
-> **Demo:**
->
-> [Here](https://phrag-standalone-lr6v6b2tza-uc.a.run.app/graphiql/index.html) is a live demo of Phrag's GraphQL connecting to a DB of this [schema](https://github.com/ykskb/phrag-standalone/blob/main/db/meetup_project.sql). You can see and try what Phrag creates merely from a database provided.
+- **Practicality in Mind:** Phrag was developed side by side with a [POC project](#poc-project) to verify its concept and validate the practicality.
 
 ## Requirements
 

@@ -1,16 +1,16 @@
 # Mechanism
 
-There are several projects out there for GraphQL automation on RDBMS. Among them, Phrag focuses on keeping itself minimal and not-overly-complicated while providing decent CRUD capabilities.
+There are several projects out there for GraphQL automation on RDBMS. Among them, Phrag focuses on keeping itself simple while providing full CRUD capabilities from a DB provided.
 
 ## Database
 
-Phrag creates its GraphQL engine from an existing RDBMS. It does not deal with DB management such as model definitions or migrations.
+Phrag creates its GraphQL API from an existing RDBMS. It does not deal with DB management such as model definitions or migrations.
 
 ## Queries
 
 All or selected tables / views become queryable as root objects including nested objects of n-ary relationships in Phrag. This is for flexible data accesses without being constrained to certain query structures defined in GraphQL schema. Data can be accessed at the root level or as a nested object together with parent objects through the relationships.
 
-In terms of query format, Phrag does not use a [cursor connection](https://relay.dev/graphql/connections.htm). This is an intentional design decision since Phrag features universal argument formats across root level and nested objects for filtering, aggregation and pagination.
+In terms of query format, Phrag does not use a [cursor connection](https://relay.dev/graphql/connections.htm). This is an intentional design decision since Phrag features a universal argument format across root level and nested objects for filtering, aggregation and pagination.
 
 ### Relationships
 

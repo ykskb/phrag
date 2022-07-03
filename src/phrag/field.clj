@@ -8,12 +8,9 @@
 
 (def ^:private clause-desc
   (str "Format for where clauses is {column: {operator: value}}. "
-       "Multiple parameters are applied with `AND` operators."))
-
-(def ^:private where-desc
-  (str "AND / OR groups can be created as clause lists in "
-       "\"and\" / \"or\" parameter under \"where\". "
-       "Multiple parameters are applied with `AND` operators."))
+       "Multiple parameters are applied with `AND` operators. "
+       "`AND`/`OR` conditions can be created as a list of clauses. "
+       "It is possible to nest them to create sub groups of conditions."))
 
 (def ^:private sort-desc
   (str "Sort format is {column: \"asc\" or \"desc\"}."))
@@ -27,7 +24,6 @@
     {:rsc rsc-name
      :query (str "Query " rsc-name ".")
      :clauses clause-desc
-     :where where-desc
      :sort sort-desc
      :fields (str rsc-name "fields for aggregation.")
      :aggregate (str "Aggrecate " rsc-name ".")
