@@ -52,4 +52,4 @@ By default, Phrag retrieves DB schema data from a DB connection and it is suffic
 > Notes:
 >
 > - When `:scan-schema` is `false`, Phrag will construct GraphQL from the provided table data only.
-> - When `:scan-schema` is `true`, provided table data will override scanned table data per table property: `:name`, `:table-type`, `:columns`, `:fks` and `:pks`.
+> - When `:scan-schema` is `true`, provided table data will override scanned table data per table property: `:name`, `:columns`, `:fks` and `:pks`.

@@ -16,7 +16,7 @@ Phrag implements its [approach](docs/mechanism.md) to creating GraphQL from an R
 
 - **CRUD Features:** tables and/or views become queryable as root objects including nested objects of [n-ary relationships](docs/mechanism.md#relationships) with [aggregation](docs/sql_feature.md#aggregation), [filter](docs/sql_feature.md#filtering), [sorting](docs/sql_feature.md#sorting) and [pagination](docs/sql_feature.md#pagination) supported. [Mutations](docs/mechanism.md#mutations) (`create`, `update` and `delete`) are also created per table.
 
-- **Customization:** Phrag comes with an [interceptor capability](#interceptor-signals) to customize behaviors of GraphQL. Custom functions can be configured before & after database accesses per an operation type & table. It can make a GraphQL service more practical with access controls, event firing and more.
+- **Customization:** Phrag comes with an [interceptor capability](docs/interceptor.md) to customize behaviors of GraphQL. Custom functions can be configured per table & operation type and at pre/post DB operations. It can make a GraphQL service more practical with access controls, event firing and more.
 
 - **Performance in Mind:** Phrag's query resolver translates a nested object query into a single SQL query, leveraging correlated subqueries and JSON functions. [Load tests](docs/performance.md) have also been performed to verify it scales linear with resources without obvious bottlenecks.
 
@@ -24,7 +24,7 @@ Phrag implements its [approach](docs/mechanism.md) to creating GraphQL from an R
 
 ## Requirements
 
-Phrag only requires an RDBMS to create its GraphQL. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
+Phrag only requires an RDBMS to create its GraphQL API. Here's a quick view of database constructs that are important for Phrag. Detailed mechanism is explained [here](docs/mechanism.md).
 
 - **Primary keys:** Phrag uses primary keys as identifiers of GraphQL mutations. Composite primary key is supported.
 
