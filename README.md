@@ -6,10 +6,6 @@ Phrag implements its [approach](docs/mechanism.md) to creating GraphQL from an R
 
 ![main](https://github.com/ykskb/phrag/actions/workflows/test.yml/badge.svg) [![Clojars Project](https://img.shields.io/clojars/v/com.github.ykskb/phrag.svg)](https://clojars.org/com.github.ykskb/phrag) [![cljdoc badge](https://cljdoc.org/badge/com.github.ykskb/phrag)](https://cljdoc.org/d/com.github.ykskb/phrag)
 
-> **TLDR:**
->
-> [Here](https://phrag-standalone-lr6v6b2tza-uc.a.run.app/graphiql/index.html) is a live demo of Phrag's GraphQL connecting to a DB of this [schema](https://github.com/ykskb/phrag-standalone/blob/main/db/meetup_project.sql). You can try what Phrag creates just from a database provided.
-
 ## Overview
 
 - **Instantly Operational:** Phrag creates a GraphQL simply from a RDBMS connection, retrieving schema data of tables, columns, primary keys and foreign keys. It can run as part of a Clojure project or [stand-alone releases](#stand-alone-releases).
